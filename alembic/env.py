@@ -25,6 +25,7 @@ config.set_main_option("sqlalchemy.url", settings.POSTGRES_URI)
 # Define target metadata
 target_metadata = Base.metadata
 
+
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -50,6 +51,7 @@ def run_migrations_online() -> None:
         )
         with context.begin_transaction():
             context.run_migrations()
+
 
 if context.is_offline_mode():
     run_migrations_offline()

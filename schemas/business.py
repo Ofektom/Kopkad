@@ -2,9 +2,11 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 
+
 class BusinessCreate(BaseModel):
     name: str
     location: Optional[str] = None
+
 
 class BusinessResponse(BaseModel):
     id: int
@@ -12,7 +14,7 @@ class BusinessResponse(BaseModel):
     location: Optional[str]
     unique_code: str
     created_at: datetime
-    delivery_status: str
+    delivery_status: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True

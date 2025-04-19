@@ -5,6 +5,7 @@ Revises: eb7ce62356d5
 Create Date: 2025-03-19 08:35:09.368741
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -12,8 +13,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '9b904b1e7f74'
-down_revision: Union[str, None] = 'eb7ce62356d5'
+revision: str = "9b904b1e7f74"
+down_revision: Union[str, None] = "eb7ce62356d5"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -33,7 +34,8 @@ def downgrade() -> None:
     # 4. Create a new ENUM without create_customer
     # 5. Convert the column back
     # 6. Drop the temporary ENUM
-    op.execute("""
+    op.execute(
+        """
         DO $$
         BEGIN
             IF EXISTS (
@@ -63,4 +65,5 @@ def downgrade() -> None:
             DROP TYPE permission_old;
         END
         $$;
-    """)
+    """
+    )

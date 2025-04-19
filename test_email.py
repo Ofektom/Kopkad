@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+
 async def test_email():
     # Retrieve SMTP settings from environment variables
     smtp_host = os.getenv("SMTP_HOST")
@@ -30,7 +31,7 @@ async def test_email():
     message["To"] = smtp_username  # Sending to self for testing
     message["Subject"] = "Test Email"
     message.set_content("<h1>Hello, this is a test!</h1>", subtype="html")
-    
+
     try:
         response = await aiosmtplib.send(
             message,
@@ -44,6 +45,7 @@ async def test_email():
         print(f"Success: {response}")
     except Exception as e:
         print(f"Error: {str(e)}")
+
 
 if __name__ == "__main__":
     asyncio.run(test_email())

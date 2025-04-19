@@ -7,6 +7,7 @@ from utils.auth import hash_password
 from sqlalchemy.sql import insert
 from datetime import datetime, timezone
 
+
 def bootstrap_super_admin(db: Session):
     """Bootstrap the SUPER_ADMIN user and default business if not already seeded."""
     print("Starting SUPER_ADMIN bootstrap process...")
@@ -27,7 +28,7 @@ def bootstrap_super_admin(db: Session):
         role=Role.SUPER_ADMIN,
         is_active=True,
         created_by=None,
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(timezone.utc),
     )
     db.add(super_admin)
     db.commit()
@@ -38,7 +39,9 @@ def bootstrap_super_admin(db: Session):
     db.commit()
 
     # Create default business (Central)
-    central_business = db.query(Business).filter(Business.unique_code == "CEN123").first()
+    central_business = (
+        db.query(Business).filter(Business.unique_code == "CEN123").first()
+    )
     if not central_business:
         central_business = Business(
             name="Central",
@@ -46,19 +49,27 @@ def bootstrap_super_admin(db: Session):
             unique_code="CEN123",
             is_default=True,
             created_by=super_admin.id,
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc),
         )
         db.add(central_business)
         db.commit()
         db.refresh(central_business)
 
     # Link SUPER_ADMIN to Central business
-    existing_link = db.query(user_business).filter(
-        user_business.c.user_id == super_admin.id,
-        user_business.c.business_id == central_business.id
-    ).first()
+    existing_link = (
+        db.query(user_business)
+        .filter(
+            user_business.c.user_id == super_admin.id,
+            user_business.c.business_id == central_business.id,
+        )
+        .first()
+    )
     if not existing_link:
-        db.execute(insert(user_business).values(user_id=super_admin.id, business_id=central_business.id))
+        db.execute(
+            insert(user_business).values(
+                user_id=super_admin.id, business_id=central_business.id
+            )
+        )
         db.commit()
 
     # Create settings for SUPER_ADMIN
@@ -68,18 +79,23 @@ def bootstrap_super_admin(db: Session):
             user_id=super_admin.id,
             notification_method=NotificationMethod.BOTH,
             created_by=super_admin.id,
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc),
         )
         db.add(settings)
         db.commit()
 
     # Assign permissions to SUPER_ADMIN
-    existing_perms = {row.permission for row in db.query(user_permissions).filter(user_permissions.c.user_id == super_admin.id).all()}
+    existing_perms = {
+        row.permission
+        for row in db.query(user_permissions)
+        .filter(user_permissions.c.user_id == super_admin.id)
+        .all()
+    }
     required_perms = {
         Permission.CREATE_ADMIN,
         Permission.CREATE_AGENT,
         Permission.ASSIGN_BUSINESS,
-        Permission.CREATE_CUSTOMER  # Add new permission here
+        Permission.CREATE_CUSTOMER,  # Add new permission here
     }
     if not existing_perms.issuperset(required_perms):
         permissions_to_add = [
@@ -89,4 +105,6 @@ def bootstrap_super_admin(db: Session):
         db.execute(insert(user_permissions).values(permissions_to_add))
         db.commit()
 
-    print(f"SUPER_ADMIN seeded with ID {super_admin.id} and linked to business 'CEN123'.")
+    print(
+        f"SUPER_ADMIN seeded with ID {super_admin.id} and linked to business 'CEN123'."
+    )

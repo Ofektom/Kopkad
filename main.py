@@ -3,11 +3,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.user import user_router
 from api.business import business_router
-# from api.savings import savings_router
+from api.savings import savings_router
+
 # from api.deposits import deposit_router
 # from api.expenses import expense_router
 # from api.analytics import analytics_router
-# from api.payments import payment_router
+from api.payments import payment_router
+
 # from api.notifications import notification_router
 from middleware.auth import AuditMiddleware
 from database.postgres import engine, Base, get_db
@@ -33,12 +35,13 @@ app.add_middleware(
 # Routers
 app.include_router(user_router, prefix="/api/v1")
 app.include_router(business_router, prefix="/api/v1")
-# app.include_router(savings_router, prefix="/api/v1")
+app.include_router(savings_router, prefix="/api/v1")
 # app.include_router(deposit_router, prefix="/api/v1")
 # app.include_router(expense_router, prefix="/api/v1")
 # app.include_router(analytics_router, prefix="/api/v1")
-# app.include_router(payment_router, prefix="/api/v1")
+app.include_router(payment_router, prefix="/api/v1")
 # app.include_router(notification_router, prefix="/api/v1")
+
 
 # Startup event to bootstrap SUPER_ADMIN
 @app.on_event("startup")
@@ -54,10 +57,13 @@ def on_startup():
         db.close()
         print("Startup process completed.")
 
+
 @app.get("/")
 def read_root():
     return {"Hello": "Welcome to Kopkad"}
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
