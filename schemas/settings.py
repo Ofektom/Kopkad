@@ -13,4 +13,4 @@ class SettingsResponse(BaseModel):
     notification_method: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
