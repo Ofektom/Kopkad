@@ -19,7 +19,6 @@ depends_on = None
 # Define enums
 savings_type_enum = ENUM("daily", "target", name="savingstype", create_type=False)
 
-
 def upgrade() -> None:
     """Upgrade schema."""
     # Create savings_type enum if it doesn’t exist
@@ -102,14 +101,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("savings_account_id", "marked_date", name="unique_marking"),
     )
 
-    # Update permission enum by checking existing values
-    existing_permissions = (
-        op.get_bind()
-        .execute(text("SELECT unnest(enum_range(NULL::permission))"))
-        .fetchall()
-    )
-    existing_values = {row[0] for row in existing_permissions}
-
+    # Add new permissions to the permission enum without querying existing values
     new_permissions = [
         "create_savings",
         "reinitiate_savings",
@@ -119,9 +111,7 @@ def upgrade() -> None:
     ]
 
     for perm in new_permissions:
-        if perm not in existing_values:
-            op.execute(text(f"ALTER TYPE permission ADD VALUE '{perm}'"))
-
+        op.execute(text(f"ALTER TYPE permission ADD VALUE '{perm}'"))
 
 def downgrade() -> None:
     """Downgrade schema."""

@@ -44,6 +44,7 @@ def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+    print(f"Connecting to database: {config.get_main_option('sqlalchemy.url')}")
     with connectable.connect() as connection:
         context.configure(
             connection=connection,
