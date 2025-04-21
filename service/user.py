@@ -391,11 +391,7 @@ async def login(request: LoginRequest, db: Session):
         .filter(user_business.c.user_id == user.id)
         .all()
     )
-    if not businesses:
-        return error_response(
-            status_code=403,
-            message="User must be associated with at least one business",
-        )
+    business_response = [BusinessResponse.model_validate(business) for business in businesses] if businesses else []
 
     access_token = create_access_token(
         data={"sub": user.username, "role": user.role, "user_id": user.id}
@@ -405,7 +401,7 @@ async def login(request: LoginRequest, db: Session):
         phone_number=user.phone_number,
         email=user.email,
         role=user.role,
-        businesses=[BusinessResponse.model_validate(business) for business in businesses],
+        businesses=business_response,
         created_at=user.created_at,
         access_token=access_token,
         next_action="choose_action",
