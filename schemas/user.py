@@ -6,7 +6,7 @@ from schemas.business import BusinessResponse
 
 class SignupRequest(BaseModel):
     phone_number: str
-    pin: str = Field(..., pattern=r"^\d{5}$")  # 5-digit numeric pin constraint
+    pin: str = Field(..., pattern=r"^\d{5}$")
     role: str
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None

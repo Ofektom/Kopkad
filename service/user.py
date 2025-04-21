@@ -1,4 +1,3 @@
-
 from fastapi import status
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import insert
@@ -29,7 +28,6 @@ import logging
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 async def signup_unauthenticated(request: SignupRequest, db: Session):
     """Handle unauthenticated signup for CUSTOMER and AGENT with optional business_code."""
@@ -73,8 +71,12 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
             status_code=status.HTTP_409_CONFLICT,
             message="Username (derived from phone number) already in use",
         )
-    if not request.full_name:
-        return error_response(status_code=400, message="Full name is required")
+    # Check if email is unique if provided
+    if request.email and db.query(User).filter(User.email == request.email).first():
+        return error_response(
+            status_code=status.HTTP_409_CONFLICT,
+            message="Email already in use",
+        )
 
     if requested_role == Role.AGENT and request.business_code:
         return error_response(
@@ -92,6 +94,22 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
             )
             if not business:
                 return error_response(status_code=404, message="Invalid business code")
+            # Check if the user is already associated with this business
+            existing_user = db.query(User).filter(User.phone_number == phone_number).first()
+            if existing_user:
+                business_association = (
+                    db.query(user_business)
+                    .filter(
+                        user_business.c.user_id == existing_user.id,
+                        user_business.c.business_id == business.id
+                    )
+                    .first()
+                )
+                if business_association:
+                    return error_response(
+                        status_code=status.HTTP_409_CONFLICT,
+                        message="User is already registered with this business",
+                    )
         else:
             business = (
                 db.query(Business).filter(Business.unique_code == "CEN123").first()
@@ -103,8 +121,11 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
                 )
 
     try:
+        # Set a default full_name if not provided
+        full_name = request.full_name if request.full_name else "No Name"
+
         user = User(
-            full_name=request.full_name,
+            full_name=full_name,
             phone_number=phone_number,
             email=request.email,
             username=phone_number,
@@ -176,7 +197,7 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
             phone_number=user.phone_number,
             email=user.email,
             role=user.role,
-            businesses=businesses,  # Pass the list of BusinessResponse objects
+            businesses=businesses,
             created_at=user.created_at,
             access_token=access_token,
             next_action="choose_action",
@@ -245,8 +266,12 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
             status_code=status.HTTP_409_CONFLICT,
             message="Username (derived from phone number) already in use",
         )
-    if not request.full_name:
-        return error_response(status_code=400, message="Full name is required")
+    # Check if email is unique if provided
+    if request.email and db.query(User).filter(User.email == request.email).first():
+        return error_response(
+            status_code=status.HTTP_409_CONFLICT,
+            message="Email already in use",
+        )
 
     business = None
     if current_user_role == Role.AGENT:
@@ -267,9 +292,29 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
                 status_code=500, message="Default business CEN123 not found in database"
             )
 
+    # Check if the user is already associated with this business
+    existing_user = db.query(User).filter(User.phone_number == phone_number).first()
+    if existing_user:
+        business_association = (
+            db.query(user_business)
+            .filter(
+                user_business.c.user_id == existing_user.id,
+                user_business.c.business_id == business.id
+            )
+            .first()
+        )
+        if business_association:
+            return error_response(
+                status_code=status.HTTP_409_CONFLICT,
+                message="User is already registered with this business",
+            )
+
     try:
+        # Set a default full_name if not provided
+        full_name = request.full_name if request.full_name else "No Name"
+
         user = User(
-            full_name=request.full_name,
+            full_name=full_name,
             phone_number=phone_number,
             email=request.email,
             username=phone_number,
@@ -346,7 +391,7 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
             phone_number=user.phone_number,
             email=user.email,
             role=user.role,
-            businesses=businesses,  # Pass the list of BusinessResponse objects
+            businesses=businesses,
             created_at=user.created_at,
             access_token=access_token,
             next_action="choose_action",
@@ -391,7 +436,9 @@ async def login(request: LoginRequest, db: Session):
         .filter(user_business.c.user_id == user.id)
         .all()
     )
-    business_response = [BusinessResponse.model_validate(business) for business in businesses] if businesses else []
+
+    # Convert businesses to BusinessResponse objects, default to empty list if none found
+    business_responses = [BusinessResponse.model_validate(business) for business in businesses] if businesses else []
 
     access_token = create_access_token(
         data={"sub": user.username, "role": user.role, "user_id": user.id}
@@ -401,7 +448,7 @@ async def login(request: LoginRequest, db: Session):
         phone_number=user.phone_number,
         email=user.email,
         role=user.role,
-        businesses=business_response,
+        businesses=business_responses,
         created_at=user.created_at,
         access_token=access_token,
         next_action="choose_action",
