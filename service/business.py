@@ -1,9 +1,8 @@
-# service/business.py
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import insert
 from models.business import Business, PendingBusinessRequest
 from models.user_business import user_business
-from models.user import User, Role
+from models.user import User, Role, Permission
 from utils.response import success_response, error_response
 from schemas.business import BusinessCreate, BusinessResponse
 from datetime import datetime, timezone
@@ -17,9 +16,14 @@ from utils.email_service import (
 )
 from config.settings import settings
 
+def has_permission(user: User, permission: str, db: Session) -> bool:
+    return permission in user.permissions
 
 async def create_business(request: BusinessCreate, current_user: dict, db: Session):
     """Create a business, only allowed by AGENT."""
+    current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not has_permission(current_user_obj, Permission.CREATE_BUSINESS, db):
+        return error_response(status_code=403, message="No permission to create business")
     if current_user["role"] != Role.AGENT:
         return error_response(
             status_code=403, message="Only AGENT can create businesses"
@@ -102,6 +106,9 @@ async def add_customer_to_business(
     customer_phone: str, business_unique_code: str, current_user: dict, db: Session
 ):
     """Add an existing customer to a business for AGENT or SUB_AGENT."""
+    current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not has_permission(current_user_obj, Permission.ASSIGN_BUSINESS, db):
+        return error_response(status_code=403, message="No permission to assign customers to business")
     if current_user["role"] not in {Role.AGENT, Role.SUB_AGENT}:
         return error_response(
             status_code=403,

@@ -1,24 +1,4 @@
-from fastapi import status, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy.sql import insert
-from models.user import User, Role, Permission, user_permissions
-from models.business import Business
-from models.user_business import user_business
-from models.settings import Settings, NotificationMethod
-from schemas.user import SignupRequest, UserResponse, LoginRequest
-from utils.response import success_response, error_response
-from utils.auth import (
-    hash_password,
-    verify_password,
-    create_access_token,
-    refresh_access_token,
-)
-import httpx
-from config.settings import settings
-from datetime import datetime, timezone
-from utils.email_service import send_welcome_email
 
-# service/user.py
 from fastapi import status
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import insert
@@ -32,6 +12,17 @@ from utils.auth import hash_password, create_access_token
 from utils.email_service import send_welcome_email
 from datetime import datetime, timezone
 from schemas.business import BusinessResponse
+from schemas.user import SignupRequest, UserResponse, LoginRequest
+from utils.auth import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    refresh_access_token,
+)
+import httpx
+from config.settings import settings
+from datetime import datetime, timezone
+from utils.email_service import send_welcome_email
 
 import logging
 
@@ -134,6 +125,7 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
             permissions_to_assign = [
                 {"user_id": user.id, "permission": Permission.CREATE_SUB_AGENT},
                 {"user_id": user.id, "permission": Permission.CREATE_BUSINESS},
+                {"user_id": user.id, "permission": Permission.ASSIGN_BUSINESS},  # Added
                 {"user_id": user.id, "permission": Permission.CREATE_SAVINGS},
                 {"user_id": user.id, "permission": Permission.MARK_SAVINGS},
                 {"user_id": user.id, "permission": Permission.UPDATE_SAVINGS},
@@ -196,6 +188,7 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
         return error_response(
             status_code=500, message=f"Failed to create user: {str(e)}"
         )
+
 
 async def signup_authenticated(request: SignupRequest, db: Session, current_user: dict):
     """Handle authenticated signup, using current_user to determine business assignment."""
@@ -293,6 +286,7 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
             permissions_to_assign = [
                 {"user_id": user.id, "permission": Permission.CREATE_SUB_AGENT},
                 {"user_id": user.id, "permission": Permission.CREATE_BUSINESS},
+                {"user_id": user.id, "permission": Permission.ASSIGN_BUSINESS},  # Added
                 {"user_id": user.id, "permission": Permission.CREATE_SAVINGS},
                 {"user_id": user.id, "permission": Permission.MARK_SAVINGS},
                 {"user_id": user.id, "permission": Permission.UPDATE_SAVINGS},
@@ -311,6 +305,7 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
             ]
         elif requested_role == Role.SUB_AGENT:
             permissions_to_assign = [
+                {"user_id": user.id, "permission": Permission.ASSIGN_BUSINESS},  # Added
                 {"user_id": user.id, "permission": Permission.CREATE_SAVINGS},
                 {"user_id": user.id, "permission": Permission.MARK_SAVINGS},
                 {"user_id": user.id, "permission": Permission.UPDATE_SAVINGS},
@@ -404,8 +399,7 @@ async def login(request: LoginRequest, db: Session):
         phone_number=user.phone_number,
         email=user.email,
         role=user.role,
-        businesses=[BusinessResponse.from_orm(business) for business in user.businesses],
-        # businesses=[{"id": business.id, "name": business.name, "location": business.location, "unique_code": business.unique_code, "created_at": business.created_at,} for business in user.businesses],
+        businesses=[BusinessResponse.model_validate(business) for business in user.businesses],
         created_at=user.created_at,
         access_token=access_token,
         next_action="choose_action",

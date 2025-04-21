@@ -16,6 +16,7 @@ class Permission:
     CREATE_ADMIN = "create_admin"
     CREATE_AGENT = "create_agent"
     CREATE_SUB_AGENT = "create_sub_agent"
+    CREATE_BUSINESS = "create_business"
     ASSIGN_BUSINESS = "assign_business"
     CREATE_CUSTOMER = "create_customer"
     # New savings-related permissions
@@ -37,6 +38,7 @@ user_permissions = Table(
             Permission.CREATE_ADMIN,
             Permission.CREATE_AGENT,
             Permission.CREATE_SUB_AGENT,
+            Permission.CREATE_BUSINESS,
             Permission.ASSIGN_BUSINESS,
             Permission.CREATE_CUSTOMER,
             Permission.CREATE_SAVINGS,

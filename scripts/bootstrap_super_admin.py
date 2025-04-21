@@ -23,7 +23,7 @@ def bootstrap_super_admin(db: Session):
         full_name="Super Admin",
         phone_number="2348000000000",
         email="superadmin@example.com",
-        username="2348000000000",
+        username="08000000000",
         pin=hash_password("51985"),
         role=Role.SUPER_ADMIN,
         is_active=True,
