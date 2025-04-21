@@ -125,7 +125,7 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
             permissions_to_assign = [
                 {"user_id": user.id, "permission": Permission.CREATE_SUB_AGENT},
                 {"user_id": user.id, "permission": Permission.CREATE_BUSINESS},
-                {"user_id": user.id, "permission": Permission.ASSIGN_BUSINESS},  # Added
+                {"user_id": user.id, "permission": Permission.ASSIGN_BUSINESS},
                 {"user_id": user.id, "permission": Permission.CREATE_SAVINGS},
                 {"user_id": user.id, "permission": Permission.MARK_SAVINGS},
                 {"user_id": user.id, "permission": Permission.UPDATE_SAVINGS},
@@ -162,7 +162,12 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
             else:
                 logger.info(f"Welcome email sent successfully to {request.email}")
 
-        business_ids = [business.id] if requested_role == Role.CUSTOMER else []
+        # Convert the business to BusinessResponse for the response
+        businesses = []
+        if requested_role == Role.CUSTOMER and business:
+            businesses = [BusinessResponse.model_validate(business)]
+        # For AGENT, businesses will be empty at signup (they create businesses later)
+
         access_token = create_access_token(
             data={"sub": user.username, "role": user.role, "user_id": user.id}
         )
@@ -171,7 +176,7 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
             phone_number=user.phone_number,
             email=user.email,
             role=user.role,
-            business_ids=business_ids,
+            businesses=businesses,  # Pass the list of BusinessResponse objects
             created_at=user.created_at,
             access_token=access_token,
             next_action="choose_action",
@@ -188,7 +193,6 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
         return error_response(
             status_code=500, message=f"Failed to create user: {str(e)}"
         )
-
 
 async def signup_authenticated(request: SignupRequest, db: Session, current_user: dict):
     """Handle authenticated signup, using current_user to determine business assignment."""
@@ -286,7 +290,7 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
             permissions_to_assign = [
                 {"user_id": user.id, "permission": Permission.CREATE_SUB_AGENT},
                 {"user_id": user.id, "permission": Permission.CREATE_BUSINESS},
-                {"user_id": user.id, "permission": Permission.ASSIGN_BUSINESS},  # Added
+                {"user_id": user.id, "permission": Permission.ASSIGN_BUSINESS},
                 {"user_id": user.id, "permission": Permission.CREATE_SAVINGS},
                 {"user_id": user.id, "permission": Permission.MARK_SAVINGS},
                 {"user_id": user.id, "permission": Permission.UPDATE_SAVINGS},
@@ -305,7 +309,7 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
             ]
         elif requested_role == Role.SUB_AGENT:
             permissions_to_assign = [
-                {"user_id": user.id, "permission": Permission.ASSIGN_BUSINESS},  # Added
+                {"user_id": user.id, "permission": Permission.ASSIGN_BUSINESS},
                 {"user_id": user.id, "permission": Permission.CREATE_SAVINGS},
                 {"user_id": user.id, "permission": Permission.MARK_SAVINGS},
                 {"user_id": user.id, "permission": Permission.UPDATE_SAVINGS},
@@ -331,6 +335,9 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
                 request.email, user.full_name, phone_number, requested_role
             )
 
+        # Convert the business to BusinessResponse for the response
+        businesses = [BusinessResponse.model_validate(business)] if business else []
+
         access_token = create_access_token(
             data={"sub": user.username, "role": user.role, "user_id": user.id}
         )
@@ -339,7 +346,7 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
             phone_number=user.phone_number,
             email=user.email,
             role=user.role,
-            business_ids=[business.id],
+            businesses=businesses,  # Pass the list of BusinessResponse objects
             created_at=user.created_at,
             access_token=access_token,
             next_action="choose_action",
@@ -355,7 +362,6 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
         return error_response(
             status_code=500, message=f"Failed to create user: {str(e)}"
         )
-
 
 async def login(request: LoginRequest, db: Session):
     """Handle user login with username in various phone number formats."""
@@ -399,7 +405,7 @@ async def login(request: LoginRequest, db: Session):
         phone_number=user.phone_number,
         email=user.email,
         role=user.role,
-        businesses=[BusinessResponse.model_validate(business) for business in user.businesses],
+        businesses=[BusinessResponse.model_validate(business) for business in businesses],
         created_at=user.created_at,
         access_token=access_token,
         next_action="choose_action",
@@ -408,7 +414,6 @@ async def login(request: LoginRequest, db: Session):
     return success_response(
         status_code=200, message="Login successful", data=user_response.model_dump()
     )
-
 
 async def handle_oauth_callback(provider: str, code: str, state: str, db: Session):
     """Handle OAuth callback to extract raw user data from provider and return it to frontend."""
@@ -470,7 +475,6 @@ async def handle_oauth_callback(provider: str, code: str, state: str, db: Sessio
             )
         else:
             return error_response(status_code=400, message="Unsupported OAuth provider")
-
 
 async def get_refresh_token(refresh_token: str):
     """Refresh access token."""
