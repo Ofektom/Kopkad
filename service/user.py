@@ -34,14 +34,14 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
     input_phone = request.phone_number.replace("+", "")
     if input_phone.startswith("234") and len(input_phone) == 13:
         phone_number = "0" + input_phone[3:]
-    elif len(input_phone) == 10 and input_phone.startswith("0"):
+    elif len(input_phone) == 11 and input_phone.startswith("0"):
         phone_number = input_phone
     elif len(input_phone) == 10 and not input_phone.startswith("0"):
         phone_number = "0" + input_phone
     else:
         return error_response(
             status_code=400,
-            message="Phone number must be 10 digits (with or without leading 0) or include country code 234",
+            message="Phone number must be 10 digits except with leading 0(zero) or include country code 234",
         )
 
     valid_roles = {
@@ -220,14 +220,14 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
     input_phone = request.phone_number.replace("+", "")
     if input_phone.startswith("234") and len(input_phone) == 13:
         phone_number = "0" + input_phone[3:]
-    elif len(input_phone) == 10 and input_phone.startswith("0"):
+    elif len(input_phone) == 11 and input_phone.startswith("0"):
         phone_number = input_phone
     elif len(input_phone) == 10 and not input_phone.startswith("0"):
         phone_number = "0" + input_phone
     else:
         return error_response(
             status_code=400,
-            message="Phone number must be 10 digits (with or without leading 0) or include country code 234",
+            message="Phone number must be 10 digits except with leading 0(zero) or include country code 234",
         )
 
     valid_roles = {
@@ -413,14 +413,14 @@ async def login(request: LoginRequest, db: Session):
     input_username = request.username.replace("+", "")
     if input_username.startswith("234") and len(input_username) == 13:
         normalized_username = "0" + input_username[3:]
-    elif len(input_username) == 10 and input_username.startswith("0"):
+    elif len(input_username) == 11 and input_username.startswith("0"):
         normalized_username = input_username
     elif len(input_username) == 10 and not input_username.startswith("0"):
         normalized_username = "0" + input_username
     else:
         return error_response(
             status_code=400,
-            message="Username must be a valid phone number format (e.g., +2348000000003, 2348000000003, 8000000003)",
+            message="Username must be a valid phone number format (e.g., +2348000000003, 2348000000003, 8000000003, 08000000003)",
         )
 
     user = db.query(User).filter(User.username == normalized_username).first()
