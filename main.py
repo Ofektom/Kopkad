@@ -20,7 +20,7 @@ app = FastAPI()
 # Middleware
 app.add_middleware(AuditMiddleware)
 
-origins = ["http://localhost:3000", "http://localhost:8080","http://localhost:8001", "https://kopkad.onrender.com", ]
+origins = ["http://localhost:3000", "http://localhost:8080","http://localhost:5173", "https://kopkad-frontend.vercel.app", ]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
