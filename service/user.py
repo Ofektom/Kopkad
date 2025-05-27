@@ -1,5 +1,6 @@
 from fastapi import status
 from sqlalchemy.orm import Session
+from sqlalchemy import select, func
 from sqlalchemy.sql import insert
 from models.user import User, Role, Permission, user_permissions
 from models.business import Business
@@ -11,7 +12,8 @@ from utils.auth import hash_password, create_access_token
 from utils.email_service import send_welcome_email
 from datetime import datetime, timezone
 from schemas.business import BusinessResponse
-from schemas.user import SignupRequest, UserResponse, LoginRequest
+from schemas.user import SignupRequest, UserResponse, LoginRequest, ChangePasswordRequest
+from models.savings import SavingsAccount, SavingsMarking, SavingsType, SavingsStatus, PaymentMethod
 from utils.auth import (
     hash_password,
     verify_password,
@@ -22,7 +24,7 @@ import httpx
 from config.settings import settings
 from datetime import datetime, timezone
 from utils.email_service import send_welcome_email
-
+from typing import List, Optional
 import logging
 
 # Set up logging
@@ -531,3 +533,225 @@ async def get_refresh_token(refresh_token: str):
         message="Access token refreshed successfully",
         data={"access_token": refresh_data},
     )
+
+async def change_password(request: ChangePasswordRequest ,user:User, db: Session):
+    """
+    Service to change the user's pin.
+    """
+    if not user or not request.old_pin or not request.new_pin:
+        return error_response(status_code=400, message="User, old pin, and new pin are required")
+
+    if not verify_password(request.old_pin, user.pin):
+        return error_response(status_code=401, message="Invalid old pin")
+    
+    if request.old_pin == request.new_pin:
+        return error_response(status_code=400, message="New pin cannot be the same as old pin")
+    
+    try:
+        user.pin = hash_password(request.new_pin)
+        user.updated_at = datetime.now(timezone.utc)
+        user.updated_by = user.id  # Self-update
+        db.commit()
+        db.refresh(user)
+        logger.info(f"User {user.full_name} with email: {user.email or 'N/A'} has reset their pin")
+        return success_response(status_code=200, message="Pin reset successful")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Pin change failed for user {user.id}: {str(e)}")
+        return error_response(status_code=500, message=f"Failed to change pin: {str(e)}")
+
+async def get_all_users(
+    db: Session,
+    current_user: dict,
+    limit: int = 10,
+    offset: int = 0,
+    role: Optional[str] = None,
+    business_name: Optional[str] = None,
+    unique_code: Optional[str] = None,
+    is_active: Optional[bool] = None
+) -> dict:
+    """
+    Retrieve all users with pagination and filtering by role, business name, unique code, and active status.
+    Restricted to SUPER_ADMIN or ADMIN.
+    """
+    if current_user.get("role") not in {"super_admin", "admin"}:
+        return error_response(status_code=403, message="Only SUPER_ADMIN or ADMIN can retrieve all users")
+
+    try:
+        # Build query with filters
+        query = select(User)
+
+        if role:
+            if role.lower() not in {r.value for r in Role}:
+                return error_response(status_code=400, message="Invalid role specified")
+            query = query.filter(User.role == role.lower())
+
+        if is_active is not None:
+            query = query.filter(User.is_active == is_active)
+
+        if business_name or unique_code:
+            query = (
+                query
+                .join(user_business, User.id == user_business.c.user_id, isouter=True)
+                .join(Business, Business.id == user_business.c.business_id, isouter=True)
+            )
+            if business_name:
+                query = query.filter(Business.name.ilike(f"%{business_name}%"))
+            if unique_code:
+                query = query.filter(Business.unique_code == unique_code)
+
+        # Apply pagination
+        total = db.execute(select(func.count()).select_from(query.subquery())).scalar()
+        users = db.execute(
+            query.order_by(User.created_at.desc()).limit(limit).offset(offset)
+        ).scalars().all()
+
+        user_responses: List[UserResponse] = []
+        for user in users:
+            businesses = (
+                db.query(Business)
+                .join(user_business, Business.id == user_business.c.business_id)
+                .filter(user_business.c.user_id == user.id)
+                .all()
+            )
+            business_responses = [BusinessResponse.model_validate(business) for business in businesses]
+
+            user_response = UserResponse(
+                full_name=user.full_name,
+                phone_number=user.phone_number,
+                email=user.email,
+                role=user.role,
+                businesses=business_responses,
+                created_at=user.created_at,
+                access_token=None,
+                next_action="choose_action",
+                location=user.location,
+            )
+            user_responses.append(user_response)
+
+        return success_response(
+            status_code=200,
+            message="Users retrieved successfully",
+            data={
+                "users": [user_response.model_dump() for user_response in user_responses],
+                "total": total,
+                "limit": limit,
+                "offset": offset
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to retrieve users: {str(e)}")
+        return error_response(status_code=500, message=f"Failed to retrieve users: {str(e)}")
+
+async def get_business_users(
+    db: Session,
+    current_user: dict,
+    business_id: int,
+    limit: int = 10,
+    offset: int = 0,
+    role: Optional[str] = None,
+    savings_type: Optional[str] = None,
+    savings_status: Optional[str] = None,
+    payment_method: Optional[str] = None,
+    is_active: Optional[bool] = None
+) -> dict:
+    """
+    Retrieve users associated with a business, filtered by role, savings type, savings status, payment method, and active status.
+    Restricted to AGENT who owns the business.
+    """
+    if current_user.get("role") != "agent":
+        return error_response(status_code=403, message="Only AGENT can retrieve business users")
+
+    try:
+        # Verify the agent owns the business
+        business = db.query(Business).filter(
+            Business.id == business_id,
+            Business.agent_id == current_user["user_id"]
+        ).first()
+        
+        if not business:
+            return error_response(
+                status_code=403,
+                message="Business not found or you do not have access to it"
+            )
+
+        # Build query for users associated with the business
+        query = (
+            select(User)
+            .join(user_business, User.id == user_business.c.user_id)
+            .filter(user_business.c.business_id == business_id)
+        )
+        
+        if role:
+            if role.lower() not in {r.value for r in Role}:
+                return error_response(status_code=400, message="Invalid role specified")
+            query = query.filter(User.role == role.lower())
+        
+        if is_active is not None:
+            query = query.filter(User.is_active == is_active)
+
+        if savings_type:
+            if savings_type.lower() not in {e.value for e in SavingsType}:
+                return error_response(status_code=400, message="Invalid savings type specified")
+            query = (
+                query
+                .join(SavingsAccount, SavingsAccount.customer_id == User.id, isouter=True)
+                .filter(SavingsAccount.savings_type == savings_type.lower())
+            )
+
+        if savings_status:
+            if savings_status.lower() not in {e.value for e in SavingsStatus}:
+                return error_response(status_code=400, message="Invalid savings status specified")
+            query = (
+                query
+                .join(SavingsAccount, SavingsAccount.customer_id == User.id, isouter=True)
+                .join(SavingsMarking, SavingsMarking.savings_account_id == SavingsAccount.id, isouter=True)
+                .filter(SavingsMarking.status == savings_status.lower())
+            )
+
+        if payment_method:
+            if payment_method.lower() not in {e.value for e in PaymentMethod}:
+                return error_response(status_code=400, message="Invalid payment method specified")
+            query = (
+                query
+                .join(SavingsAccount, SavingsAccount.customer_id == User.id, isouter=True)
+                .join(SavingsMarking, SavingsMarking.savings_account_id == SavingsAccount.id, isouter=True)
+                .filter(SavingsMarking.payment_method == payment_method.lower())
+            )
+
+        # Apply pagination
+        total = db.execute(select(func.count()).select_from(query.subquery())).scalar()
+        users = db.execute(
+            query.order_by(User.created_at.desc()).limit(limit).offset(offset)
+        ).scalars().all()
+
+        user_responses: List[UserResponse] = []
+        for user in users:
+            business_response = BusinessResponse.model_validate(business)
+            
+            user_response = UserResponse(
+                full_name=user.full_name,
+                phone_number=user.phone_number,
+                email=user.email,
+                role=user.role,
+                businesses=[business_response],
+                created_at=user.created_at,
+                access_token=None,
+                next_action="choose_action",
+                location=user.location,
+            )
+            user_responses.append(user_response)
+
+        return success_response(
+            status_code=200,
+            message="Business users retrieved successfully",
+            data={
+                "users": [user_response.model_dump() for user_response in user_responses],
+                "total": total,
+                "limit": limit,
+                "offset": offset
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to retrieve business users: {str(e)}")
+        return error_response(status_code=500, message=f"Failed to retrieve business users: {str(e)}")

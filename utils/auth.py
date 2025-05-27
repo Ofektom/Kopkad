@@ -9,6 +9,7 @@ from config.settings import settings
 from database.postgres import get_db
 from models.user import User
 
+
 # OAuth2 scheme for token authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 

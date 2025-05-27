@@ -1,15 +1,14 @@
-# config/settings.py
 import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 import logging
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from specific .env file
+load_dotenv("/Users/decagon/Documents/Ofektom/savings-system/.env")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
+logger.info(f"Raw POSTGRES_URI from os.getenv: {os.getenv('POSTGRES_URI')}")
 
 class Settings(BaseSettings):
     POSTGRES_URI: str
@@ -35,7 +34,7 @@ class Settings(BaseSettings):
     ENV: str
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file="/Users/decagon/Documents/Ofektom/savings-system/.env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -49,12 +48,12 @@ class Settings(BaseSettings):
             logger.info(f"Using BASE_DIR from environment: {os.getenv('BASE_DIR')}")
 
         super().__init__(**kwargs)
+        logger.info(f"Settings loaded POSTGRES_URI: {self.POSTGRES_URI}")
         logger.info(f"Settings BASE_DIR after init: {self.BASE_DIR}")
         logger.info(
             f"SMTP Settings - Host: {self.SMTP_HOST}, Port: {self.SMTP_PORT}, Username: {self.SMTP_USERNAME}, Password: {self.SMTP_PASSWORD[:4]}****"
         )
         logger.info(f"GOOGLE_REDIRECT_URI from settings: {self.GOOGLE_REDIRECT_URI}")
         logger.info(f"PAYSTACK_SECRET_KEY: {self.PAYSTACK_SECRET_KEY[:4]}****")
-
 
 settings = Settings()

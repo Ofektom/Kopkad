@@ -12,3 +12,5 @@ wheels/
 # Environment Variables
 .env
 .qodo
+
+test_env.py

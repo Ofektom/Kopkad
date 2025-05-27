@@ -21,7 +21,7 @@ class UserResponse(BaseModel):
     role: str
     businesses: List[BusinessResponse]
     created_at: datetime
-    access_token: str
+    access_token: Optional[str] = None
     next_action: str
     location: Optional[str]
 
@@ -32,6 +32,10 @@ class UserResponse(BaseModel):
 class LoginRequest(BaseModel):
     username: str
     pin: str = Field(..., pattern=r"^\d{5}$")
+
+class ChangePasswordRequest(BaseModel):
+    old_pin: str
+    new_pin: str
 
 
 class Response(BaseModel):
