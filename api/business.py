@@ -11,6 +11,8 @@ from service.business import (
 )
 from database.postgres import get_db
 from utils.auth import get_current_user
+from typing import Optional
+from datetime import date
 
 business_router = APIRouter(tags=["Business"], prefix="/business")
 
@@ -46,11 +48,19 @@ async def reject_invitation(token: str = Query(...), db: Session = Depends(get_d
     return await reject_business_invitation(token, db)
 
 
-@business_router.get("/list", response_model=list[BusinessResponse])
+@business_router.get("/list")
 async def get_user_businesses_endpoint(
-    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
+    location: Optional[str] = Query(None, description="Filter by business location"),
+    start_date: Optional[date] = Query(None, description="Filter by creation date start"),
+    end_date: Optional[date] = Query(None, description="Filter by creation date end"),
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(8, ge=1, le=100, description="Items per page"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    return await get_user_businesses(current_user, db)
+    return await get_user_businesses(
+        current_user, db, location, start_date, end_date, page, size
+    )
 
 
 @business_router.get("/{business_id}", response_model=BusinessResponse)

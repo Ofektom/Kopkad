@@ -15,6 +15,8 @@ from utils.email_service import (
     send_business_invitation_email,
 )
 from config.settings import settings
+from typing import Optional
+from datetime import date
 
 def has_permission(user: User, permission: str, db: Session) -> bool:
     return permission in user.permissions
@@ -299,8 +301,17 @@ async def reject_business_invitation(token: str, db: Session):
         )
 
 
-async def get_user_businesses(current_user: dict, db: Session):
-    """Retrieve the list of businesses associated with the logged-in user."""
+async def get_user_businesses(
+    current_user: dict,
+    db: Session,
+    location: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    page: int = 1,
+    size: int = 8
+):
+    """Retrieve paginated and filtered list of businesses associated with the user."""
+    # Get business IDs associated with the user
     business_ids = [
         row[0]
         for row in db.query(user_business.c.business_id)
@@ -308,22 +319,65 @@ async def get_user_businesses(current_user: dict, db: Session):
         .all()
     ]
     if not business_ids:
-        return error_response(
-            status_code=403, message="User is not associated with any businesses"
-        )
+        return {
+            "status_code": 200,
+            "success": True,
+            "message": "No businesses found",
+            "data": {
+                "businesses": [],
+                "total_items": 0,
+                "total_pages": 0,
+                "current_page": page,
+                "size": size
+            }
+        }
 
-    businesses = db.query(Business).filter(Business.id.in_(business_ids)).all()
-    return [
+    # Build query with filters
+    query = db.query(Business).filter(Business.id.in_(business_ids))
+
+    if location:
+        query = query.filter(Business.location.ilike(f"%{location}%"))
+
+    if start_date:
+        query = query.filter(Business.created_at >= start_date)
+    if end_date:
+        # Include full end date by adding one day
+        query = query.filter(Business.created_at < end_date + timedelta(days=1))
+
+    # Get total count for pagination
+    total_items = query.count()
+
+    # Apply pagination
+    offset = (page - 1) * size
+    businesses = query.order_by(Business.created_at.desc()).offset(offset).limit(size).all()
+
+    total_pages = (total_items + size - 1) // size
+
+    # Prepare response
+    business_list = [
         BusinessResponse(
             id=business.id,
             name=business.name,
             location=business.location,
             unique_code=business.unique_code,
             created_at=business.created_at,
-            delivery_status="n/a",  # Not applicable here
-        )
+            delivery_status="n/a",
+        ).model_dump()
         for business in businesses
     ]
+
+    return {
+        "status_code": 200,
+        "success": True,
+        "message": "Businesses retrieved successfully",
+        "data": {
+            "businesses": business_list,
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "current_page": page,
+            "size": size
+        }
+    }
 
 
 async def get_single_business(business_id: int, current_user: dict, db: Session):
