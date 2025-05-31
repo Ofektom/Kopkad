@@ -1,33 +1,23 @@
 from fastapi import status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, func
 from sqlalchemy.sql import insert
 from models.user import User, Role, Permission, user_permissions
-from models.business import Business
+from models.business import Business, Unit
 from models.user_business import user_business
 from models.settings import Settings, NotificationMethod
-from schemas.user import SignupRequest, UserResponse
-from utils.response import success_response, error_response
-from utils.auth import hash_password, create_access_token
-from utils.email_service import send_welcome_email
-from datetime import datetime, timezone
-from schemas.business import BusinessResponse
 from schemas.user import SignupRequest, UserResponse, LoginRequest, ChangePasswordRequest
+from schemas.business import BusinessResponse
+from utils.response import success_response, error_response
+from utils.auth import hash_password, verify_password, create_access_token, refresh_access_token
+from utils.email_service import send_welcome_email
 from models.savings import SavingsAccount, SavingsMarking, SavingsType, SavingsStatus, PaymentMethod
-from utils.auth import (
-    hash_password,
-    verify_password,
-    create_access_token,
-    refresh_access_token,
-)
+from datetime import datetime, timezone
 import httpx
 from config.settings import settings
-from datetime import datetime, timezone
-from utils.email_service import send_welcome_email
 from typing import List, Optional
 import logging
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -73,7 +63,6 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
             status_code=status.HTTP_409_CONFLICT,
             message="Username (derived from phone number) already in use",
         )
-    # Check if email is unique if provided
     if request.email and db.query(User).filter(User.email == request.email).first():
         return error_response(
             status_code=status.HTTP_409_CONFLICT,
@@ -96,7 +85,6 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
             )
             if not business:
                 return error_response(status_code=404, message="Invalid business code")
-            # Check if the user is already associated with this business
             existing_user = db.query(User).filter(User.phone_number == phone_number).first()
             if existing_user:
                 business_association = (
@@ -123,15 +111,12 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
                 )
 
     try:
-        # Set a default full_name if not provided
         full_name = request.full_name if request.full_name else "No Name"
-
         user = User(
             full_name=full_name,
             phone_number=phone_number,
             email=request.email,
             username=phone_number,
-            location=request.location,
             pin=hash_password(request.pin),
             role=requested_role,
             is_active=True,
@@ -142,7 +127,6 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
         db.commit()
         db.refresh(user)
 
-        # Assign permissions based on role
         permissions_to_assign = []
         if requested_role == Role.AGENT:
             permissions_to_assign = [
@@ -185,12 +169,7 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
             else:
                 logger.info(f"Welcome email sent successfully to {request.email}")
 
-        # Convert the business to BusinessResponse for the response
-        businesses = []
-        if requested_role == Role.CUSTOMER and business:
-            businesses = [BusinessResponse.model_validate(business)]
-        # For AGENT, businesses will be empty at signup (they create businesses later)
-
+        businesses = [BusinessResponse.model_validate(business)] if requested_role == Role.CUSTOMER and business else []
         access_token = create_access_token(
             data={"sub": user.username, "role": user.role, "user_id": user.id}
         )
@@ -203,7 +182,6 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
             created_at=user.created_at,
             access_token=access_token,
             next_action="choose_action",
-            location=user.location,
         )
         return success_response(
             status_code=201,
@@ -268,7 +246,6 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
             status_code=status.HTTP_409_CONFLICT,
             message="Username (derived from phone number) already in use",
         )
-    # Check if email is unique if provided
     if request.email and db.query(User).filter(User.email == request.email).first():
         return error_response(
             status_code=status.HTTP_409_CONFLICT,
@@ -287,14 +264,13 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
                 status_code=403,
                 message="Agent must register a business before creating sub-agents",
             )
-    else:  # SUPER_ADMIN or ADMIN
+    else:
         business = db.query(Business).filter(Business.unique_code == "CEN123").first()
         if not business:
             return error_response(
                 status_code=500, message="Default business CEN123 not found in database"
             )
 
-    # Check if the user is already associated with this business
     existing_user = db.query(User).filter(User.phone_number == phone_number).first()
     if existing_user:
         business_association = (
@@ -312,15 +288,12 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
             )
 
     try:
-        # Set a default full_name if not provided
         full_name = request.full_name if request.full_name else "No Name"
-
         user = User(
             full_name=full_name,
             phone_number=phone_number,
             email=request.email,
             username=phone_number,
-            location=request.location,
             pin=hash_password(request.pin),
             role=requested_role,
             is_active=True,
@@ -331,7 +304,6 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
         db.commit()
         db.refresh(user)
 
-        # Assign permissions based on role
         permissions_to_assign = []
         if requested_role == Role.AGENT:
             permissions_to_assign = [
@@ -382,9 +354,7 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
                 request.email, user.full_name, phone_number, requested_role
             )
 
-        # Convert the business to BusinessResponse for the response
         businesses = [BusinessResponse.model_validate(business)] if business else []
-
         access_token = create_access_token(
             data={"sub": user.username, "role": user.role, "user_id": user.id}
         )
@@ -397,7 +367,6 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
             created_at=user.created_at,
             access_token=access_token,
             next_action="choose_action",
-            location=user.location,
         )
         return success_response(
             status_code=201,
@@ -431,16 +400,18 @@ async def login(request: LoginRequest, db: Session):
     if not user.is_active:
         return error_response(status_code=403, message="Account is inactive")
 
-    # Fetch full business objects instead of just IDs
     businesses = (
         db.query(Business)
+        .options(joinedload(Business.units))
         .join(user_business, Business.id == user_business.c.business_id)
         .filter(user_business.c.user_id == user.id)
         .all()
     )
 
-    # Convert businesses to BusinessResponse objects, default to empty list if none found
-    business_responses = [BusinessResponse.model_validate(business) for business in businesses] if businesses else []
+    business_responses = [
+        BusinessResponse.model_validate(business, from_attributes=True)
+        for business in businesses
+    ] if businesses else []
 
     access_token = create_access_token(
         data={"sub": user.username, "role": user.role, "user_id": user.id}
@@ -454,7 +425,7 @@ async def login(request: LoginRequest, db: Session):
         created_at=user.created_at,
         access_token=access_token,
         next_action="choose_action",
-        location=user.location,
+        address=None
     )
     return success_response(
         status_code=200, message="Login successful", data=user_response.model_dump()
@@ -534,10 +505,8 @@ async def get_refresh_token(refresh_token: str):
         data={"access_token": refresh_data},
     )
 
-async def change_password(request: ChangePasswordRequest ,user:User, db: Session):
-    """
-    Service to change the user's pin.
-    """
+async def change_password(request: ChangePasswordRequest, user: User, db: Session):
+    """Service to change the user's pin."""
     if not user or not request.old_pin or not request.new_pin:
         return error_response(status_code=400, message="User, old pin, and new pin are required")
 
@@ -550,7 +519,7 @@ async def change_password(request: ChangePasswordRequest ,user:User, db: Session
     try:
         user.pin = hash_password(request.new_pin)
         user.updated_at = datetime.now(timezone.utc)
-        user.updated_by = user.id  # Self-update
+        user.updated_by = user.id
         db.commit()
         db.refresh(user)
         logger.info(f"User {user.full_name} with email: {user.email or 'N/A'} has reset their pin")
@@ -569,18 +538,13 @@ async def get_all_users(
     business_name: Optional[str] = None,
     unique_code: Optional[str] = None,
     is_active: Optional[bool] = None
-) -> dict:
-    """
-    Retrieve all users with pagination and filtering by role, business name, unique code, and active status.
-    Restricted to SUPER_ADMIN or ADMIN.
-    """
+):
+    """Retrieve all users with pagination and filtering by role, business name, unique code, and active status."""
     if current_user.get("role") not in {"super_admin", "admin"}:
         return error_response(status_code=403, message="Only SUPER_ADMIN or ADMIN can retrieve all users")
 
     try:
-        # Build query with filters
         query = select(User)
-
         if role:
             if role.lower() not in {r.value for r in Role}:
                 return error_response(status_code=400, message="Invalid role specified")
@@ -600,7 +564,6 @@ async def get_all_users(
             if unique_code:
                 query = query.filter(Business.unique_code == unique_code)
 
-        # Apply pagination
         total = db.execute(select(func.count()).select_from(query.subquery())).scalar()
         users = db.execute(
             query.order_by(User.created_at.desc()).limit(limit).offset(offset)
@@ -610,6 +573,7 @@ async def get_all_users(
         for user in users:
             businesses = (
                 db.query(Business)
+                .options(joinedload(Business.units).joinedload(Unit.members))
                 .join(user_business, Business.id == user_business.c.business_id)
                 .filter(user_business.c.user_id == user.id)
                 .all()
@@ -625,7 +589,6 @@ async def get_all_users(
                 created_at=user.created_at,
                 access_token=None,
                 next_action="choose_action",
-                location=user.location,
             )
             user_responses.append(user_response)
 
@@ -654,16 +617,12 @@ async def get_business_users(
     savings_status: Optional[str] = None,
     payment_method: Optional[str] = None,
     is_active: Optional[bool] = None
-) -> dict:
-    """
-    Retrieve users associated with a business, filtered by role, savings type, savings status, payment method, and active status.
-    Restricted to AGENT who owns the business.
-    """
+):
+    """Retrieve users associated with a business, filtered by role, savings type, savings status, payment method, and active status."""
     if current_user.get("role") != "agent":
         return error_response(status_code=403, message="Only AGENT can retrieve business users")
 
     try:
-        # Verify the agent owns the business
         business = db.query(Business).filter(
             Business.id == business_id,
             Business.agent_id == current_user["user_id"]
@@ -675,7 +634,6 @@ async def get_business_users(
                 message="Business not found or you do not have access to it"
             )
 
-        # Build query for users associated with the business
         query = (
             select(User)
             .join(user_business, User.id == user_business.c.user_id)
@@ -719,7 +677,6 @@ async def get_business_users(
                 .filter(SavingsMarking.payment_method == payment_method.lower())
             )
 
-        # Apply pagination
         total = db.execute(select(func.count()).select_from(query.subquery())).scalar()
         users = db.execute(
             query.order_by(User.created_at.desc()).limit(limit).offset(offset)
@@ -738,7 +695,6 @@ async def get_business_users(
                 created_at=user.created_at,
                 access_token=None,
                 next_action="choose_action",
-                location=user.location,
             )
             user_responses.append(user_response)
 

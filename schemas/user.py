@@ -3,7 +3,6 @@ from typing import Optional, List, Dict
 from datetime import datetime
 from schemas.business import BusinessResponse
 
-
 class SignupRequest(BaseModel):
     phone_number: str
     pin: str = Field(..., pattern=r"^\d{5}$")
@@ -12,22 +11,22 @@ class SignupRequest(BaseModel):
     email: Optional[EmailStr] = None
     identifier: Optional[str] = None
     business_code: Optional[str] = None
-    location: Optional[str] = None
+    address: Optional[str] = None
 
 class UserResponse(BaseModel):
-    full_name: str
+    full_name: Optional[str] = None
     phone_number: str
-    email: Optional[str]
+    email: Optional[EmailStr] = None
     role: str
-    businesses: List[BusinessResponse]
+    businesses: List[BusinessResponse] = []
     created_at: datetime
     access_token: Optional[str] = None
-    next_action: str
-    location: Optional[str]
+    next_action: Optional[str] = None
+    address: Optional[str] = None
 
     class Config:
         from_attributes = True
-
+        arbitrary_types_allowed = True
 
 class LoginRequest(BaseModel):
     username: str
@@ -36,7 +35,6 @@ class LoginRequest(BaseModel):
 class ChangePasswordRequest(BaseModel):
     old_pin: str
     new_pin: str
-
 
 class Response(BaseModel):
     status_code: int

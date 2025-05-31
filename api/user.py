@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from schemas.user import SignupRequest, Response, LoginRequest, ChangePasswordRequest
+from schemas.user import SignupRequest, LoginRequest, ChangePasswordRequest, UserResponse
 from service.user import (
     signup_unauthenticated,
     signup_authenticated,
@@ -18,14 +18,14 @@ from typing import Optional
 user_router = APIRouter(tags=["auth"], prefix="/auth")
 
 
-@user_router.post("/signup", response_model=Response)
+@user_router.post("/signup", response_model=UserResponse)
 async def signup_unauthenticated_endpoint(
     request: SignupRequest, db: Session = Depends(get_db)
 ):
     return await signup_unauthenticated(request, db)
 
 
-@user_router.post("/signup-authenticated", response_model=Response)
+@user_router.post("/signup-authenticated", response_model=UserResponse)
 async def signup_authenticated_endpoint(
     request: SignupRequest,
     db: Session = Depends(get_db),
@@ -34,23 +34,23 @@ async def signup_authenticated_endpoint(
     return await signup_authenticated(request, db, current_user)
 
 
-@user_router.post("/login", response_model=Response)
+@user_router.post("/login", response_model=UserResponse)
 async def login_endpoint(request: LoginRequest, db: Session = Depends(get_db)):
     return await login(request, db)
 
 
-@user_router.get("/oauth/callback/{provider}", response_model=Response)
+@user_router.get("/oauth/callback/{provider}", response_model=UserResponse)
 async def oauth_callback(
     provider: str, code: str, state: str, db: Session = Depends(get_db)
 ):
     return await handle_oauth_callback(provider, code, state, db)
 
 
-@user_router.post("/refresh", response_model=Response)
+@user_router.post("/refresh", response_model=UserResponse)
 async def refresh_token(refresh_token: str):
     return await get_refresh_token(refresh_token)
 
-@user_router.post("/change_password", response_model=Response)
+@user_router.post("/change_password", response_model=UserResponse)
 async def change_user_password(
     request: ChangePasswordRequest,
     db: Session = Depends(get_db),
@@ -59,7 +59,7 @@ async def change_user_password(
     """Resets a users password"""
     return await change_password(request, current_user, db)
 
-@user_router.get("/users", response_model=Response)
+@user_router.get("/users", response_model=UserResponse)
 async def list_all_users(
     limit: int = Query(8, ge=1, le=100, description="Maximum number of users to return"),
     offset: int = Query(0, ge=0, description="Number of users to skip"),
@@ -82,7 +82,7 @@ async def list_all_users(
         is_active=is_active
     )
 
-@user_router.get("/business/{business_id}/users", response_model=Response)
+@user_router.get("/business/{business_id}/users", response_model=UserResponse)
 async def list_business_users(
     business_id: int,
     limit: int = Query(8, ge=5, le=100, description="Maximum number of users to return"),

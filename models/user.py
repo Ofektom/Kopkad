@@ -1,8 +1,9 @@
 from sqlalchemy import Column, Integer, String, Boolean, Enum, Table, ForeignKey
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import select
 from database.postgres import Base
 from models.audit import AuditMixin
-
+from models.user_business import user_business
 
 class Role:
     SUPER_ADMIN = "super_admin"
@@ -11,7 +12,6 @@ class Role:
     SUB_AGENT = "sub_agent"
     CUSTOMER = "customer"
 
-
 class Permission:
     CREATE_ADMIN = "create_admin"
     CREATE_AGENT = "create_agent"
@@ -19,15 +19,12 @@ class Permission:
     CREATE_BUSINESS = "create_business"
     ASSIGN_BUSINESS = "assign_business"
     CREATE_CUSTOMER = "create_customer"
-    # New savings-related permissions
     CREATE_SAVINGS = "create_savings"
     REINITIATE_SAVINGS = "reinitiate_savings"
     UPDATE_SAVINGS = "update_savings"
     MARK_SAVINGS = "mark_savings"
     MARK_SAVINGS_BULK = "mark_savings_bulk"
 
-
-# Define the user_permissions table with updated Enum
 user_permissions = Table(
     "user_permissions",
     Base.metadata,
@@ -53,7 +50,6 @@ user_permissions = Table(
     ),
 )
 
-
 class User(AuditMixin, Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
@@ -61,8 +57,7 @@ class User(AuditMixin, Base):
     phone_number = Column(String(20), unique=True, nullable=False)
     email = Column(String, unique=True, nullable=True)
     username = Column(String(50), unique=True, nullable=False)
-    location = Column(String, nullable=True)
-    pin = Column(String, nullable=False)
+    pin = Column(String(255), nullable=False)
     role = Column(
         Enum(
             Role.SUPER_ADMIN,
@@ -76,7 +71,7 @@ class User(AuditMixin, Base):
     )
     is_active = Column(Boolean, default=True, nullable=True)
     businesses = relationship(
-        "Business", secondary="user_business", back_populates="users"
+        "Business", secondary=user_business, back_populates="users"
     )
     settings = relationship(
         "Settings",
@@ -87,8 +82,6 @@ class User(AuditMixin, Base):
 
     @property
     def permissions(self):
-        from sqlalchemy import select
-
         stmt = select(user_permissions.c.permission).where(
             user_permissions.c.user_id == self.id
         )
