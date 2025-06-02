@@ -41,6 +41,10 @@ class UnitCreate(BaseModel):
     name: str
     location: Optional[str] = None
 
+class UnitUpdate(BaseModel):
+    name: str
+    location: Optional[str] = None
+
 class CustomerInvite(BaseModel):
     customer_phone: str = Field(..., pattern=r"^(0\d{9,10}|\+234\d{10})$")
     business_unique_code: str = Field(..., min_length=6, max_length=10)

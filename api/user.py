@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query
+from typing import List
 from sqlalchemy.orm import Session
 from schemas.user import SignupRequest, LoginRequest, ChangePasswordRequest, UserResponse
 from service.user import (
@@ -59,7 +60,7 @@ async def change_user_password(
     """Resets a users password"""
     return await change_password(request, current_user, db)
 
-@user_router.get("/users", response_model=UserResponse)
+@user_router.get("/users", response_model=List[UserResponse])
 async def list_all_users(
     limit: int = Query(8, ge=1, le=100, description="Maximum number of users to return"),
     offset: int = Query(0, ge=0, description="Number of users to skip"),
@@ -82,7 +83,7 @@ async def list_all_users(
         is_active=is_active
     )
 
-@user_router.get("/business/{business_id}/users", response_model=UserResponse)
+@user_router.get("/business/{business_id}/users", response_model=List[UserResponse])
 async def list_business_users(
     business_id: int,
     limit: int = Query(8, ge=5, le=100, description="Maximum number of users to return"),
@@ -95,7 +96,7 @@ async def list_business_users(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Retrieve users associated with a business, restricted to AGENT who owns the business."""
+    """Retrieve users associated with a business, restricted to AGENT who owns the business and SUB_AGENTS."""
     return await get_business_users(
         db=db,
         current_user=current_user,

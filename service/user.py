@@ -619,13 +619,12 @@ async def get_business_users(
     is_active: Optional[bool] = None
 ):
     """Retrieve users associated with a business, filtered by role, savings type, savings status, payment method, and active status."""
-    if current_user.get("role") != "agent":
-        return error_response(status_code=403, message="Only AGENT can retrieve business users")
+    if current_user["role"] not in [Role.AGENT, Role.SUB_AGENT]:
+        return error_response(status_code=403, message="Only AGENT and SUB AGENT can retrieve business users")
 
     try:
         business = db.query(Business).filter(
             Business.id == business_id,
-            Business.agent_id == current_user["user_id"]
         ).first()
         
         if not business:

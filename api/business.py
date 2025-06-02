@@ -1,6 +1,14 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from schemas.business import BusinessCreate, BusinessResponse, BusinessUpdate, CustomerInvite, UnitCreate, UnitResponse
+from schemas.business import (
+    BusinessCreate, 
+    BusinessResponse, 
+    BusinessUpdate, 
+    CustomerInvite, 
+    UnitCreate, 
+    UnitResponse,
+    UnitUpdate,
+)
 from service.business import (
     create_business,
     add_customer_to_business,
@@ -13,8 +21,11 @@ from service.business import (
     create_unit,
     get_business_units,
     get_all_units,
-    get_agent_business_units,
-    get_customer_business_units,
+    update_business_unit,
+    delete_unit,
+    get_business_summary,
+    get_all_unit_summary,
+    get_business_unit_summary,
 )
 from database.postgres import get_db
 from utils.auth import get_current_user
@@ -86,7 +97,7 @@ async def delete_business_endpoint(
 ):
     return await delete_business(business_id, current_user, db)
 
-@business_router.post("/{business_id}/units", response_model=dict)
+@business_router.post("/{business_id}/units", response_model=UnitResponse)
 async def create_unit_endpoint(
     business_id: int,
     request: UnitCreate,
@@ -94,6 +105,15 @@ async def create_unit_endpoint(
     db: Session = Depends(get_db),
 ):
     return await create_unit(business_id, request, current_user, db)
+
+@business_router.get("/units/all", response_model=List[UnitResponse])
+async def get_all_units_endpoint(
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(8, ge=1, le=100, description="Items per page"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return await get_all_units(current_user, db, page, size)
 
 @business_router.get("/{business_unique_code}/units", response_model=List[UnitResponse])
 async def get_business_units_endpoint(
@@ -105,31 +125,41 @@ async def get_business_units_endpoint(
 ):
     return await get_business_units(business_unique_code, current_user, db, page, size)
 
-@business_router.get("/units/all", response_model=List[UnitResponse])
-async def get_all_units_endpoint(
-    page: int = Query(1, ge=1, description="Page number"),
-    size: int = Query(8, ge=1, le=100, description="Items per page"),
+@business_router.put("/{unit_id}/units", response_model=UnitResponse)
+async def update_unit_endpoint(
+    unit_id: int,
+    request: UnitUpdate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return await get_all_units(current_user, db, page, size)
+    return await update_business_unit(unit_id, request, current_user, db)
 
-@business_router.get("/{business_unique_code}/units/agent", response_model=List[UnitResponse])
-async def get_agent_business_units_endpoint(
-    business_unique_code: str,
-    page: int = Query(1, ge=1, description="Page number"),
-    size: int = Query(8, ge=1, le=100, description="Items per page"),
+@business_router.delete("/units/{unit_id}", response_model=dict)
+async def delete_unit_endpoint(
+    unit_id: int,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return await get_agent_business_units(business_unique_code, current_user, db, page, size)
+    return await delete_unit(unit_id, current_user, db)
 
-@business_router.get("/{business_unique_code}/units/customer", response_model=List[UnitResponse])
-async def get_customer_business_units_endpoint(
-    business_unique_code: str,
-    page: int = Query(1, ge=1, description="Page number"),
-    size: int = Query(8, ge=1, le=100, description="Items per page"),
+@business_router.get("/summary/business-count", response_model=dict)
+async def get_total_business_count_endpoint(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return await get_customer_business_units(business_unique_code, current_user, db, page, size)
+    return await get_business_summary(current_user, db)
+
+@business_router.get("/summary/unit-count", response_model=dict)
+async def get_total_unit_count_endpoint(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return await get_all_unit_summary(current_user, db)
+
+@business_router.get("/{business_id}/summary/unit-count", response_model=dict)
+async def get_business_unit_count_endpoint(
+    business_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return await get_business_unit_summary(business_id, current_user, db)
