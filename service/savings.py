@@ -23,6 +23,8 @@ from paystackapi.transaction import Transaction
 from paystackapi.paystack import Paystack
 from dateutil.relativedelta import relativedelta
 from service.payments import initiate_virtual_account_payment
+from models.business import Unit, user_units
+from sqlalchemy.sql import exists
 
 
 paystack = Paystack(secret_key=os.getenv("PAYSTACK_SECRET_KEY"))
@@ -129,6 +131,17 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
     if request.daily_amount <= 0 or request.duration_months <= 0:
         return error_response(status_code=400, message="Daily amount and duration must be positive")
 
+    # NEW: Validate that the customer is associated with a unit under the specified business
+    unit_exists = db.query(exists().where(
+        user_units.c.user_id == customer_id
+    ).where(
+        user_units.c.unit_id == Unit.id
+    ).where(
+        Unit.business_id == request.business_id
+    )).scalar()
+    if not unit_exists:
+        return error_response(status_code=400, message=f"Customer {customer_id} is not associated with any unit in business {request.business_id}")
+
     total_days = _calculate_total_days(request.start_date, request.duration_months)
     tracking_number = _generate_unique_tracking_number(db, SavingsAccount)
     
@@ -159,11 +172,9 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
     db.commit()
 
     logger.info(f"Created daily savings {tracking_number} for customer {customer_id}")
-    return  _savings_response(savings)
+    return _savings_response(savings)
 
-
-async def calculate_target_savings(request: SavingsCreateTarget ):  # NEW
-    """Calculate daily amount and duration months without saving to DB."""
+async def calculate_target_savings(request: SavingsCreateTarget):
     if request.target_amount <= 0:
         return error_response(status_code=400, message="Target amount must be positive")
 
@@ -182,7 +193,6 @@ async def calculate_target_savings(request: SavingsCreateTarget ):  # NEW
             duration_months=duration_months,
         ).model_dump(),
     )
-
 
 async def create_savings_target(request: SavingsCreateTarget, current_user: dict, db: Session):
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
@@ -206,6 +216,18 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
     total_days = (request.end_date - request.start_date).days + 1
     if total_days <= 0:
         return error_response(status_code=400, message="End date must be after start date")
+
+    # NEW: Validate business_id if provided
+    if request.business_id:
+        unit_exists = db.query(exists().where(
+            user_units.c.user_id == customer_id
+        ).where(
+            user_units.c.unit_id == Unit.id
+        ).where(
+            Unit.business_id == request.business_id
+        )).scalar()
+        if not unit_exists:
+            return error_response(status_code=400, message=f"Customer {customer_id} is not associated with any unit in business {request.business_id}")
 
     duration_months = (request.end_date.year - request.start_date.year) * 12 + request.end_date.month - request.start_date.month + 1
     tracking_number = _generate_unique_tracking_number(db, SavingsAccount)
@@ -240,7 +262,7 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
     db.commit()
 
     logger.info(f"Created target savings {tracking_number} for customer {customer_id}")
-    return  _savings_response(savings)
+    return _savings_response(savings)
 
 
 async def reinitiate_savings_daily(request: SavingsReinitiateDaily, current_user: dict, db: Session):
@@ -652,4 +674,107 @@ async def verify_savings_payment(reference: str, db: Session):
         status_code=200,
         message="Payment verified and dates marked (local test)",
         data={"reference": reference, "marked_dates": [m.marked_date.isoformat() for m in markings]}
+    )
+
+async def get_all_savings(
+        customer_id: int | None,
+        business_id: int | None,
+        savings_type: str | None,
+        limit: int, 
+        offset: int, 
+        current_user: dict, 
+        db: Session
+    ):
+    current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not current_user_obj:
+        return error_response(status_code=404, message="User not found")
+    
+    query = db.query(SavingsAccount)
+
+    # Role-based parameter validation and filtering
+    if current_user["role"] == "customer":
+        if customer_id and customer_id != current_user["user_id"]:
+            return error_response(status_code=403, message="Customers can only view their own savings")
+        query = query.filter(SavingsAccount.customer_id == current_user["user_id"])
+    elif current_user["role"] == "admin":
+        if not business_id:
+            return error_response(status_code=400, message="Business ID is required for admin role")
+        unit_exists = db.query(exists().where(Unit.business_id == business_id)).scalar()
+        if not unit_exists:
+            return error_response(status_code=400, message=f"Business {business_id} not found")
+        query = query.filter(SavingsAccount.business_id == business_id)
+    elif current_user["role"] in ["agent", "sub_agent"]:
+        business_ids = [b.id for b in current_user_obj.businesses]
+        if not business_ids:
+            return error_response(status_code=400, message="No business associated with user")
+        if business_id and business_id not in business_ids:
+            return error_response(status_code=403, message="Access restricted to your business")
+        query = query.filter(SavingsAccount.business_id.in_(business_ids))
+    elif current_user["role"] != "super_admin":
+        return error_response(status_code=403, message="Unauthorized role")
+
+    # Optional customer_id filter (for super_admin, admin, agent, sub_agent)
+    if customer_id and current_user["role"] != "customer":
+        customer = db.query(User).filter(User.id == customer_id, User.role == "customer").first()
+        if not customer:
+            return error_response(status_code=400, message=f"User {customer_id} is not a customer")
+        query = query.filter(SavingsAccount.customer_id == customer_id)
+
+    # Optional savings_type filter
+    if savings_type:
+        if savings_type not in [SavingsType.DAILY.value, SavingsType.TARGET.value]:
+            return error_response(status_code=400, message="Invalid savings type. Use DAILY or TARGET")
+        query = query.filter(SavingsAccount.savings_type == savings_type)
+    
+     # Pagination validation
+    if limit < 1 or offset < 0:
+        return error_response(status_code=400, message="Limit must be positive and offset non-negative")
+
+    # Get total count
+    total_count = query.count()
+
+    # Fetch savings accounts
+    savings = query.order_by(SavingsAccount.created_at.desc()).offset(offset).limit(limit).all()
+
+    if not savings:
+        return success_response(
+            status_code=200,
+            message="No savings accounts found",
+            data={
+                "savings": [], 
+                "total_count": 0,
+                "limit": limit,
+                "offset": offset,
+            }
+        )
+
+    response_data = [
+        SavingsResponse(
+            id=s.id,
+            customer_id=s.customer_id,
+            business_id=s.business_id,
+            tracking_number=s.tracking_number,
+            savings_type=s.savings_type,
+            daily_amount=s.daily_amount,
+            duration_months=s.duration_months,
+            start_date=s.start_date,
+            target_amount=s.target_amount,
+            end_date=s.end_date,
+            commission_days=s.commission_days,
+            created_at=s.created_at,
+            updated_at=s.updated_at,
+        ).model_dump()
+        for s in savings
+    ]
+
+    logger.info(f"Retrieved {len(savings)} savings accounts for user {current_user['user_id']}")
+    return success_response(
+        status_code=200,
+        message="Savings accounts retrieved successfully",
+        data={
+            "savings": response_data, 
+            "total_count": total_count,
+            "limit": limit,
+            "offset": offset,
+        }
     )

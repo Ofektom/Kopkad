@@ -23,6 +23,7 @@ from service.savings import (
     reinitiate_savings_target,
     verify_savings_payment,
     calculate_target_savings,
+    get_all_savings,
 )
 from database.postgres import get_db
 from utils.auth import get_current_user
@@ -112,6 +113,18 @@ async def mark_savings_bulk_endpoint(
     db: Session = Depends(get_db),
 ):
     return await mark_savings_bulk(request, current_user, db)
+
+@savings_router.get("/all", response_model=dict)
+async def savings_list_route(
+    customer_id: int = Query(None, description="Filter by customer ID (required for customer role)"),
+    business_id: int = Query(None, description="Filter by business ID (required for admin role)"),
+    savings_type: str = Query(None, description="Filter by savings type (DAILY or TARGET)"),
+    limit: int = Query(10, ge=1, description="Number of records to return"),
+    offset: int = Query(0, ge=0, description="Number of records to skip"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db), 
+):
+    return await get_all_savings(customer_id, business_id, savings_type, limit, offset, current_user, db)
 
 
 if ENV == "dev":
