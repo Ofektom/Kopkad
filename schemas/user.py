@@ -14,6 +14,7 @@ class SignupRequest(BaseModel):
     address: Optional[str] = None
 
 class UserResponse(BaseModel):
+    user_id: int
     full_name: Optional[str] = None
     phone_number: str
     email: Optional[EmailStr] = None

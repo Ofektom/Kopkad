@@ -174,6 +174,7 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
             data={"sub": user.username, "role": user.role, "user_id": user.id}
         )
         user_response = UserResponse(
+            user_id=user.id,
             full_name=user.full_name,
             phone_number=user.phone_number,
             email=user.email,
@@ -359,6 +360,7 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
             data={"sub": user.username, "role": user.role, "user_id": user.id}
         )
         user_response = UserResponse(
+            user_id=user.id,
             full_name=user.full_name,
             phone_number=user.phone_number,
             email=user.email,
@@ -417,6 +419,7 @@ async def login(request: LoginRequest, db: Session):
         data={"sub": user.username, "role": user.role, "user_id": user.id}
     )
     user_response = UserResponse(
+        user_id=user.id,
         full_name=user.full_name,
         phone_number=user.phone_number,
         email=user.email,
@@ -581,6 +584,7 @@ async def get_all_users(
             business_responses = [BusinessResponse.model_validate(business) for business in businesses]
 
             user_response = UserResponse(
+                user_id=user.id,
                 full_name=user.full_name,
                 phone_number=user.phone_number,
                 email=user.email,
@@ -686,6 +690,7 @@ async def get_business_users(
             business_response = BusinessResponse.model_validate(business)
             
             user_response = UserResponse(
+                user_id=user.id,
                 full_name=user.full_name,
                 phone_number=user.phone_number,
                 email=user.email,
