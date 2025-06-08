@@ -28,11 +28,8 @@ from service.savings import (
 from database.postgres import get_db
 from utils.auth import get_current_user
 from typing import List
-import os
 
 savings_router = APIRouter(tags=["savings"], prefix="/savings")
-
-ENV = os.getenv("ENV", "prod")
 
 
 @savings_router.post("/daily", response_model=SavingsResponse)
@@ -87,32 +84,6 @@ async def update_savings_endpoint(
 ):
     return await update_savings(savings_id, request, current_user, db)
 
-@savings_router.get("/markings/{tracking_number}", response_model=List[SavingsMarkingResponse])
-async def get_savings_list(
-    tracking_number: str,
-    db: Session = Depends(get_db),
-):
-    return await get_savings_markings_by_tracking_number(tracking_number, db)
-
-
-@savings_router.post("/mark/{tracking_number}", response_model=SavingsMarkingResponse)
-async def mark_savings(
-    tracking_number: str,
-    request: SavingsMarkingRequest,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    return await mark_savings_payment(tracking_number, request, current_user, db)
-
-
-
-@savings_router.post("/mark/bulk", response_model=dict)
-async def mark_savings_bulk_endpoint(
-    request: BulkMarkSavingsRequest,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    return await mark_savings_bulk(request, current_user, db)
 
 @savings_router.get("/all", response_model=dict)
 async def savings_list_route(
@@ -127,10 +98,36 @@ async def savings_list_route(
     return await get_all_savings(customer_id, business_id, savings_type, limit, offset, current_user, db)
 
 
-if ENV == "dev":
-    @savings_router.get("/verify-payment")
-    async def verify_payment_local(
-        reference: str = Query(...),
-        db: Session = Depends(get_db),
-    ):
-        return await verify_savings_payment(reference, db)
+@savings_router.get("/markings/{tracking_number}", response_model=dict)
+async def get_savings_markings(
+    tracking_number: str,
+    db: Session = Depends(get_db),
+):
+    return await get_savings_markings_by_tracking_number(tracking_number, db)
+
+
+@savings_router.post("/mark/{tracking_number}", response_model=dict)
+async def mark_savings(
+    tracking_number: str,
+    request: SavingsMarkingRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return await mark_savings_payment(tracking_number, request, current_user, db)
+
+
+@savings_router.post("/mark/bulk", response_model=dict)
+async def mark_savings_bulk_endpoint(
+    request: BulkMarkSavingsRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return await mark_savings_bulk(request, current_user, db)
+
+
+@savings_router.get("/verify-payment")
+async def verify_payment(
+    reference: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    return await verify_savings_payment(reference, db)

@@ -86,3 +86,6 @@ async def verify_payment(reference: str, expected_amount: Decimal):
             return error_response(status_code=400, message=f"Paid amount {paid_amount} less than expected {expected_amount}")
         logger.info(f"Payment verified: {reference}")
         return reference
+
+
+        #interswitch flutterwave

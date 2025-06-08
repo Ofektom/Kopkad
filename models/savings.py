@@ -23,9 +23,10 @@ class SavingsStatus(PyEnum):
     PAID = "paid"
 
 
-class PaymentMethod(PyEnum):  # New Enum
+class PaymentMethod(PyEnum):
     CARD = "card"
     BANK_TRANSFER = "bank_transfer"
+    CASH = "cash"  # New payment method
 
 
 class SavingsAccount(AuditMixin, Base):
@@ -62,10 +63,9 @@ class SavingsMarking(AuditMixin, Base):
         nullable=False,
         default=SavingsStatus.PENDING.value,
     )
-    payment_method = Column(  # New Field
+    payment_method = Column(
         Enum(PaymentMethod, values_callable=lambda obj: [e.value for e in obj]),
-        nullable=False,
-        default=PaymentMethod.CARD.value
+        nullable=True  # Allow null for existing records
     )
 
     __table_args__ = (
