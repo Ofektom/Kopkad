@@ -26,7 +26,6 @@ from service.payments import initiate_virtual_account_payment
 from models.business import Unit, user_units
 from sqlalchemy.sql import exists
 
-
 paystack = Paystack(secret_key=os.getenv("PAYSTACK_SECRET_KEY"))
 
 logging.basicConfig(
@@ -36,18 +35,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 def has_permission(user: User, permission: str, db: Session) -> bool:
     return permission in user.permissions
 
-
 def _calculate_total_days(start_date: date, duration_months: int) -> int:
-    end_date = start_date
-    for _ in range(duration_months):
-        next_month = end_date.replace(day=1) + timedelta(days=32)
-        end_date = next_month.replace(day=1) - timedelta(days=1)
-    return (end_date - start_date).days + 1
-
+    """Calculate total days for the given duration in months."""
+    end_date = start_date + relativedelta(months=duration_months) - timedelta(days=1)
+    total_days = (end_date - start_date).days + 1
+    logger.info(f"Calculated {total_days} days from {start_date} to {end_date} for {duration_months} months")
+    return total_days
 
 def _generate_unique_tracking_number(db: Session, model) -> str:
     import random
@@ -55,7 +51,6 @@ def _generate_unique_tracking_number(db: Session, model) -> str:
         number = ''.join([str(random.randint(0, 9)) for _ in range(10)])
         if not db.query(model).filter(model.tracking_number == number).first():
             return number
-
 
 def _adjust_savings_markings(savings: SavingsAccount, markings: list[SavingsMarking], db: Session):
     total_days = _calculate_total_days(savings.start_date, savings.duration_months)
@@ -84,7 +79,6 @@ def _adjust_savings_markings(savings: SavingsAccount, markings: list[SavingsMark
 
     db.commit()
 
-
 def _savings_response(savings: SavingsAccount) -> dict:
     return success_response(
         status_code=status.HTTP_201_CREATED if savings.created_at == savings.updated_at else 200,
@@ -105,7 +99,6 @@ def _savings_response(savings: SavingsAccount) -> dict:
             updated_at=savings.updated_at,
         ).model_dump(),
     )
-
 
 async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, db: Session):
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
@@ -139,7 +132,8 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
 
     total_days = _calculate_total_days(request.start_date, request.duration_months)
     tracking_number = _generate_unique_tracking_number(db, SavingsAccount)
-    
+    end_date = request.start_date + relativedelta(months=request.duration_months) - timedelta(days=1)
+
     savings = SavingsAccount(
         customer_id=customer_id,
         business_id=request.business_id,
@@ -148,11 +142,14 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
         daily_amount=request.daily_amount,
         duration_months=request.duration_months,
         start_date=request.start_date,
+        end_date=end_date,
         commission_days=request.commission_days,
         created_by=current_user["user_id"],
     )
     db.add(savings)
     db.flush()
+
+    logger.info(f"Creating {total_days} markings for daily savings {tracking_number} from {request.start_date} to {end_date}")
 
     markings = [
         SavingsMarking(
@@ -166,9 +163,8 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
     db.add_all(markings)
     db.commit()
 
-    logger.info(f"Created daily savings {tracking_number} for customer {customer_id}")
+    logger.info(f"Created daily savings {tracking_number} with {len(markings)} markings for customer {customer_id}")
     return _savings_response(savings)
-
 
 async def calculate_target_savings(request: SavingsCreateTarget):
     if request.target_amount <= 0:
@@ -189,7 +185,6 @@ async def calculate_target_savings(request: SavingsCreateTarget):
             duration_months=duration_months,
         ).model_dump(),
     )
-
 
 async def create_savings_target(request: SavingsCreateTarget, current_user: dict, db: Session):
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
@@ -260,7 +255,6 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
     logger.info(f"Created target savings {tracking_number} for customer {customer_id}")
     return _savings_response(savings)
 
-
 async def reinitiate_savings_daily(request: SavingsReinitiateDaily, current_user: dict, db: Session):
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not has_permission(current_user_obj, Permission.REINITIATE_SAVINGS, db):
@@ -285,12 +279,13 @@ async def reinitiate_savings_daily(request: SavingsReinitiateDaily, current_user
         return error_response(status_code=400, message="Daily amount and duration must be positive")
 
     total_days = _calculate_total_days(request.start_date, request.duration_months)
+    end_date = request.start_date + relativedelta(months=request.duration_months) - timedelta(days=1)
     savings.daily_amount = request.daily_amount
     savings.duration_months = request.duration_months
     savings.start_date = request.start_date
+    savings.end_date = end_date
     savings.commission_days = request.commission_days
     savings.target_amount = None
-    savings.end_date = None
     savings.savings_type = SavingsType.DAILY.value
     savings.updated_by = current_user["user_id"]
     db.flush()
@@ -310,7 +305,6 @@ async def reinitiate_savings_daily(request: SavingsReinitiateDaily, current_user
 
     logger.info(f"Reinitiated daily savings {savings.tracking_number} for customer {current_user['user_id']}")
     return _savings_response(savings)
-
 
 async def reinitiate_savings_target(request: SavingsReinitiateTarget, current_user: dict, db: Session):
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
@@ -367,7 +361,6 @@ async def reinitiate_savings_target(request: SavingsReinitiateTarget, current_us
     logger.info(f"Reinitiated target savings {savings.tracking_number} for customer {current_user['user_id']}")
     return _savings_response(savings)
 
-
 async def update_savings(savings_id: int, request: SavingsUpdate, current_user: dict, db: Session):
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not has_permission(current_user_obj, Permission.UPDATE_SAVINGS, db):
@@ -405,7 +398,7 @@ async def update_savings(savings_id: int, request: SavingsUpdate, current_user: 
                 return error_response(status_code=400, message="End date must be after start date")
             savings.end_date = request.end_date
         elif request.start_date:
-            savings.end_date = savings.start_date + relativedelta(months=savings.duration_months)
+            savings.end_date = savings.start_date + relativedelta(months=savings.duration_months) - timedelta(days=1)
         elif request.end_date:
             savings.duration_months = (request.end_date - savings.start_date).days // 30
             savings.end_date = request.end_date
@@ -427,7 +420,6 @@ async def update_savings(savings_id: int, request: SavingsUpdate, current_user: 
     logger.info(f"Updated savings {savings.tracking_number} for customer {current_user['user_id']}")
 
     return _savings_response(savings)
-
 
 async def get_all_savings(
         customer_id: int | None,
@@ -526,7 +518,6 @@ async def get_all_savings(
         }
     )
 
-
 async def get_savings_markings_by_tracking_number(tracking_number: str, db: Session):
     savings_account = db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tracking_number).first()
     
@@ -548,8 +539,8 @@ async def get_savings_markings_by_tracking_number(tracking_number: str, db: Sess
         "total_amount": sum(marking.amount for marking in markings)
     }
 
+    logger.info(f"Retrieved {len(savings_schedule)} markings for savings {tracking_number}")
     return success_response(status_code=200, message="Savings schedule retrieved successfully", data=response_data)
-
 
 async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequest, current_user: dict, db: Session):
     savings = db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tracking_number).first()
@@ -640,7 +631,6 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
         return virtual_account
     return error_response(status_code=400, message="Invalid payment method")
 
-
 async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict, db: Session):
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not has_permission(current_user_obj, Permission.MARK_SAVINGS_BULK, db):
@@ -650,7 +640,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
         return error_response(status_code=400, message="No savings accounts provided")
 
     all_markings = []
-    total_amount = Decimal(0)
+    total_amount = Decimal("0")
     payment_method = request.markings[0].payment_method
     
     for mark_request in request.markings:
@@ -744,7 +734,6 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
         return virtual_account
     return error_response(status_code=400, message="Invalid payment method")
 
-
 async def verify_savings_payment(reference: str, db: Session):
     markings = db.query(SavingsMarking).filter(SavingsMarking.payment_reference == reference).all()
     if not markings:
@@ -785,7 +774,7 @@ async def verify_savings_payment(reference: str, db: Session):
     db.commit()
 
     return success_response(
-        status_code=200,
-        message="Payment verified and dates marked",
-        data={"reference": reference, "marked_dates": [m.marked_date.isoformat() for m in markings]}
-    )
+            status_code=200,
+            message="Payment verified and dates marked",
+            data={"reference": reference, "marked_dates": [m.marked_date.isoformat() for m in markings]}
+        )
