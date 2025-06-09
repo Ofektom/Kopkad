@@ -53,7 +53,7 @@ class SavingsMarking(AuditMixin, Base):
     __tablename__ = "savings_markings"
     
     id = Column(Integer, primary_key=True)
-    savings_account_id = Column(Integer, ForeignKey("savings_accounts.id"), nullable=False)
+    savings_account_id = Column(Integer, ForeignKey("savings_accounts.id", ondelete="CASCADE"), nullable=False)
     marked_date = Column(Date, nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)
     marked_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)

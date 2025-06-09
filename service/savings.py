@@ -421,6 +421,40 @@ async def update_savings(savings_id: int, request: SavingsUpdate, current_user: 
 
     return _savings_response(savings)
 
+async def delete_savings(savings_id: int, current_user: dict, db: Session):
+    """Delete a savings account if none of its markings are paid."""
+    current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not has_permission(current_user_obj, Permission.UPDATE_SAVINGS, db):
+        return error_response(status_code=403, message="No permission to delete savings")
+
+    savings = db.query(SavingsAccount).filter(SavingsAccount.id == savings_id).first()
+    if not savings:
+        return error_response(status_code=404, message="Savings account not found")
+
+    if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
+        return error_response(status_code=403, message="Not your savings account")
+    elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
+        return error_response(status_code=403, message="Unauthorized role")
+
+    # Check if any markings are paid
+    has_paid_markings = db.query(SavingsMarking).filter(
+        SavingsMarking.savings_account_id == savings_id,
+        SavingsMarking.status == SavingsStatus.PAID.value
+    ).first()
+    if has_paid_markings:
+        return error_response(status_code=400, message="Cannot delete savings account with paid markings")
+
+    tracking_number = savings.tracking_number
+    db.delete(savings)
+    db.commit()
+
+    logger.info(f"Deleted savings account {tracking_number} (ID: {savings_id}) for customer {savings.customer_id}")
+    return success_response(
+        status_code=200,
+        message="Savings account deleted successfully",
+        data={"tracking_number": tracking_number, "savings_id": savings_id}
+    )
+
 async def get_all_savings(
         customer_id: int | None,
         business_id: int | None,

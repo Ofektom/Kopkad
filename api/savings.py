@@ -24,6 +24,7 @@ from service.savings import (
     verify_savings_payment,
     calculate_target_savings,
     get_all_savings,
+    delete_savings,
 )
 from database.postgres import get_db
 from utils.auth import get_current_user
@@ -83,6 +84,15 @@ async def update_savings_endpoint(
     db: Session = Depends(get_db),
 ):
     return await update_savings(savings_id, request, current_user, db)
+
+
+@savings_router.delete("/{savings_id}", response_model=dict)
+async def delete_savings_account(
+    savings_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return await delete_savings(savings_id, current_user, db)
 
 
 @savings_router.get("/all", response_model=dict)
