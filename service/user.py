@@ -179,6 +179,7 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
             phone_number=user.phone_number,
             email=user.email,
             role=user.role,
+            is_active=user.is_active,
             businesses=businesses,
             created_at=user.created_at,
             access_token=access_token,
@@ -365,6 +366,7 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
             phone_number=user.phone_number,
             email=user.email,
             role=user.role,
+            is_active=user.is_active,
             businesses=businesses,
             created_at=user.created_at,
             access_token=access_token,
@@ -424,6 +426,7 @@ async def login(request: LoginRequest, db: Session):
         phone_number=user.phone_number,
         email=user.email,
         role=user.role,
+        is_active=user.is_active,
         businesses=business_responses,
         created_at=user.created_at,
         access_token=access_token,
@@ -589,6 +592,7 @@ async def get_all_users(
                 phone_number=user.phone_number,
                 email=user.email,
                 role=user.role,
+                is_active=user.is_active,
                 businesses=business_responses,
                 created_at=user.created_at,
                 access_token=None,
@@ -695,6 +699,7 @@ async def get_business_users(
                 phone_number=user.phone_number,
                 email=user.email,
                 role=user.role,
+                is_active=user.is_active,
                 businesses=[business_response],
                 created_at=user.created_at,
                 access_token=None,
@@ -715,3 +720,123 @@ async def get_business_users(
     except Exception as e:
         logger.error(f"Failed to retrieve business users: {str(e)}")
         return error_response(status_code=500, message=f"Failed to retrieve business users: {str(e)}")
+
+
+async def toggle_user_status(user_id: int, is_active: bool, current_user: dict, db: Session):
+    """Toggle a user's active status."""
+    current_user_role = current_user.get("role")
+    if current_user_role not in {"super_admin", "agent"}:
+        return error_response(
+            status_code=403,
+            message="Only SUPER_ADMIN or AGENT can toggle user status"
+        )
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return error_response(status_code=404, message="User not found")
+
+    if user.role == Role.SUPER_ADMIN:
+        return error_response(
+            status_code=403,
+            message="Super admin users cannot be deactivated or reactivated"
+        )
+
+    if current_user_role == "agent":
+        # Check if the user is associated with the agent's business
+        business = db.query(Business).filter(Business.agent_id == current_user["user_id"]).first()
+        if not business:
+            return error_response(
+                status_code=403,
+                message="Agent has no associated business"
+            )
+        user_business_association = db.query(user_business).filter(
+            user_business.c.user_id == user_id,
+            user_business.c.business_id == business.id
+        ).first()
+        if not user_business_association:
+            return error_response(
+                status_code=403,
+                message="User is not associated with your business"
+            )
+
+    try:
+        user.is_active = is_active
+        user.updated_at = datetime.now(timezone.utc)
+        user.updated_by = current_user["user_id"]
+        db.commit()
+        db.refresh(user)
+        user_response = UserResponse(
+            user_id=user.id,
+            full_name=user.full_name,
+            phone_number=user.phone_number,
+            email=user.email,
+            role=user.role,
+            is_active=user.is_active,
+            businesses=[],
+            created_at=user.created_at,
+            access_token=None,
+            next_action="",
+        )
+        return success_response(
+            status_code=200,
+            message=f"User {'activated' if is_active else 'deactivated'} successfully",
+            data=user_response.model_dump()
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to toggle user status: {str(e)}")
+        return error_response(
+            status_code=500,
+            message=f"Failed to toggle user status: {str(e)}"
+        )
+
+async def delete_user(user_id: int, current_user: dict, db: Session):
+    """Delete an inactive user without savings accounts."""
+    if current_user.get("role") != "super_admin":
+        return error_response(
+            status_code=403,
+            message="Only SUPER_ADMIN can delete users"
+        )
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return error_response(status_code=404, message="User not found")
+
+    if user.is_active:
+        return error_response(
+            status_code=400,
+            message="Cannot delete active user; deactivate first"
+        )
+
+    if user.role == Role.SUPER_ADMIN:
+        return error_response(
+            status_code=403,
+            message="Super admin users cannot be deleted"
+        )
+
+    # Check for savings accounts
+    savings_accounts = db.query(SavingsAccount).filter(SavingsAccount.customer_id == user_id).all()
+    if savings_accounts:
+        return error_response(
+            status_code=400,
+            message="Cannot delete user with savings accounts; deactivate instead"
+        )
+
+    try:
+        # Delete associated records
+        db.execute(user_business.delete().where(user_business.c.user_id == user_id))
+        db.execute(user_permissions.delete().where(user_permissions.c.user_id == user_id))
+        db.delete(user)
+        db.commit()
+        return success_response(
+            status_code=200,
+            message="User deleted successfully",
+            data={}
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to delete user: {str(e)}")
+        return error_response(
+            status_code=500,
+            message=f"Failed to delete user: {str(e)}"
+        )

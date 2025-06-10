@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Body
 from typing import List
 from sqlalchemy.orm import Session
 from schemas.user import SignupRequest, LoginRequest, ChangePasswordRequest, UserResponse
@@ -11,6 +11,8 @@ from service.user import (
     get_all_users,
     get_business_users,
     change_password,
+    toggle_user_status,
+    delete_user,
 )
 from database.postgres import get_db
 from utils.auth import get_current_user
@@ -109,3 +111,20 @@ async def list_business_users(
         payment_method=payment_method,
         is_active=is_active
     )
+
+@user_router.patch("/users/{user_id}/status", response_model=dict)
+async def toggle_user_status_route(
+    user_id: int,
+    is_active: bool = Body(...),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    return await toggle_user_status(user_id, is_active, current_user, db)
+
+@user_router.delete("/users/{user_id}", response_model=dict)
+async def delete_user_route(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    return await delete_user(user_id, current_user, db)

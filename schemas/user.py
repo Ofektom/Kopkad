@@ -19,6 +19,7 @@ class UserResponse(BaseModel):
     phone_number: str
     email: Optional[EmailStr] = None
     role: str
+    is_active: bool
     businesses: List[BusinessResponse] = []
     created_at: datetime
     access_token: Optional[str] = None
