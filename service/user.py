@@ -823,9 +823,6 @@ async def delete_user(user_id: int, current_user: dict, db: Session):
         )
 
     try:
-        # Delete associated records
-        db.execute(user_business.delete().where(user_business.c.user_id == user_id))
-        db.execute(user_permissions.delete().where(user_permissions.c.user_id == user_id))
         db.delete(user)
         db.commit()
         return success_response(

@@ -28,7 +28,7 @@ class Permission:
 user_permissions = Table(
     "user_permissions",
     Base.metadata,
-    Column("user_id", Integer, ForeignKey("users.id"), primary_key=True),
+    Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
     Column(
         "permission",
         Enum(

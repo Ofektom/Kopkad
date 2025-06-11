@@ -13,7 +13,7 @@ class NotificationMethod:
 class Settings(Base, AuditMixin):
     __tablename__ = "user_settings"
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
     notification_method = Column(
         Enum(
             NotificationMethod.WHATSAPP,
