@@ -8,6 +8,11 @@ import bcrypt
 from config.settings import settings
 from database.postgres import get_db
 from models.user import User
+from models.token import TokenBlocklist
+import logging
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 
 # OAuth2 scheme for token authentication
@@ -47,6 +52,11 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    # Check if token is blocklisted
+    if db.query(TokenBlocklist).filter(TokenBlocklist.token == token).first():
+        raise credentials_exception
+
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
@@ -88,3 +98,16 @@ def decode_access_token(token: str):
         return None
     except JWTError:
         return None
+    
+def block_token(token: str, db: Session) -> bool:
+    """Add a token to the blocklist."""
+    try:
+        blocklist_entry = TokenBlocklist(token=token)
+        db.add(blocklist_entry)
+        db.commit()
+        logger.info("Token blocklisted successfully")
+        return True
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to blocklist token: {str(e)}")
+        return False

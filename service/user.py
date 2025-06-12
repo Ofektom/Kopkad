@@ -9,7 +9,7 @@ from models.settings import Settings, NotificationMethod
 from schemas.user import SignupRequest, UserResponse, LoginRequest, ChangePasswordRequest
 from schemas.business import BusinessResponse
 from utils.response import success_response, error_response
-from utils.auth import hash_password, verify_password, create_access_token, refresh_access_token
+from utils.auth import hash_password, verify_password, create_access_token, refresh_access_token, block_token
 from utils.email_service import send_welcome_email
 from models.savings import SavingsAccount, SavingsMarking, SavingsType, SavingsStatus, PaymentMethod
 from datetime import datetime, timezone
@@ -840,4 +840,25 @@ async def delete_user(user_id: int, current_user: dict, db: Session):
         return error_response(
             status_code=500,
             message=f"Failed to delete user: {str(e)}"
+        )
+
+async def logout(token: str, db: Session):
+    """Logout user by blocklisting their access token."""
+    try:
+        if block_token(token, db):
+            return success_response(
+                status_code=200,
+                message="Logged out successfully",
+                data={}
+            )
+        else:
+            return error_response(
+                status_code=500,
+                message="Failed to logout"
+            )
+    except Exception as e:
+        logger.error(f"Logout failed: {str(e)}")
+        return error_response(
+            status_code=500,
+            message=f"Failed to logout: {str(e)}"
         )

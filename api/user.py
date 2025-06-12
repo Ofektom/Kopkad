@@ -13,9 +13,10 @@ from service.user import (
     change_password,
     toggle_user_status,
     delete_user,
+    logout,
 )
 from database.postgres import get_db
-from utils.auth import get_current_user
+from utils.auth import get_current_user, oauth2_scheme
 from typing import Optional
 
 user_router = APIRouter(tags=["auth"], prefix="/auth")
@@ -128,3 +129,12 @@ async def delete_user_route(
     current_user: dict = Depends(get_current_user)
 ):
     return await delete_user(user_id, current_user, db)
+
+@user_router.post("/logout")
+async def logout_endpoint(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Logout the current user by blocklisting their access token."""
+    return await logout(token, db)
