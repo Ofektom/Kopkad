@@ -9,6 +9,8 @@ def get_db_models():
     from models.audit import AuditMixin
     from models.settings import Settings
     from models.user_business import user_business
+    from models.token import TokenBlocklist
+
 
     return [
         User,
@@ -20,4 +22,5 @@ def get_db_models():
         AuditMixin,
         Settings,
         user_business,
+        TokenBlocklist,
     ]
