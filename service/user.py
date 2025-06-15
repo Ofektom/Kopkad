@@ -9,7 +9,7 @@ from models.settings import Settings, NotificationMethod
 from schemas.user import SignupRequest, UserResponse, LoginRequest, ChangePasswordRequest
 from schemas.business import BusinessResponse
 from utils.response import success_response, error_response
-from utils.auth import hash_password, verify_password, create_access_token, refresh_access_token, block_token
+from utils.auth import hash_password, verify_password, create_access_token, refresh_access_token
 from utils.email_service import send_welcome_email
 from models.savings import SavingsAccount, SavingsMarking, SavingsType, SavingsStatus, PaymentMethod
 from datetime import datetime, timezone
@@ -171,7 +171,7 @@ async def signup_unauthenticated(request: SignupRequest, db: Session):
 
         businesses = [BusinessResponse.model_validate(business)] if requested_role == Role.CUSTOMER and business else []
         access_token = create_access_token(
-            data={"sub": user.username, "role": user.role, "user_id": user.id}
+            data={"sub": user.username, "role": user.role, "user_id": user.id}, db=db
         )
         user_response = UserResponse(
             user_id=user.id,
@@ -358,7 +358,7 @@ async def signup_authenticated(request: SignupRequest, db: Session, current_user
 
         businesses = [BusinessResponse.model_validate(business)] if business else []
         access_token = create_access_token(
-            data={"sub": user.username, "role": user.role, "user_id": user.id}
+            data={"sub": user.username, "role": user.role, "user_id": user.id}, db=db
         )
         user_response = UserResponse(
             user_id=user.id,
@@ -418,7 +418,7 @@ async def login(request: LoginRequest, db: Session):
     ] if businesses else []
 
     access_token = create_access_token(
-        data={"sub": user.username, "role": user.role, "user_id": user.id}
+        data={"sub": user.username, "role": user.role, "user_id": user.id}, db=db
     )
     user_response = UserResponse(
         user_id=user.id,
@@ -842,21 +842,23 @@ async def delete_user(user_id: int, current_user: dict, db: Session):
             message=f"Failed to delete user: {str(e)}"
         )
 
-async def logout(token: str, db: Session):
-    """Logout user by blocklisting their access token."""
+# service/user.py
+async def logout(token: str, db: Session, current_user: dict):
+    """Logout user by incrementing token_version."""
     try:
-        if block_token(token, db):
-            return success_response(
-                status_code=200,
-                message="Logged out successfully",
-                data={}
-            )
-        else:
-            return error_response(
-                status_code=500,
-                message="Failed to logout"
-            )
+        user = db.query(User).filter(User.id == current_user["user_id"]).first()
+        if not user:
+            return error_response(status_code=404, message="User not found")
+        user.token_version += 1
+        db.commit()
+        logger.info(f"User {user.id} logged out, token_version incremented to {user.token_version}")
+        return success_response(
+            status_code=200,
+            message="Logged out successfully",
+            data={}
+        )
     except Exception as e:
+        db.rollback()
         logger.error(f"Logout failed: {str(e)}")
         return error_response(
             status_code=500,

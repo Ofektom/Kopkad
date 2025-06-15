@@ -137,4 +137,4 @@ async def logout_endpoint(
     current_user: dict = Depends(get_current_user)
 ):
     """Logout the current user by blocklisting their access token."""
-    return await logout(token, db)
+    return await logout(token, db, current_user)

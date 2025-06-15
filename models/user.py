@@ -70,6 +70,7 @@ class User(AuditMixin, Base):
         nullable=False,
     )
     is_active = Column(Boolean, default=True, nullable=True)
+    token_version = Column(Integer, nullable=False, default=1)
     businesses = relationship(
         "Business", secondary=user_business, back_populates="users"
     )
