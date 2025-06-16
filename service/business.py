@@ -191,8 +191,8 @@ async def add_customer_to_business(
         db.add(pending_request)
         db.commit()
 
-        accept_url = f"{settings.APP_BASE_URL}/api/v1/business/accept-invitation?token={token}"
-        reject_url = f"{settings.APP_BASE_URL}/api/v1/business/reject-invitation?token={token}"
+        accept_url = f"{settings.APP_BASE_URL}/business/accept-invitation?token={token}"
+        reject_url = f"{settings.APP_BASE_URL}/business/reject-invitation?token={token}"
         notification_method = customer.settings.notification_method if customer.settings else "both"
         delivery_method = []
 
