@@ -571,6 +571,58 @@ async def get_business_units(business_unique_code: str, current_user: dict, db: 
         }
     )
 
+async def get_user_units(
+    current_user: dict,
+    db: Session,
+    name: Optional[str] = None,
+    location: Optional[str] = None,
+    page: int = 1,
+    size: int = 8
+):
+    """Retrieve paginated units associated with the current user via user_units."""
+    logger.info(f"Fetching units for user_id: {current_user['user_id']}, role: {current_user['role']}, page: {page}, size: {size}")
+    
+    # Base query: Join units with user_units to get units the user is associated with
+    query = db.query(Unit).join(user_units).filter(user_units.c.user_id == current_user["user_id"])
+
+    # Apply filters
+    if name:
+        query = query.filter(Unit.name.ilike(f"%{name}%"))
+    if location:
+        query = query.filter(Unit.location.ilike(f"%{location}%"))
+
+    # Pagination
+    total_items = query.count()
+    offset = (page - 1) * size
+    units = query.order_by(Unit.created_at.desc()).offset(offset).limit(size).all()
+
+    if not units:
+        logger.warning(f"No units found for user {current_user['user_id']}")
+        return success_response(
+            status_code=200,
+            message="No units found for this user",
+            data={
+                "units": [],
+                "total_items": 0,
+                "total_pages": 0,
+                "current_page": page,
+                "size": size
+            }
+        )
+
+    logger.info(f"Found {len(units)} units for user {current_user['user_id']}")
+    return success_response(
+        status_code=200,
+        message="User units retrieved successfully",
+        data={
+            "units": [UnitResponse.model_validate(unit).model_dump() for unit in units],
+            "total_items": total_items,
+            "total_pages": (total_items + size - 1) // size,
+            "current_page": page,
+            "size": size
+        }
+    )
+
 async def update_business_unit(unit_id: int, request: UnitUpdate, current_user: dict, db: Session):
     """Update Unit Details"""
     unit = db.query(Unit).filter(Unit.id == unit_id).first()
