@@ -39,7 +39,6 @@ def has_permission(user: User, permission: str, db: Session) -> bool:
     return permission in user.permissions
 
 def _calculate_total_days(start_date: date, duration_months: int) -> int:
-    """Calculate total days for the given duration in months."""
     end_date = start_date + relativedelta(months=duration_months) - timedelta(days=1)
     total_days = (end_date - start_date).days + 1
     logger.info(f"Calculated {total_days} days from {start_date} to {end_date} for {duration_months} months")
@@ -60,6 +59,7 @@ def _adjust_savings_markings(savings: SavingsAccount, markings: list[SavingsMark
         for day in range(existing_days, total_days):
             new_marking = SavingsMarking(
                 savings_account_id=savings.id,
+                unit_id=savings.unit_id,  # Set unit_id from SavingsAccount
                 amount=savings.daily_amount,
                 marked_date=savings.start_date + timedelta(days=day)
             )
@@ -87,6 +87,7 @@ def _savings_response(savings: SavingsAccount) -> dict:
             id=savings.id,
             customer_id=savings.customer_id,
             business_id=savings.business_id,
+            unit_id=savings.unit_id,  # Include unit_id
             tracking_number=savings.tracking_number,
             savings_type=savings.savings_type,
             daily_amount=savings.daily_amount,
@@ -120,15 +121,18 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
     if request.daily_amount <= 0 or request.duration_months <= 0:
         return error_response(status_code=400, message="Daily amount and duration must be positive")
 
+    # Validate unit_id and business_id association
     unit_exists = db.query(exists().where(
         user_units.c.user_id == customer_id
     ).where(
-        user_units.c.unit_id == Unit.id
+        user_units.c.unit_id == request.unit_id
+    ).where(
+        Unit.id == request.unit_id
     ).where(
         Unit.business_id == request.business_id
     )).scalar()
     if not unit_exists:
-        return error_response(status_code=400, message=f"Customer {customer_id} is not associated with any unit in business {request.business_id}")
+        return error_response(status_code=400, message=f"Customer {customer_id} is not associated with unit {request.unit_id} in business {request.business_id}")
 
     total_days = _calculate_total_days(request.start_date, request.duration_months)
     tracking_number = _generate_unique_tracking_number(db, SavingsAccount)
@@ -137,6 +141,7 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
     savings = SavingsAccount(
         customer_id=customer_id,
         business_id=request.business_id,
+        unit_id=request.unit_id,  # Set unit_id
         tracking_number=tracking_number,
         savings_type=SavingsType.DAILY.value,
         daily_amount=request.daily_amount,
@@ -154,6 +159,7 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
     markings = [
         SavingsMarking(
             savings_account_id=savings.id,
+            unit_id=savings.unit_id,  # Set unit_id
             marked_date=request.start_date + timedelta(days=i),
             amount=request.daily_amount,
             marked_by_id=None,
@@ -209,16 +215,18 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
     if total_days <= 0:
         return error_response(status_code=400, message="End date must be after start date")
 
-    if request.business_id:
-        unit_exists = db.query(exists().where(
-            user_units.c.user_id == customer_id
-        ).where(
-            user_units.c.unit_id == Unit.id
-        ).where(
-            Unit.business_id == request.business_id
-        )).scalar()
-        if not unit_exists:
-            return error_response(status_code=400, message=f"Customer {customer_id} is not associated with any unit in business {request.business_id}")
+    # Validate unit_id and business_id association
+    unit_exists = db.query(exists().where(
+        user_units.c.user_id == customer_id
+    ).where(
+        user_units.c.unit_id == request.unit_id
+    ).where(
+        Unit.id == request.unit_id
+    ).where(
+        Unit.business_id == request.business_id
+    )).scalar()
+    if not unit_exists:
+        return error_response(status_code=400, message=f"Customer {customer_id} is not associated with unit {request.unit_id} in business {request.business_id}")
 
     duration_months = (request.end_date.year - request.start_date.year) * 12 + request.end_date.month - request.start_date.month + 1
     tracking_number = _generate_unique_tracking_number(db, SavingsAccount)
@@ -227,6 +235,7 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
     savings = SavingsAccount(
         customer_id=customer_id,
         business_id=request.business_id,
+        unit_id=request.unit_id,  # Set unit_id
         tracking_number=tracking_number,
         savings_type=SavingsType.TARGET.value,
         daily_amount=daily_amount.quantize(Decimal("0.01")),
@@ -243,6 +252,7 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
     markings = [
         SavingsMarking(
             savings_account_id=savings.id,
+            unit_id=savings.unit_id,  # Set unit_id
             marked_date=request.start_date + timedelta(days=i),
             amount=daily_amount.quantize(Decimal("0.01")),
             marked_by_id=None,
@@ -278,6 +288,19 @@ async def reinitiate_savings_daily(request: SavingsReinitiateDaily, current_user
     if request.daily_amount <= 0 or request.duration_months <= 0:
         return error_response(status_code=400, message="Daily amount and duration must be positive")
 
+    # Validate unit_id and business_id association
+    unit_exists = db.query(exists().where(
+        user_units.c.user_id == savings.customer_id
+    ).where(
+        user_units.c.unit_id == request.unit_id
+    ).where(
+        Unit.id == request.unit_id
+    ).where(
+        Unit.business_id == request.business_id
+    )).scalar()
+    if not unit_exists:
+        return error_response(status_code=400, message=f"Customer {savings.customer_id} is not associated with unit {request.unit_id} in business {request.business_id}")
+
     total_days = _calculate_total_days(request.start_date, request.duration_months)
     end_date = request.start_date + relativedelta(months=request.duration_months) - timedelta(days=1)
     savings.daily_amount = request.daily_amount
@@ -287,6 +310,8 @@ async def reinitiate_savings_daily(request: SavingsReinitiateDaily, current_user
     savings.commission_days = request.commission_days
     savings.target_amount = None
     savings.savings_type = SavingsType.DAILY.value
+    savings.business_id = request.business_id  # Update business_id
+    savings.unit_id = request.unit_id  # Update unit_id
     savings.updated_by = current_user["user_id"]
     db.flush()
 
@@ -294,6 +319,7 @@ async def reinitiate_savings_daily(request: SavingsReinitiateDaily, current_user
     markings = [
         SavingsMarking(
             savings_account_id=savings.id,
+            unit_id=savings.unit_id,  # Set unit_id
             marked_date=request.start_date + timedelta(days=i),
             amount=request.daily_amount,
             marked_by_id=None,
@@ -332,6 +358,19 @@ async def reinitiate_savings_target(request: SavingsReinitiateTarget, current_us
     if total_days <= 0:
         return error_response(status_code=400, message="End date must be after start date")
 
+    # Validate unit_id and business_id association
+    unit_exists = db.query(exists().where(
+        user_units.c.user_id == savings.customer_id
+    ).where(
+        user_units.c.unit_id == request.unit_id
+    ).where(
+        Unit.id == request.unit_id
+    ).where(
+        Unit.business_id == request.business_id
+    )).scalar()
+    if not unit_exists:
+        return error_response(status_code=400, message=f"Customer {savings.customer_id} is not associated with unit {request.unit_id} in business {request.business_id}")
+
     duration_months = (request.end_date.year - request.start_date.year) * 12 + request.end_date.month - request.start_date.month + 1
     daily_amount = request.target_amount / Decimal(total_days)
 
@@ -342,6 +381,8 @@ async def reinitiate_savings_target(request: SavingsReinitiateTarget, current_us
     savings.target_amount = request.target_amount
     savings.commission_days = request.commission_days
     savings.savings_type = SavingsType.TARGET.value
+    savings.business_id = request.business_id  # Update business_id
+    savings.unit_id = request.unit_id  # Update unit_id
     savings.updated_by = current_user["user_id"]
     db.flush()
 
@@ -349,6 +390,7 @@ async def reinitiate_savings_target(request: SavingsReinitiateTarget, current_us
     markings = [
         SavingsMarking(
             savings_account_id=savings.id,
+            unit_id=savings.unit_id,  # Set unit_id
             marked_date=request.start_date + timedelta(days=i),
             amount=daily_amount.quantize(Decimal("0.01")),
             marked_by_id=None,
@@ -370,6 +412,22 @@ async def update_savings(savings_id: int, request: SavingsUpdate, current_user: 
     if not savings:
         return error_response(status_code=404, message="Savings account not found")
 
+    # Validate unit_id and business_id if provided
+    if request.business_id and request.unit_id:
+        unit_exists = db.query(exists().where(
+            user_units.c.user_id == savings.customer_id
+        ).where(
+            user_units.c.unit_id == request.unit_id
+        ).where(
+            Unit.id == request.unit_id
+        ).where(
+            Unit.business_id == request.business_id
+        )).scalar()
+        if not unit_exists:
+            return error_response(status_code=400, message=f"Customer {savings.customer_id} is not associated with unit {request.unit_id} in business {request.business_id}")
+        savings.business_id = request.business_id
+        savings.unit_id = request.unit_id
+
     markings = db.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings.id).all()
     has_markings = len(markings) > 0
 
@@ -385,6 +443,7 @@ async def update_savings(savings_id: int, request: SavingsUpdate, current_user: 
 
         for marking in markings:
             marking.amount = request.daily_amount
+            marking.unit_id = savings.unit_id  # Update unit_id in markings
         db.commit()
 
     if request.duration_months is not None or request.start_date or request.end_date:
@@ -422,7 +481,6 @@ async def update_savings(savings_id: int, request: SavingsUpdate, current_user: 
     return _savings_response(savings)
 
 async def delete_savings(savings_id: int, current_user: dict, db: Session):
-    """Delete a savings account if none of its markings are paid."""
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not has_permission(current_user_obj, Permission.UPDATE_SAVINGS, db):
         return error_response(status_code=403, message="No permission to delete savings")
@@ -436,7 +494,6 @@ async def delete_savings(savings_id: int, current_user: dict, db: Session):
     elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
         return error_response(status_code=403, message="Unauthorized role")
 
-    # Check if any markings are paid
     has_paid_markings = db.query(SavingsMarking).filter(
         SavingsMarking.savings_account_id == savings_id,
         SavingsMarking.status == SavingsStatus.PAID.value
@@ -458,6 +515,7 @@ async def delete_savings(savings_id: int, current_user: dict, db: Session):
 async def get_all_savings(
         customer_id: int | None,
         business_id: int | None,
+        unit_id: int | None,  # Added unit_id filter
         savings_type: str | None,
         limit: int, 
         offset: int, 
@@ -470,17 +528,11 @@ async def get_all_savings(
     
     query = db.query(SavingsAccount)
 
+    # Role-based filtering
     if current_user["role"] == "customer":
         if customer_id and customer_id != current_user["user_id"]:
             return error_response(status_code=403, message="Customers can only view their own savings")
         query = query.filter(SavingsAccount.customer_id == current_user["user_id"])
-    elif current_user["role"] == "admin":
-        if not business_id:
-            return error_response(status_code=400, message="Business ID is required for admin role")
-        unit_exists = db.query(exists().where(Unit.business_id == business_id)).scalar()
-        if not unit_exists:
-            return error_response(status_code=400, message=f"Business {business_id} not found")
-        query = query.filter(SavingsAccount.business_id == business_id)
     elif current_user["role"] in ["agent", "sub_agent"]:
         business_ids = [b.id for b in current_user_obj.businesses]
         if not business_ids:
@@ -488,6 +540,23 @@ async def get_all_savings(
         if business_id and business_id not in business_ids:
             return error_response(status_code=403, message="Access restricted to your business")
         query = query.filter(SavingsAccount.business_id.in_(business_ids))
+        if unit_id:
+            unit_exists = db.query(exists().where(Unit.id == unit_id).where(Unit.business_id.in_(business_ids))).scalar()
+            if not unit_exists:
+                return error_response(status_code=400, message=f"Unit {unit_id} not found in your businesses")
+            query = query.filter(SavingsAccount.unit_id == unit_id)
+    elif current_user["role"] == "admin":
+        if not business_id:
+            return error_response(status_code=400, message="Business ID is required for admin role")
+        unit_exists = db.query(exists().where(Unit.business_id == business_id)).scalar()
+        if not unit_exists:
+            return error_response(status_code=400, message=f"Business {business_id} not found")
+        query = query.filter(SavingsAccount.business_id == business_id)
+        if unit_id:
+            unit_exists = db.query(exists().where(Unit.id == unit_id).where(Unit.business_id == business_id)).scalar()
+            if not unit_exists:
+                return error_response(status_code=400, message=f"Unit {unit_id} not found in business {business_id}")
+            query = query.filter(SavingsAccount.unit_id == unit_id)
     elif current_user["role"] != "super_admin":
         return error_response(status_code=403, message="Unauthorized role")
 
@@ -526,6 +595,7 @@ async def get_all_savings(
             id=s.id,
             customer_id=s.customer_id,
             business_id=s.business_id,
+            unit_id=s.unit_id,  # Include unit_id
             tracking_number=s.tracking_number,
             savings_type=s.savings_type,
             daily_amount=s.daily_amount,
@@ -564,7 +634,10 @@ async def get_savings_markings_by_tracking_number(tracking_number: str, db: Sess
         return error_response(status_code=404, message="No savings schedule found for this account")
 
     savings_schedule = {
-        marking.marked_date.isoformat(): marking.status for marking in markings
+        marking.marked_date.isoformat(): {
+            "status": marking.status,
+            "unit_id": marking.unit_id  # Include unit_id
+        } for marking in markings
     }
 
     response_data = {
@@ -586,6 +659,20 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
     elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
         return error_response(status_code=403, message="Unauthorized role")
 
+    # Validate unit_id if provided
+    if request.unit_id:
+        unit_exists = db.query(exists().where(
+            user_units.c.user_id == savings.customer_id
+        ).where(
+            user_units.c.unit_id == request.unit_id
+        ).where(
+            Unit.id == request.unit_id
+        ).where(
+            Unit.business_id == savings.business_id
+        )).scalar()
+        if not unit_exists:
+            return error_response(status_code=400, message=f"Customer {savings.customer_id} is not associated with unit {request.unit_id} in business {savings.business_id}")
+
     marking = db.query(SavingsMarking).filter(
         SavingsMarking.savings_account_id == savings.id,
         SavingsMarking.marked_date == request.marked_date
@@ -601,6 +688,7 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
 
     reference = f"savings_{savings.tracking_number}_{datetime.now().timestamp()}"
     marking.payment_method = request.payment_method
+    marking.unit_id = request.unit_id or savings.unit_id  # Set unit_id
 
     if request.payment_method == PaymentMethod.CASH.value:
         marking.status = SavingsStatus.PAID.value
@@ -689,6 +777,20 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
         elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
             return error_response(status_code=403, message="Unauthorized role")
 
+        # Validate unit_id if provided
+        if mark_request.unit_id:
+            unit_exists = db.query(exists().where(
+                user_units.c.user_id == savings.customer_id
+            ).where(
+                user_units.c.unit_id == mark_request.unit_id
+            ).where(
+                Unit.id == mark_request.unit_id
+            ).where(
+                Unit.business_id == savings.business_id
+            )).scalar()
+            if not unit_exists:
+                return error_response(status_code=400, message=f"Customer {savings.customer_id} is not associated with unit {mark_request.unit_id} in business {savings.business_id}")
+
         markings = db.query(SavingsMarking).filter(
             SavingsMarking.savings_account_id == savings.id,
             SavingsMarking.marked_date.in_([mark_request.marked_date])
@@ -697,6 +799,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
             return error_response(status_code=400, message=f"Invalid or already marked date for {mark_request.tracking_number}")
 
         markings[0].payment_method = mark_request.payment_method
+        markings[0].unit_id = mark_request.unit_id or savings.unit_id  # Set unit_id
         total_amount += markings[0].amount
         all_markings.extend(markings)
 
