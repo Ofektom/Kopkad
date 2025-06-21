@@ -26,7 +26,7 @@ class SavingsStatus(PyEnum):
 class PaymentMethod(PyEnum):
     CARD = "card"
     BANK_TRANSFER = "bank_transfer"
-    CASH = "cash"  # New payment method
+    CASH = "cash"
 
 
 class SavingsAccount(AuditMixin, Base):
@@ -35,6 +35,7 @@ class SavingsAccount(AuditMixin, Base):
     id = Column(Integer, primary_key=True)
     customer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     business_id = Column(Integer, ForeignKey("businesses.id"), nullable=False)
+    unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)  # Added unit_id
     tracking_number = Column(String(10), unique=True, nullable=False)
     savings_type = Column(
         Enum(SavingsType, values_callable=lambda obj: [e.value for e in obj]),
@@ -54,6 +55,7 @@ class SavingsMarking(AuditMixin, Base):
     
     id = Column(Integer, primary_key=True)
     savings_account_id = Column(Integer, ForeignKey("savings_accounts.id", ondelete="CASCADE"), nullable=False)
+    unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)  # Added unit_id
     marked_date = Column(Date, nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)
     marked_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -65,7 +67,7 @@ class SavingsMarking(AuditMixin, Base):
     )
     payment_method = Column(
         Enum(PaymentMethod, values_callable=lambda obj: [e.value for e in obj]),
-        nullable=True  # Allow null for existing records
+        nullable=True
     )
 
     __table_args__ = (
