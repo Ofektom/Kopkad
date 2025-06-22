@@ -19,6 +19,7 @@ from service.business import (
     update_business,
     delete_business,
     create_unit,
+    get_single_unit,
     get_business_units,
     get_all_units,
     update_business_unit,
@@ -106,6 +107,15 @@ async def create_unit_endpoint(
     db: Session = Depends(get_db),
 ):
     return await create_unit(business_id, request, current_user, db)
+
+@business_router.get("/{business_id}/units/{unit_id}", response_model=UnitResponse)
+async def get_single_unit_endpoint(
+    business_id: int,
+    unit_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return await get_single_unit(business_id, unit_id, current_user, db)
 
 @business_router.get("/units/all", response_model=List[UnitResponse])
 async def get_all_units_endpoint(

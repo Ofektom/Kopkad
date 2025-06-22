@@ -467,6 +467,51 @@ async def create_unit(business_id: int, request: UnitCreate, current_user: dict,
         logger.error(f"Unit creation failed: {str(e)}")
         return error_response(status_code=500, message=f"Failed to create unit: {str(e)}")
 
+async def get_single_unit(business_id: int, unit_id: int, current_user: dict, db: Session):
+    """Retrieve details of a single unit by ID if the user is associated with its business or is SUPER_ADMIN."""
+    logger.info(f"Fetching unit_id: {unit_id} for business_id: {business_id}, user_id: {current_user['user_id']}, role: {current_user['role']}")
+    
+    unit = db.query(Unit).filter(Unit.id == unit_id, Unit.business_id == business_id).first()
+    if not unit:
+        logger.error(f"Unit not found for unit_id: {unit_id} in business_id: {business_id}")
+        return error_response(status_code=404, message="Unit not found or does not belong to specified business")
+
+    business = db.query(Business).filter(Business.id == unit.business_id).first()
+    if not business:
+        logger.error(f"Business not found for unit_id: {unit_id}")
+        return error_response(status_code=404, message="Associated business not found")
+
+    # Role-based access control
+    if current_user["role"] not in [Role.SUPER_ADMIN, Role.ADMIN]:
+        if current_user["role"] == Role.AGENT:
+            if business.agent_id != current_user["user_id"]:
+                logger.error(f"User {current_user['user_id']} is not the agent owner of business {business.id}")
+                return error_response(status_code=403, message="Only the agent owner can access this unit")
+        elif current_user["role"] in [Role.CUSTOMER, Role.SUB_AGENT]:
+            if not db.query(user_business).filter(
+                user_business.c.user_id == current_user["user_id"],
+                user_business.c.business_id == business.id
+            ).first():
+                logger.error(f"User {current_user['user_id']} not associated with business {business.id}")
+                return error_response(status_code=403, message="User not associated with this business")
+            if current_user["role"] == Role.CUSTOMER:
+                if not db.query(user_units).filter(
+                    user_units.c.user_id == current_user["user_id"],
+                    user_units.c.unit_id == unit_id
+                ).first():
+                    logger.error(f"User {current_user['user_id']} not associated with unit {unit_id}")
+                    return error_response(status_code=403, message="User not associated with this unit")
+        else:
+            logger.error(f"Invalid role {current_user['role']} for user {current_user['user_id']}")
+            return error_response(status_code=403, message="Invalid user role")
+
+    logger.info(f"Unit {unit_id} retrieved successfully for user {current_user['user_id']}")
+    return success_response(
+        status_code=200,
+        message="Unit retrieved successfully",
+        data=UnitResponse.model_validate(unit).model_dump()
+    )
+
 async def get_all_units(current_user: dict, db: Session, page: int = 1, size: int = 8):
     """Retrieve all paginated units in the system for SUPER_ADMIN only."""
     logger.info(f"Fetching all units for user_id: {current_user['user_id']}, page: {page}, size: {size}")
