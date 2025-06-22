@@ -25,6 +25,7 @@ from dateutil.relativedelta import relativedelta
 from service.payments import initiate_virtual_account_payment
 from models.business import Unit, user_units
 from sqlalchemy.sql import exists
+from config.settings import settings
 
 paystack = Paystack(secret_key=os.getenv("PAYSTACK_SECRET_KEY"))
 
@@ -740,7 +741,7 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
             reference=reference,
             amount=total_amount_kobo,
             email=customer.email,
-            callback_url="http://localhost:8001/payments/webhook/paystack"
+            callback_url="https://kopkad.onrender.com/api/v1/payments/webhook/paystack"
         )
         logger.info(f"Paystack initialize response: {response}")
         if response["status"]:
@@ -962,7 +963,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
             reference=reference,
             amount=total_amount_kobo,
             email=customer.email,
-            callback_url="http://localhost:8001/payments/webhook/paystack"
+            callback_url="https://kopkad.onrender.com/api/v1/payments/webhook/paystack"
         )
         if response["status"]:
             for marking in all_markings:
