@@ -92,6 +92,22 @@ class SavingsMarkingRequest(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
+# New schema for bulk marking entries
+class BulkSavingsMarkingRequest(BaseModel):
+    tracking_number: str
+    marked_date: date
+    unit_id: Optional[int] = None
+
+    class Config:
+        arbitrary_types_allowed = True
+
+class BulkMarkSavingsRequest(BaseModel):
+    payment_method: PaymentMethod
+    markings: List[BulkSavingsMarkingRequest]
+
+    class Config:
+        arbitrary_types_allowed = True
+
 class SavingsTargetCalculationResponse(BaseModel):
     daily_amount: Decimal
     duration_months: int
@@ -106,12 +122,6 @@ class SavingsMarkingResponse(BaseModel):
     authorization_url: Optional[str] = None
     payment_reference: Optional[str] = None
     virtual_account: Optional[dict] = None
-
-    class Config:
-        arbitrary_types_allowed = True
-
-class BulkMarkSavingsRequest(BaseModel):
-    markings: List[SavingsMarkingRequest]
 
     class Config:
         arbitrary_types_allowed = True

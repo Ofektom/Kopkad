@@ -127,7 +127,7 @@ async def mark_savings(
     return await mark_savings_payment(tracking_number, request, current_user, db)
 
 
-@savings_router.post("/mark/bulk", response_model=dict)
+@savings_router.post("/markings/bulk", response_model=dict)
 async def mark_savings_bulk_endpoint(
     request: BulkMarkSavingsRequest,
     current_user: dict = Depends(get_current_user),
