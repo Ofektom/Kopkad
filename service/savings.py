@@ -675,113 +675,6 @@ async def get_savings_markings_by_tracking_number(tracking_number: str, db: Sess
     logger.info(f"Retrieved {len(savings_schedule)} markings for savings {tracking_number}")
     return success_response(status_code=200, message="Savings schedule retrieved successfully", data=response_data)
 
-# async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequest, current_user: dict, db: Session):
-#     savings = db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tracking_number).first()
-#     if not savings:
-#         return error_response(status_code=404, message="Savings account not found")
-
-#     if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
-#         return error_response(status_code=403, message="Not your savings account")
-#     elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
-#         return error_response(status_code=403, message="Unauthorized role")
-
-#     # Validate unit_id if provided
-#     if request.unit_id:
-#         unit_exists = db.query(exists().where(
-#             user_units.c.user_id == savings.customer_id
-#         ).where(
-#             user_units.c.unit_id == request.unit_id
-#         ).where(
-#             Unit.id == request.unit_id
-#         ).where(
-#             Unit.business_id == savings.business_id
-#         )).scalar()
-#         if not unit_exists:
-#             return error_response(status_code=400, message=f"Customer {savings.customer_id} is not associated with unit {request.unit_id} in business {savings.business_id}")
-
-#     marking = db.query(SavingsMarking).filter(
-#         SavingsMarking.savings_account_id == savings.id,
-#         SavingsMarking.marked_date == request.marked_date
-#     ).first()
-#     if not marking or marking.marked_by_id:
-#         return error_response(status_code=400, message="Invalid date or already marked")
-
-#     total_amount = marking.amount
-#     total_amount_kobo = int(total_amount * 100)
-#     customer = db.query(User).filter(User.id == savings.customer_id).first()
-#     if not customer.email:
-#         return error_response(status_code=400, message="Customer email required")
-
-#     reference = f"savings_{savings.tracking_number}_{datetime.now().timestamp()}"
-#     marking.payment_method = request.payment_method  # Set the payment method directly
-#     marking.unit_id = request.unit_id or savings.unit_id  # Set unit_id
-
-#     # Validate payment method
-#     if request.payment_method not in [PaymentMethod.CASH, PaymentMethod.CARD, PaymentMethod.BANK_TRANSFER]:
-#         return error_response(status_code=400, message=f"Invalid payment method: {request.payment_method}")
-
-#     if request.payment_method == PaymentMethod.CASH:
-#         marking.status = SavingsStatus.PAID
-#         marking.marked_by_id = current_user["user_id"]
-#         marking.updated_by = current_user["user_id"]
-#         marking.updated_at = datetime.now()
-#         db.commit()
-#         logger.info(f"Cash payment marked for savings {tracking_number} on {request.marked_date}")
-#         return success_response(
-#             status_code=200,
-#             message="Savings marked successfully",
-#             data=SavingsMarkingResponse(
-#                 tracking_number=savings.tracking_number,
-#                 savings_schedule={request.marked_date.isoformat(): SavingsStatus.PAID.value},
-#                 total_amount=total_amount,
-#                 authorization_url=None,
-#                 payment_reference=None
-#             ).model_dump()
-#         )
-#     elif request.payment_method == PaymentMethod.CARD:
-#         response = Transaction.initialize(
-#             reference=reference,
-#             amount=total_amount_kobo,
-#             email=customer.email,
-#             callback_url="https://kopkad.onrender.com/api/v1/payments/webhook/paystack"
-#         )
-#         logger.info(f"Paystack initialize response: {response}")
-#         if response["status"]:
-#             marking.payment_reference = response["data"]["reference"]
-#             marking.status = SavingsStatus.PENDING
-#             db.commit()
-#             return success_response(
-#                 status_code=200,
-#                 message="Proceed to payment",
-#                 data=SavingsMarkingResponse(
-#                     tracking_number=savings.tracking_number,
-#                     savings_schedule={request.marked_date.isoformat(): SavingsStatus.PENDING.value},
-#                     total_amount=total_amount,
-#                     authorization_url=response["data"]["authorization_url"],
-#                     payment_reference=response["data"]["reference"]
-#                 ).model_dump()
-#             )
-#         logger.error(f"Paystack initialization failed: {response}")
-#         return error_response(status_code=500, message=f"Failed to initiate card payment: {response.get('message', 'Unknown error')}")
-#     elif request.payment_method == PaymentMethod.BANK_TRANSFER:
-#         virtual_account = await initiate_virtual_account_payment(total_amount, customer.email, savings.customer_id, reference)
-#         if isinstance(virtual_account, dict):
-#             marking.payment_reference = reference
-#             marking.status = SavingsStatus.PENDING
-#             db.commit()
-#             return success_response(
-#                 status_code=200,
-#                 message="Pay to the virtual account",
-#                 data=SavingsMarkingResponse(
-#                     tracking_number=savings.tracking_number,
-#                     savings_schedule={request.marked_date.isoformat(): SavingsStatus.PENDING.value},
-#                     total_amount=total_amount,
-#                     payment_reference=reference,
-#                     virtual_account=virtual_account
-#                 ).model_dump()
-#             )
-#         return virtual_account
-#     return error_response(status_code=400, message="Invalid payment method")
 
 async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequest, current_user: dict, db: Session):
     savings = db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tracking_number).first()
@@ -793,7 +686,6 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
     elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
         return error_response(status_code=403, message="Unauthorized role")
 
-    # Validate unit_id if provided
     if request.unit_id:
         unit_exists = db.query(exists().where(
             user_units.c.user_id == savings.customer_id
@@ -822,14 +714,13 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
 
     reference = f"savings_{savings.tracking_number}_{datetime.now().timestamp()}"
 
-    # Validate payment_method
     try:
         payment_method = PaymentMethod(request.payment_method)
     except ValueError:
         return error_response(status_code=400, message=f"Invalid payment method: {request.payment_method}")
 
     marking.payment_method = payment_method
-    marking.unit_id = request.unit_id or savings.unit_id  # Set unit_id
+    marking.unit_id = request.unit_id or savings.unit_id
 
     if payment_method == PaymentMethod.CASH:
         marking.status = SavingsStatus.PAID
@@ -854,7 +745,7 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
             reference=reference,
             amount=total_amount_kobo,
             email=customer.email,
-            callback_url="https://kopkad.onrender.com/api/v1/payments/webhook/paystack"
+            callback_url="https://kopkad.onrender.com/payment-confirmation"
         )
         logger.info(f"Paystack initialize response: {response}")
         if response["status"]:
@@ -904,7 +795,6 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
     total_amount = Decimal("0")
     marked_dates_by_tracking = {}
 
-    # Get payment method from root
     try:
         payment_method = PaymentMethod(request.payment_method)
     except ValueError:
@@ -920,7 +810,6 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
         elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
             return error_response(status_code=403, message="Unauthorized role")
 
-        # Validate unit_id if provided
         if mark_request.unit_id:
             unit_exists = db.query(exists().where(
                 user_units.c.user_id == savings.customer_id
@@ -946,7 +835,6 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
         total_amount += marking.amount
         all_markings.append(marking)
 
-        # Track marked dates for response
         if mark_request.tracking_number not in marked_dates_by_tracking:
             marked_dates_by_tracking[mark_request.tracking_number] = []
         marked_dates_by_tracking[mark_request.tracking_number].append(mark_request.marked_date.isoformat())
@@ -982,7 +870,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
             reference=reference,
             amount=total_amount_kobo,
             email=customer.email,
-            callback_url="https://kopkad.onrender.com/api/v1/payments/webhook/paystack"
+            callback_url="https://kopkad.onrender.com/payment-confirmation"
         )
         logger.info(f"Paystack initialize response: {response}")
         if response["status"]:
