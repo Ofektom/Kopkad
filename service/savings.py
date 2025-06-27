@@ -1035,41 +1035,54 @@ async def verify_savings_payment(reference: str, db: Session):
         return error_response(status_code=404, message="Payment reference not found")
 
     payment_method = markings[0].payment_method
+    status = markings[0].status  # Assume all markings for the same reference have the same status
+    total_amount = sum(m.amount for m in markings)
+    tracking_numbers = list({m.savings_account.tracking_number for m in markings})
+    marked_dates = [m.marked_date.isoformat() for m in markings]
+
     logger.info(f"Verifying payment for reference {reference} with method {payment_method}")
 
+    response_data = {
+        "reference": reference,
+        "status": status,
+        "amount": str(total_amount),
+        "tracking_numbers": tracking_numbers,
+        "marked_dates": marked_dates,
+    }
+
     if payment_method == PaymentMethod.CASH.value:
-        return error_response(status_code=400, message="Cash payments do not require verification")
+        return success_response(
+            status_code=200,
+            message="Payment details retrieved",
+            data=response_data
+        )
     elif payment_method == PaymentMethod.CARD.value:
         response = Transaction.verify(reference=reference)
-        if response["status"] and response["data"]["status"] == "success":
+        if response["status"]:
+            response_data["status"] = "paid" if response["data"]["status"] == "success" else "pending"
             total_paid = Decimal(response["data"]["amount"]) / 100
-            expected_amount = sum(m.amount for m in markings)
-            if total_paid < expected_amount:
-                logger.error(f"Underpayment for {reference}: expected {expected_amount}, paid {total_paid}")
+            if total_paid < total_amount:
+                logger.error(f"Underpayment for {reference}: expected {total_amount}, paid {total_paid}")
                 return error_response(
                     status_code=400,
-                    message=f"Paid amount {total_paid} less than expected {expected_amount}"
+                    message=f"Paid amount {total_paid} less than expected {total_amount}"
                 )
         else:
             logger.error(f"Card payment verification failed: {response.get('message', 'No message')}")
             return error_response(status_code=400, message="Payment verification failed")
     elif payment_method == PaymentMethod.BANK_TRANSFER.value:
-        expected_amount = sum(m.amount for m in markings)
-        total_paid = expected_amount  # Simplified for now; real verification needed
-        logger.info(f"Simulating bank transfer verification for {reference}")
+        # Assuming virtual account details are returned by initiate_virtual_account_payment
+        # Replace with actual retrieval logic if stored in database
+        virtual_account = await initiate_virtual_account_payment(total_amount, "", 0, reference)  # Dummy call for example
+        if isinstance(virtual_account, dict):
+            response_data["virtual_account"] = virtual_account
+        else:
+            response_data["virtual_account"] = {"bank": "Unknown", "account_number": "Unknown"}
     else:
         return error_response(status_code=400, message=f"Unsupported payment method: {payment_method}")
 
-    for marking in markings:
-        if marking.status == SavingsStatus.PENDING.value:
-            marking.marked_by_id = markings[0].savings_account.customer_id
-            marking.updated_by = marking.marked_by_id
-            marking.status = SavingsStatus.PAID.value
-            marking.updated_at = datetime.now()
-    db.commit()
-
     return success_response(
-            status_code=200,
-            message="Payment verified and dates marked",
-            data={"reference": reference, "marked_dates": [m.marked_date.isoformat() for m in markings]}
-        )
+        status_code=200,
+        message="Payment details retrieved",
+        data=response_data
+    )

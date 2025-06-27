@@ -136,9 +136,9 @@ async def mark_savings_bulk_endpoint(
     return await mark_savings_bulk(request, current_user, db)
 
 
-@savings_router.get("/verify-payment")
+@savings_router.get("/verify/{reference}", response_model=dict)
 async def verify_payment(
-    reference: str = Query(...),
+    reference: str,
     db: Session = Depends(get_db),
 ):
     return await verify_savings_payment(reference, db)

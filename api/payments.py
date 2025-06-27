@@ -6,7 +6,8 @@ import hmac
 import hashlib
 import logging
 from decimal import Decimal
-from models.savings import SavingsMarking, SavingsStatus 
+from models.savings import SavingsMarking, SavingsStatus
+from datetime import datetime
 
 payment_router = APIRouter(tags=["payments"], prefix="/payments")
 
@@ -18,14 +19,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 @payment_router.post("/webhook/paystack")
 async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
     logger.info("Received Paystack webhook request")
+    
+    # Read request body and verify signature
     body = await request.body()
     signature = request.headers.get("x-paystack-signature")
     if not signature:
-        logger.error("No signature provided")
+        logger.error("No signature provided in webhook request")
         raise HTTPException(status_code=400, detail="No signature provided")
 
     secret_key = settings.PAYSTACK_SECRET_KEY.encode("utf-8")
@@ -39,6 +41,11 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
     data = payload.get("data")
     reference = data.get("reference")
 
+    if not reference:
+        logger.error("No reference provided in webhook payload")
+        raise HTTPException(status_code=400, detail="No reference provided")
+
+    # Check if payment is already processed
     if db.query(SavingsMarking).filter(
         SavingsMarking.payment_reference == reference,
         SavingsMarking.status == SavingsStatus.PAID.value
@@ -51,8 +58,9 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
         logger.warning(f"No markings found for reference {reference}")
         return {"status": "success"}
 
+    # Verify payment amount
     expected_amount = sum(m.amount for m in markings)
-    amount_paid = Decimal(data["amount"]) / 100
+    amount_paid = Decimal(data["amount"]) / 100  # Convert kobo to naira
 
     if event in ["charge.success", "transfer.success"]:
         if amount_paid < expected_amount:
@@ -60,11 +68,13 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
             return {"status": "success"}  # Leave pending
 
         for marking in markings:
+            marking.status = SavingsStatus.PAID.value
             marking.marked_by_id = markings[0].savings_account.customer_id
             marking.updated_by = marking.marked_by_id
-            marking.status = SavingsStatus.PAID.value
-            marking.updated_at = data["paid_at"]
+            marking.updated_at = datetime.fromisoformat(data["paid_at"].replace("Z", "+00:00"))
         db.commit()
         logger.info(f"Confirmed {len(markings)} markings for {reference}. Paid: {amount_paid}, Expected: {expected_amount}")
-
+    else:
+        logger.warning(f"Ignored webhook event: {event} for reference {reference}")
+    
     return {"status": "success"}
