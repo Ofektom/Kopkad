@@ -7,7 +7,9 @@ from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
     Enum,
+    JSON,  # Added for virtual_account_details
 )
+from sqlalchemy.orm import relationship
 from database.postgres import Base
 from models.audit import AuditMixin
 from enum import Enum as PyEnum
@@ -35,7 +37,7 @@ class SavingsAccount(AuditMixin, Base):
     id = Column(Integer, primary_key=True)
     customer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     business_id = Column(Integer, ForeignKey("businesses.id"), nullable=False)
-    unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)  # Added unit_id
+    unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)
     tracking_number = Column(String(10), unique=True, nullable=False)
     savings_type = Column(
         Enum(SavingsType, values_callable=lambda obj: [e.value for e in obj]),
@@ -49,13 +51,15 @@ class SavingsAccount(AuditMixin, Base):
     end_date = Column(Date)
     commission_days = Column(Integer, default=30)
 
+    markings = relationship("SavingsMarking", back_populates="savings_account", cascade="all, delete")
+
 
 class SavingsMarking(AuditMixin, Base):
     __tablename__ = "savings_markings"
     
     id = Column(Integer, primary_key=True)
     savings_account_id = Column(Integer, ForeignKey("savings_accounts.id", ondelete="CASCADE"), nullable=False)
-    unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)  # Added unit_id
+    unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)
     marked_date = Column(Date, nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)
     marked_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -69,6 +73,9 @@ class SavingsMarking(AuditMixin, Base):
         Enum(PaymentMethod, values_callable=lambda obj: [e.value for e in obj]),
         nullable=True
     )
+    virtual_account_details = Column(JSON, nullable=True)  # Added to store virtual account details
+
+    savings_account = relationship("SavingsAccount", back_populates="markings")
 
     __table_args__ = (
         UniqueConstraint("savings_account_id", "marked_date", name="unique_marking"),

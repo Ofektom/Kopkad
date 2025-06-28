@@ -25,7 +25,7 @@ from dateutil.relativedelta import relativedelta
 from service.payments import initiate_virtual_account_payment
 from models.business import Unit, user_units
 from sqlalchemy.sql import exists
-from config.settings import settings
+import requests
 
 paystack = Paystack(secret_key=os.getenv("PAYSTACK_SECRET_KEY"))
 
@@ -35,6 +35,45 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+async def initiate_virtual_account_payment(amount: Decimal, email: str, customer_id: int, reference: str):
+    try:
+        # Placeholder for Paystack dedicated virtual account creation
+        # Replace with actual Paystack API call to create a dedicated virtual account
+        headers = {
+            "Authorization": f"Bearer {os.getenv('PAYSTACK_SECRET_KEY')}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "customer": customer_id,
+            "preferred_bank": "wema-bank",  # Example bank
+            "reference": reference,
+            "amount": int(amount * 100),  # Convert to kobo
+        }
+        response = requests.post(
+            "https://api.paystack.co/dedicated_account",
+            headers=headers,
+            json=payload,
+        )
+        response_data = response.json()
+        logger.info(f"Paystack virtual account response: {response_data}")
+        
+        if response.status_code == 200 and response_data.get("status"):
+            virtual_account = {
+                "bank": response_data["data"]["bank"]["name"],
+                "account_number": response_data["data"]["account_number"],
+                "account_name": response_data["data"]["account_name"],
+            }
+            return virtual_account
+        else:
+            logger.error(f"Failed to create virtual account: {response_data}")
+            return error_response(
+                status_code=response.status_code,
+                message=f"Failed to initiate virtual account: {response_data.get('message', 'Unknown error')}",
+            )
+    except Exception as e:
+        logger.error(f"Error initiating virtual account: {str(e)}")
+        return error_response(status_code=500, message=f"Error initiating virtual account: {str(e)}")
 
 def has_permission(user: User, permission: str, db: Session) -> bool:
     return permission in user.permissions
@@ -923,7 +962,7 @@ async def verify_savings_payment(reference: str, db: Session):
         return error_response(status_code=404, message="Payment reference not found")
 
     payment_method = markings[0].payment_method
-    status = markings[0].status  # Assume all markings for the same reference have the same status
+    status = markings[0].status
     total_amount = sum(m.amount for m in markings)
     tracking_numbers = list({m.savings_account.tracking_number for m in markings})
     marked_dates = [m.marked_date.isoformat() for m in markings]
@@ -938,13 +977,13 @@ async def verify_savings_payment(reference: str, db: Session):
         "marked_dates": marked_dates,
     }
 
-    if payment_method == PaymentMethod.CASH.value:
+    if payment_method == PaymentMethod.CASH:
         return success_response(
             status_code=200,
             message="Payment details retrieved",
             data=response_data
         )
-    elif payment_method == PaymentMethod.CARD.value:
+    elif payment_method == PaymentMethod.CARD:
         response = Transaction.verify(reference=reference)
         if response["status"]:
             response_data["status"] = "paid" if response["data"]["status"] == "success" else "pending"
@@ -958,14 +997,31 @@ async def verify_savings_payment(reference: str, db: Session):
         else:
             logger.error(f"Card payment verification failed: {response.get('message', 'No message')}")
             return error_response(status_code=400, message="Payment verification failed")
-    elif payment_method == PaymentMethod.BANK_TRANSFER.value:
-        # Assuming virtual account details are returned by initiate_virtual_account_payment
-        # Replace with actual retrieval logic if stored in database
-        virtual_account = await initiate_virtual_account_payment(total_amount, "", 0, reference)  # Dummy call for example
-        if isinstance(virtual_account, dict):
+    elif payment_method == PaymentMethod.BANK_TRANSFER:
+        # Retrieve virtual account details from the first marking
+        virtual_account = markings[0].virtual_account_details
+        if virtual_account:
             response_data["virtual_account"] = virtual_account
         else:
-            response_data["virtual_account"] = {"bank": "Unknown", "account_number": "Unknown"}
+            # Fallback to Paystack API if no details stored
+            headers = {
+                "Authorization": f"Bearer {os.getenv('PAYSTACK_SECRET_KEY')}",
+                "Content-Type": "application/json",
+            }
+            response = requests.get(
+                f"https://api.paystack.co/dedicated_account/{reference}",
+                headers=headers,
+            )
+            response_data_api = response.json()
+            logger.info(f"Paystack virtual account retrieval response: {response_data_api}")
+            if response.status_code == 200 and response_data_api.get("status"):
+                response_data["virtual_account"] = {
+                    "bank": response_data_api["data"]["bank"]["name"],
+                    "account_number": response_data_api["data"]["account_number"],
+                    "account_name": response_data_api["data"]["account_name"],
+                }
+            else:
+                response_data["virtual_account"] = {"bank": "Unknown", "account_number": "Unknown"}
     else:
         return error_response(status_code=400, message=f"Unsupported payment method: {payment_method}")
 
