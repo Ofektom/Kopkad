@@ -784,7 +784,7 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
             reference=reference,
             amount=total_amount_kobo,
             email=customer.email,
-            callback_url="https://kopkad.onrender.com/payment-confirmation"
+            callback_url="https://kopkad-frontend.vercel.app/payment-confirmation"
         )
         logger.info(f"Paystack initialize response: {response}")
         if response["status"]:
@@ -909,7 +909,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
             reference=reference,
             amount=total_amount_kobo,
             email=customer.email,
-            callback_url="https://kopkad.onrender.com/payment-confirmation"
+            callback_url="https://kopkad-frontend.vercel.app/payment-confirmation"
         )
         logger.info(f"Paystack initialize response: {response}")
         if response["status"]:
