@@ -962,7 +962,6 @@ async def verify_savings_payment(reference: str, db: Session):
         return error_response(status_code=404, message="Payment reference not found")
 
     payment_method = markings[0].payment_method
-    status = markings[0].status
     total_amount = sum(m.amount for m in markings)
     tracking_numbers = list({m.savings_account.tracking_number for m in markings})
     marked_dates = [m.marked_date.isoformat() for m in markings]
@@ -971,13 +970,14 @@ async def verify_savings_payment(reference: str, db: Session):
 
     response_data = {
         "reference": reference,
-        "status": status,
+        "status": SavingsStatus.PENDING,
         "amount": str(total_amount),
         "tracking_numbers": tracking_numbers,
         "marked_dates": marked_dates,
     }
 
     if payment_method == PaymentMethod.CASH:
+        response_data["status"] = SavingsStatus.PAID
         return success_response(
             status_code=200,
             message="Payment details retrieved",
@@ -985,8 +985,8 @@ async def verify_savings_payment(reference: str, db: Session):
         )
     elif payment_method == PaymentMethod.CARD:
         response = Transaction.verify(reference=reference)
-        if response["status"]:
-            response_data["status"] = "paid" if response["data"]["status"] == "success" else "pending"
+        logger.info(f"Paystack verify response: {response}")
+        if response["status"] and response["data"]["status"] == "success":
             total_paid = Decimal(response["data"]["amount"]) / 100
             if total_paid < total_amount:
                 logger.error(f"Underpayment for {reference}: expected {total_amount}, paid {total_paid}")
@@ -994,34 +994,62 @@ async def verify_savings_payment(reference: str, db: Session):
                     status_code=400,
                     message=f"Paid amount {total_paid} less than expected {total_amount}"
                 )
+            for marking in markings:
+                marking.status = SavingsStatus.PAID
+                marking.updated_at = datetime.now()
+            db.commit()
+            response_data["status"] = SavingsStatus.PAID.value
+            logger.info(f"Card payment verified and marked as PAID for reference {reference}")
         else:
             logger.error(f"Card payment verification failed: {response.get('message', 'No message')}")
             return error_response(status_code=400, message="Payment verification failed")
     elif payment_method == PaymentMethod.BANK_TRANSFER:
-        # Retrieve virtual account details from the first marking
-        virtual_account = markings[0].virtual_account_details
-        if virtual_account:
-            response_data["virtual_account"] = virtual_account
-        else:
-            # Fallback to Paystack API if no details stored
-            headers = {
-                "Authorization": f"Bearer {os.getenv('PAYSTACK_SECRET_KEY')}",
-                "Content-Type": "application/json",
+        response = Transaction.verify(reference=reference)
+        logger.info(f"Paystack verify response for bank transfer: {response}")
+        if response["status"] and response["data"]["status"] == "success":
+            total_paid = Decimal(response["data"]["amount"]) / 100
+            if total_paid < total_amount:
+                logger.error(f"Underpayment for {reference}: expected {total_amount}, paid {total_paid}")
+                return error_response(
+                    status_code=400,
+                    message=f"Paid amount {total_paid} less than expected {total_amount}"
+                )
+            for marking in markings:
+                marking.status = SavingsStatus.PAID
+                marking.updated_at = datetime.now()
+            db.commit()
+            response_data["status"] = SavingsStatus.PAID
+            response_data["virtual_account"] = {
+                "bank": response["data"].get("bank", "Unknown"),
+                "account_number": response["data"].get("account_number", "Unknown"),
+                "account_name": response["data"].get("account_name", "Unknown"),
             }
-            response = requests.get(
-                f"https://api.paystack.co/dedicated_account/{reference}",
-                headers=headers,
-            )
-            response_data_api = response.json()
-            logger.info(f"Paystack virtual account retrieval response: {response_data_api}")
-            if response.status_code == 200 and response_data_api.get("status"):
-                response_data["virtual_account"] = {
-                    "bank": response_data_api["data"]["bank"]["name"],
-                    "account_number": response_data_api["data"]["account_number"],
-                    "account_name": response_data_api["data"]["account_name"],
-                }
+            logger.info(f"Bank transfer payment verified and marked as PAID for reference {reference}")
+        else:
+            virtual_account = markings[0].virtual_account_details
+            if virtual_account:
+                response_data["virtual_account"] = virtual_account
             else:
-                response_data["virtual_account"] = {"bank": "Unknown", "account_number": "Unknown"}
+                headers = {
+                    "Authorization": f"Bearer {os.getenv('PAYSTACK_SECRET_KEY')}",
+                    "Content-Type": "application/json",
+                }
+                response = requests.get(
+                    f"https://api.paystack.co/dedicated_account/{reference}",
+                    headers=headers,
+                )
+                response_data_api = response.json()
+                logger.info(f"Paystack virtual account retrieval response: {response_data_api}")
+                if response.status_code == 200 and response_data_api.get("status"):
+                    response_data["virtual_account"] = {
+                        "bank": response_data_api["data"]["bank"]["name"],
+                        "account_number": response_data_api["data"]["account_number"],
+                        "account_name": response_data_api["data"]["account_name"],
+                    }
+                else:
+                    response_data["virtual_account"] = {"bank": "Unknown", "account_number": "Unknown"}
+            logger.error(f"Bank transfer verification failed: {response.get('message', 'No message')}")
+            return error_response(status_code=400, message="Payment verification failed")
     else:
         return error_response(status_code=400, message=f"Unsupported payment method: {payment_method}")
 
