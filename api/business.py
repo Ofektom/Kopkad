@@ -136,7 +136,7 @@ async def get_business_units_endpoint(
 ):
     return await get_business_units(business_unique_code, current_user, db, page, size)
 
-@business_router.get("/user/units/list", response_model=List[UnitResponse])  # New endpoint
+@business_router.get("/user/units/list/", response_model=List[UnitResponse])  # New endpoint
 async def get_user_units_endpoint(
     name: Optional[str] = Query(None, description="Filter by unit name"),
     location: Optional[str] = Query(None, description="Filter by unit location"),
