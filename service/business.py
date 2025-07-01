@@ -551,12 +551,12 @@ async def get_all_units(current_user: dict, db: Session, page: int = 1, size: in
         }
     )
 
-async def get_business_units(business_unique_code: str, current_user: dict, db: Session, page: int = 1, size: int = 8):
+async def get_business_units(business_id: int, current_user: dict, db: Session, page: int = 1, size: int = 8):
     """Retrieve paginated units for a business based on user role."""
-    logger.info(f"Fetching units for business_unique_code: {business_unique_code}, user_id: {current_user['user_id']}, role: {current_user['role']}, page: {page}, size: {size}")
-    business = db.query(Business).filter(Business.unique_code.ilike(business_unique_code)).first()
+    logger.info(f"Fetching units for business_id: {business_id}, user_id: {current_user['user_id']}, role: {current_user['role']}, page: {page}, size: {size}")
+    business = db.query(Business).filter(Business.id == business_id).first()
     if not business:
-        logger.error(f"Business not found for unique_code: {business_unique_code}")
+        logger.error(f"Business not found for id: {business_id}")
         return error_response(status_code=404, message="Business not found")
 
     # Role-based access control

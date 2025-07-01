@@ -126,15 +126,15 @@ async def get_all_units_endpoint(
 ):
     return await get_all_units(current_user, db, page, size)
 
-@business_router.get("/{business_unique_code}/units", response_model=List[UnitResponse])
+@business_router.get("/{business_id}/units", response_model=List[UnitResponse])
 async def get_business_units_endpoint(
-    business_unique_code: str,
+    business_id: int,
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(8, ge=1, le=100, description="Items per page"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return await get_business_units(business_unique_code, current_user, db, page, size)
+    return await get_business_units(business_id, current_user, db, page, size)
 
 @business_router.get("/user/units/list/", response_model=List[UnitResponse])  # New endpoint
 async def get_user_units_endpoint(
