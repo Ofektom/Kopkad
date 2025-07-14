@@ -553,15 +553,15 @@ async def delete_savings(savings_id: int, current_user: dict, db: Session):
     )
 
 async def get_all_savings(
-        customer_id: int | None,
-        business_id: int | None,
-        unit_id: int | None,  # Added unit_id filter
-        savings_type: str | None,
-        limit: int, 
-        offset: int, 
-        current_user: dict, 
-        db: Session
-    ):
+    customer_id: int | None,
+    business_id: int | None,
+    unit_id: int | None,
+    savings_type: str | None,
+    limit: int, 
+    offset: int, 
+    current_user: dict, 
+    db: Session
+):
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not current_user_obj:
         return error_response(status_code=404, message="User not found")
@@ -600,6 +600,10 @@ async def get_all_savings(
     elif current_user["role"] != "super_admin":
         return error_response(status_code=403, message="Unauthorized role")
 
+    # Apply business_id filter if provided (for all roles, including super_admin)
+    if business_id:
+        query = query.filter(SavingsAccount.business_id == business_id)
+
     if customer_id and current_user["role"] != "customer":
         customer = db.query(User).filter(User.id == customer_id, User.role == "customer").first()
         if not customer:
@@ -635,7 +639,7 @@ async def get_all_savings(
             id=s.id,
             customer_id=s.customer_id,
             business_id=s.business_id,
-            unit_id=s.unit_id,  # Include unit_id
+            unit_id=s.unit_id,
             tracking_number=s.tracking_number,
             savings_type=s.savings_type,
             daily_amount=s.daily_amount,
@@ -700,16 +704,17 @@ async def get_savings_markings_by_tracking_number(tracking_number: str, db: Sess
 
     if not markings:
         return error_response(status_code=404, message="No savings schedule found for this account")
-
+    
     savings_schedule = {
         marking.marked_date.isoformat(): marking.status for marking in markings
     }
 
-    response_data = {
-        "tracking_number": tracking_number,
-        "savings_schedule": savings_schedule,
-        "total_amount": sum(marking.amount for marking in markings)
-    }
+    response_data = SavingsMarkingResponse(
+        tracking_number=tracking_number,
+        unit_id=savings_account.unit_id,
+        savings_schedule=savings_schedule,
+        total_amount=sum(marking.amount for marking in markings)
+    )
 
     logger.info(f"Retrieved {len(savings_schedule)} markings for savings {tracking_number}")
     return success_response(status_code=200, message="Savings schedule retrieved successfully", data=response_data)

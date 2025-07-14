@@ -117,6 +117,7 @@ class SavingsTargetCalculationResponse(BaseModel):
 
 class SavingsMarkingResponse(BaseModel):
     tracking_number: str
+    unit_id: Optional[int]
     savings_schedule: Dict[str, str]
     total_amount: Decimal
     authorization_url: Optional[str] = None
