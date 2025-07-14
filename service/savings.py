@@ -681,11 +681,9 @@ async def get_savings_markings_by_tracking_number(tracking_number: str, db: Sess
         marking.marked_date.isoformat(): marking.status for marking in markings
     }
 
-    unit_id = markings[0].unit_id if markings else None
-
     response_data = {
         "tracking_number": tracking_number,
-        "unit_id": unit_id,
+        "unit_id": savings_account.unit_id,  # Use unit_id from SavingsAccount
         "savings_schedule": savings_schedule,
         "total_amount": sum(marking.amount for marking in markings)
     }
@@ -693,40 +691,13 @@ async def get_savings_markings_by_tracking_number(tracking_number: str, db: Sess
     logger.info(f"Retrieved {len(savings_schedule)} markings for savings {tracking_number}")
     return success_response(status_code=200, message="Savings schedule retrieved successfully", data=response_data)
 
-
-async def get_savings_markings_by_tracking_number(tracking_number: str, db: Session):
-    savings_account = db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tracking_number).first()
-    
-    if not savings_account:
-        return error_response(status_code=404, message="Savings account not found")
-
-    markings = db.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings_account.id).all()
-
-    if not markings:
-        return error_response(status_code=404, message="No savings schedule found for this account")
-    
-    savings_schedule = {
-        marking.marked_date.isoformat(): marking.status for marking in markings
-    }
-
-    response_data = SavingsMarkingResponse(
-        tracking_number=tracking_number,
-        unit_id=savings_account.unit_id,
-        savings_schedule=savings_schedule,
-        total_amount=sum(marking.amount for marking in markings)
-    )
-
-    logger.info(f"Retrieved {len(savings_schedule)} markings for savings {tracking_number}")
-    return success_response(status_code=200, message="Savings schedule retrieved successfully", data=response_data)
-
-
 async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequest, current_user: dict, db: Session):
     savings = db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tracking_number).first()
     if not savings:
-        return error_response(status_code=404, message="Savings account not found")
+        return error_response(status_code=404, message=f"Savings {tracking_number} not found")
 
     if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
-        return error_response(status_code=403, message="Not your savings account")
+        return error_response(status_code=403, message=f"Not your savings {tracking_number}")
     elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
         return error_response(status_code=403, message="Unauthorized role")
 
@@ -748,15 +719,11 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
         SavingsMarking.marked_date == request.marked_date
     ).first()
     if not marking or marking.marked_by_id:
-        return error_response(status_code=400, message="Invalid date or already marked")
+        return error_response(status_code=400, message=f"Invalid or already marked date {request.marked_date}")
 
-    total_amount = marking.amount
-    total_amount_kobo = int(total_amount * 100)
-    customer = db.query(User).filter(User.id == savings.customer_id).first()
+    customer = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not customer.email:
-        return error_response(status_code=400, message="Customer email required")
-
-    reference = f"savings_{savings.tracking_number}_{datetime.now().timestamp()}"
+        return error_response(status_code=400, message="User email required")
 
     try:
         payment_method = PaymentMethod(request.payment_method)
@@ -765,6 +732,7 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
 
     marking.payment_method = payment_method
     marking.unit_id = request.unit_id or savings.unit_id
+    total_amount = marking.amount
 
     if payment_method == PaymentMethod.CASH:
         marking.status = SavingsStatus.PAID
@@ -778,13 +746,17 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
             message="Savings marked successfully",
             data=SavingsMarkingResponse(
                 tracking_number=savings.tracking_number,
-                savings_schedule={request.marked_date.isoformat(): SavingsStatus.PAID.value},
+                unit_id=savings.unit_id,  # Include unit_id from SavingsAccount
+                savings_schedule={marking.marked_date.isoformat(): marking.status},
                 total_amount=total_amount,
                 authorization_url=None,
-                payment_reference=None
+                payment_reference=None,
+                virtual_account=None
             ).model_dump()
         )
     elif payment_method == PaymentMethod.CARD:
+        total_amount_kobo = int(total_amount * 100)
+        reference = f"savings_{tracking_number}_{datetime.now().timestamp()}"
         response = Transaction.initialize(
             reference=reference,
             amount=total_amount_kobo,
@@ -801,16 +773,19 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
                 message="Proceed to payment",
                 data=SavingsMarkingResponse(
                     tracking_number=savings.tracking_number,
-                    savings_schedule={request.marked_date.isoformat(): SavingsStatus.PENDING.value},
+                    unit_id=savings.unit_id,  # Include unit_id from SavingsAccount
+                    savings_schedule={marking.marked_date.isoformat(): marking.status},
                     total_amount=total_amount,
                     authorization_url=response["data"]["authorization_url"],
-                    payment_reference=response["data"]["reference"]
+                    payment_reference=response["data"]["reference"],
+                    virtual_account=None
                 ).model_dump()
             )
         logger.error(f"Paystack initialization failed: {response}")
         return error_response(status_code=500, message=f"Failed to initiate card payment: {response.get('message', 'Unknown error')}")
     elif payment_method == PaymentMethod.BANK_TRANSFER:
-        virtual_account = await initiate_virtual_account_payment(total_amount, customer.email, savings.customer_id, reference)
+        reference = f"savings_{tracking_number}_{datetime.now().timestamp()}"
+        virtual_account = await initiate_virtual_account_payment(total_amount, customer.email, current_user["user_id"], reference)
         if isinstance(virtual_account, dict):
             marking.payment_reference = reference
             marking.status = SavingsStatus.PENDING
@@ -820,8 +795,10 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
                 message="Pay to the virtual account",
                 data=SavingsMarkingResponse(
                     tracking_number=savings.tracking_number,
-                    savings_schedule={request.marked_date.isoformat(): SavingsStatus.PENDING.value},
+                    unit_id=savings.unit_id,  # Include unit_id from SavingsAccount
+                    savings_schedule={marking.marked_date.isoformat(): marking.status},
                     total_amount=total_amount,
+                    authorization_url=None,
                     payment_reference=reference,
                     virtual_account=virtual_account
                 ).model_dump()
@@ -881,7 +858,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
 
         if mark_request.tracking_number not in marked_dates_by_tracking:
             marked_dates_by_tracking[mark_request.tracking_number] = []
-        marked_dates_by_tracking[mark_request.tracking_number].append(mark_request.marked_date.isoformat())
+        marked_dates_by_tracking[mark_request.tracking_number].append(marking.marked_date.isoformat())
 
     customer = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not customer.email:
@@ -904,7 +881,11 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
             data={
                 "total_amount": total_amount,
                 "savings_accounts": [
-                    {"tracking_number": tn, "marked_dates": dates}
+                    {
+                        "tracking_number": tn,
+                        "unit_id": db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tn).first().unit_id,
+                        "marked_dates": dates
+                    }
                     for tn, dates in marked_dates_by_tracking.items()
                 ]
             }
@@ -930,7 +911,11 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
                     "reference": response["data"]["reference"],
                     "total_amount": total_amount,
                     "savings_accounts": [
-                        {"tracking_number": tn, "marked_dates": dates}
+                        {
+                            "tracking_number": tn,
+                            "unit_id": db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tn).first().unit_id,
+                            "marked_dates": dates
+                        }
                         for tn, dates in marked_dates_by_tracking.items()
                     ]
                 }
@@ -952,14 +937,17 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
                     "reference": reference,
                     "total_amount": total_amount,
                     "savings_accounts": [
-                        {"tracking_number": tn, "marked_dates": dates}
+                        {
+                            "tracking_number": tn,
+                            "unit_id": db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tn).first().unit_id,
+                            "marked_dates": dates
+                        }
                         for tn, dates in marked_dates_by_tracking.items()
                     ]
                 }
             )
         return virtual_account
     return error_response(status_code=400, message=f"Invalid payment method: {payment_method.value}")
-
 
 async def verify_savings_payment(reference: str, db: Session):
     markings = db.query(SavingsMarking).filter(SavingsMarking.payment_reference == reference).all()
