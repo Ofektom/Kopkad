@@ -126,3 +126,12 @@ class SavingsMarkingResponse(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+
+class SavingsMetricsResponse(BaseModel):
+    tracking_number: str
+    total_amount: Decimal
+    amount_marked: Decimal
+    days_remaining: int
+
+    class Config:
+        arbitrary_types_allowed = True

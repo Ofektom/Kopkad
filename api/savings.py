@@ -25,6 +25,7 @@ from service.savings import (
     calculate_target_savings,
     get_all_savings,
     delete_savings,
+    get_savings_metrics,
 )
 from database.postgres import get_db
 from utils.auth import get_current_user
@@ -115,6 +116,13 @@ async def get_savings_markings(
     db: Session = Depends(get_db),
 ):
     return await get_savings_markings_by_tracking_number(tracking_number, db)
+
+@savings_router.get("/metrics/{tracking_number}", response_model=dict)
+async def get_savings_metrics_endpoint(
+    tracking_number: str,
+    db: Session = Depends(get_db),
+):
+    return await get_savings_metrics(tracking_number, db)
 
 
 @savings_router.post("/mark/{tracking_number}", response_model=dict)

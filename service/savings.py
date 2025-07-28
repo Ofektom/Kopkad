@@ -12,6 +12,7 @@ from schemas.savings import (
     SavingsReinitiateTarget,
     BulkMarkSavingsRequest,
     SavingsTargetCalculationResponse,
+    SavingsMetricsResponse,
 )
 from utils.response import success_response, error_response
 from models.user import User, Permission
@@ -948,6 +949,31 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
             )
         return virtual_account
     return error_response(status_code=400, message=f"Invalid payment method: {payment_method.value}")
+
+async def get_savings_metrics(tracking_number: str, db: Session):
+    savings_account = db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tracking_number).first()
+    
+    if not savings_account:
+        return error_response(status_code=404, message="Savings account not found")
+
+    markings = db.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings_account.id).all()
+
+    if not markings:
+        return error_response(status_code=404, message="No savings schedule found for this account")
+
+    total_amount = sum(marking.amount for marking in markings)
+    amount_marked = sum(marking.amount for marking in markings if marking.status == SavingsStatus.PAID.value)
+    days_remaining = sum(1 for marking in markings if marking.status == SavingsStatus.PENDING.value)
+
+    response_data = SavingsMetricsResponse(
+        tracking_number=tracking_number,
+        total_amount=total_amount,
+        amount_marked=amount_marked,
+        days_remaining=days_remaining
+    ).model_dump()
+
+    logger.info(f"Retrieved metrics for savings {tracking_number}: total={total_amount}, marked={amount_marked}, days_remaining={days_remaining}")
+    return success_response(status_code=200, message="Savings metrics retrieved successfully", data=response_data)
 
 async def verify_savings_payment(reference: str, db: Session):
     markings = db.query(SavingsMarking).filter(SavingsMarking.payment_reference == reference).all()
