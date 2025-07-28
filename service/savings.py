@@ -39,17 +39,15 @@ logger = logging.getLogger(__name__)
 
 async def initiate_virtual_account_payment(amount: Decimal, email: str, customer_id: int, reference: str):
     try:
-        # Placeholder for Paystack dedicated virtual account creation
-        # Replace with actual Paystack API call to create a dedicated virtual account
         headers = {
             "Authorization": f"Bearer {os.getenv('PAYSTACK_SECRET_KEY')}",
             "Content-Type": "application/json",
         }
         payload = {
             "customer": customer_id,
-            "preferred_bank": "wema-bank",  # Example bank
+            "preferred_bank": "wema-bank",
             "reference": reference,
-            "amount": int(amount * 100),  # Convert to kobo
+            "amount": int(amount * 100),
         }
         response = requests.post(
             "https://api.paystack.co/dedicated_account",
@@ -100,7 +98,7 @@ def _adjust_savings_markings(savings: SavingsAccount, markings: list[SavingsMark
         for day in range(existing_days, total_days):
             new_marking = SavingsMarking(
                 savings_account_id=savings.id,
-                unit_id=savings.unit_id,  # Set unit_id from SavingsAccount
+                unit_id=savings.unit_id,
                 amount=savings.daily_amount,
                 marked_date=savings.start_date + timedelta(days=day)
             )
@@ -128,7 +126,7 @@ def _savings_response(savings: SavingsAccount) -> dict:
             id=savings.id,
             customer_id=savings.customer_id,
             business_id=savings.business_id,
-            unit_id=savings.unit_id,  # Include unit_id
+            unit_id=savings.unit_id,
             tracking_number=savings.tracking_number,
             savings_type=savings.savings_type,
             daily_amount=savings.daily_amount,
@@ -162,7 +160,6 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
     if request.daily_amount <= 0 or request.duration_months <= 0:
         return error_response(status_code=400, message="Daily amount and duration must be positive")
 
-    # Validate unit_id and business_id association
     unit_exists = db.query(exists().where(
         user_units.c.user_id == customer_id
     ).where(
@@ -176,13 +173,14 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
         return error_response(status_code=400, message=f"Customer {customer_id} is not associated with unit {request.unit_id} in business {request.business_id}")
 
     total_days = _calculate_total_days(request.start_date, request.duration_months)
+    total_amount = request.daily_amount * Decimal(total_days)  # Calculate total for target_amount
     tracking_number = _generate_unique_tracking_number(db, SavingsAccount)
     end_date = request.start_date + relativedelta(months=request.duration_months) - timedelta(days=1)
 
     savings = SavingsAccount(
         customer_id=customer_id,
         business_id=request.business_id,
-        unit_id=request.unit_id,  # Set unit_id
+        unit_id=request.unit_id,
         tracking_number=tracking_number,
         savings_type=SavingsType.DAILY.value,
         daily_amount=request.daily_amount,
@@ -190,17 +188,19 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
         start_date=request.start_date,
         end_date=end_date,
         commission_days=request.commission_days,
+        target_amount=total_amount,  # Store total in target_amount
         created_by=current_user["user_id"],
     )
     db.add(savings)
     db.flush()
 
+    logger.info(f"Set target_amount={total_amount} for daily savings {tracking_number} with {total_days} days")
     logger.info(f"Creating {total_days} markings for daily savings {tracking_number} from {request.start_date} to {end_date}")
 
     markings = [
         SavingsMarking(
             savings_account_id=savings.id,
-            unit_id=savings.unit_id,  # Set unit_id
+            unit_id=savings.unit_id,
             marked_date=request.start_date + timedelta(days=i),
             amount=request.daily_amount,
             marked_by_id=None,
@@ -256,7 +256,6 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
     if total_days <= 0:
         return error_response(status_code=400, message="End date must be after start date")
 
-    # Validate unit_id and business_id association
     unit_exists = db.query(exists().where(
         user_units.c.user_id == customer_id
     ).where(
@@ -276,7 +275,7 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
     savings = SavingsAccount(
         customer_id=customer_id,
         business_id=request.business_id,
-        unit_id=request.unit_id,  # Set unit_id
+        unit_id=request.unit_id,
         tracking_number=tracking_number,
         savings_type=SavingsType.TARGET.value,
         daily_amount=daily_amount.quantize(Decimal("0.01")),
@@ -293,7 +292,7 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
     markings = [
         SavingsMarking(
             savings_account_id=savings.id,
-            unit_id=savings.unit_id,  # Set unit_id
+            unit_id=savings.unit_id,
             marked_date=request.start_date + timedelta(days=i),
             amount=daily_amount.quantize(Decimal("0.01")),
             marked_by_id=None,
@@ -329,7 +328,6 @@ async def reinitiate_savings_daily(request: SavingsReinitiateDaily, current_user
     if request.daily_amount <= 0 or request.duration_months <= 0:
         return error_response(status_code=400, message="Daily amount and duration must be positive")
 
-    # Validate unit_id and business_id association
     unit_exists = db.query(exists().where(
         user_units.c.user_id == savings.customer_id
     ).where(
@@ -343,16 +341,17 @@ async def reinitiate_savings_daily(request: SavingsReinitiateDaily, current_user
         return error_response(status_code=400, message=f"Customer {savings.customer_id} is not associated with unit {request.unit_id} in business {request.business_id}")
 
     total_days = _calculate_total_days(request.start_date, request.duration_months)
+    total_amount = request.daily_amount * Decimal(total_days)  # Calculate total for target_amount
     end_date = request.start_date + relativedelta(months=request.duration_months) - timedelta(days=1)
     savings.daily_amount = request.daily_amount
     savings.duration_months = request.duration_months
     savings.start_date = request.start_date
     savings.end_date = end_date
     savings.commission_days = request.commission_days
-    savings.target_amount = None
+    savings.target_amount = total_amount  # Update target_amount
     savings.savings_type = SavingsType.DAILY.value
-    savings.business_id = request.business_id  # Update business_id
-    savings.unit_id = request.unit_id  # Update unit_id
+    savings.business_id = request.business_id
+    savings.unit_id = request.unit_id
     savings.updated_by = current_user["user_id"]
     db.flush()
 
@@ -360,7 +359,7 @@ async def reinitiate_savings_daily(request: SavingsReinitiateDaily, current_user
     markings = [
         SavingsMarking(
             savings_account_id=savings.id,
-            unit_id=savings.unit_id,  # Set unit_id
+            unit_id=savings.unit_id,
             marked_date=request.start_date + timedelta(days=i),
             amount=request.daily_amount,
             marked_by_id=None,
@@ -370,7 +369,7 @@ async def reinitiate_savings_daily(request: SavingsReinitiateDaily, current_user
     db.add_all(markings)
     db.commit()
 
-    logger.info(f"Reinitiated daily savings {savings.tracking_number} for customer {current_user['user_id']}")
+    logger.info(f"Reinitiated daily savings {savings.tracking_number} with target_amount={total_amount} for customer {current_user['user_id']}")
     return _savings_response(savings)
 
 async def reinitiate_savings_target(request: SavingsReinitiateTarget, current_user: dict, db: Session):
@@ -399,7 +398,6 @@ async def reinitiate_savings_target(request: SavingsReinitiateTarget, current_us
     if total_days <= 0:
         return error_response(status_code=400, message="End date must be after start date")
 
-    # Validate unit_id and business_id association
     unit_exists = db.query(exists().where(
         user_units.c.user_id == savings.customer_id
     ).where(
@@ -422,8 +420,8 @@ async def reinitiate_savings_target(request: SavingsReinitiateTarget, current_us
     savings.target_amount = request.target_amount
     savings.commission_days = request.commission_days
     savings.savings_type = SavingsType.TARGET.value
-    savings.business_id = request.business_id  # Update business_id
-    savings.unit_id = request.unit_id  # Update unit_id
+    savings.business_id = request.business_id
+    savings.unit_id = request.unit_id
     savings.updated_by = current_user["user_id"]
     db.flush()
 
@@ -431,7 +429,7 @@ async def reinitiate_savings_target(request: SavingsReinitiateTarget, current_us
     markings = [
         SavingsMarking(
             savings_account_id=savings.id,
-            unit_id=savings.unit_id,  # Set unit_id
+            unit_id=savings.unit_id,
             marked_date=request.start_date + timedelta(days=i),
             amount=daily_amount.quantize(Decimal("0.01")),
             marked_by_id=None,
@@ -453,7 +451,6 @@ async def update_savings(savings_id: int, request: SavingsUpdate, current_user: 
     if not savings:
         return error_response(status_code=404, message="Savings account not found")
 
-    # Validate unit_id and business_id if provided
     if request.business_id and request.unit_id:
         unit_exists = db.query(exists().where(
             user_units.c.user_id == savings.customer_id
@@ -484,7 +481,7 @@ async def update_savings(savings_id: int, request: SavingsUpdate, current_user: 
 
         for marking in markings:
             marking.amount = request.daily_amount
-            marking.unit_id = savings.unit_id  # Update unit_id in markings
+            marking.unit_id = savings.unit_id
         db.commit()
 
     if request.duration_months is not None or request.start_date or request.end_date:
@@ -502,6 +499,11 @@ async def update_savings(savings_id: int, request: SavingsUpdate, current_user: 
         elif request.end_date:
             savings.duration_months = (request.end_date - savings.start_date).days // 30
             savings.end_date = request.end_date
+
+        # Update target_amount for daily savings
+        if savings.savings_type == SavingsType.DAILY.value:
+            total_days = _calculate_total_days(savings.start_date, savings.duration_months)
+            savings.target_amount = savings.daily_amount * Decimal(total_days)
 
         _adjust_savings_markings(savings, markings, db)
 
@@ -569,7 +571,6 @@ async def get_all_savings(
     
     query = db.query(SavingsAccount)
 
-    # Role-based filtering
     if current_user["role"] == "customer":
         if customer_id and customer_id != current_user["user_id"]:
             return error_response(status_code=403, message="Customers can only view their own savings")
@@ -601,7 +602,6 @@ async def get_all_savings(
     elif current_user["role"] != "super_admin":
         return error_response(status_code=403, message="Unauthorized role")
 
-    # Apply business_id filter if provided (for all roles, including super_admin)
     if business_id:
         query = query.filter(SavingsAccount.business_id == business_id)
 
@@ -684,9 +684,9 @@ async def get_savings_markings_by_tracking_number(tracking_number: str, db: Sess
 
     response_data = {
         "tracking_number": tracking_number,
-        "unit_id": savings_account.unit_id,  # Use unit_id from SavingsAccount
+        "unit_id": savings_account.unit_id,
         "savings_schedule": savings_schedule,
-        "total_amount": sum(marking.amount for marking in markings)
+        "total_amount": savings_account.target_amount or sum(marking.amount for marking in markings)
     }
 
     logger.info(f"Retrieved {len(savings_schedule)} markings for savings {tracking_number}")
@@ -747,7 +747,7 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
             message="Savings marked successfully",
             data=SavingsMarkingResponse(
                 tracking_number=savings.tracking_number,
-                unit_id=savings.unit_id,  # Include unit_id from SavingsAccount
+                unit_id=savings.unit_id,
                 savings_schedule={marking.marked_date.isoformat(): marking.status},
                 total_amount=total_amount,
                 authorization_url=None,
@@ -774,7 +774,7 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
                 message="Proceed to payment",
                 data=SavingsMarkingResponse(
                     tracking_number=savings.tracking_number,
-                    unit_id=savings.unit_id,  # Include unit_id from SavingsAccount
+                    unit_id=savings.unit_id,
                     savings_schedule={marking.marked_date.isoformat(): marking.status},
                     total_amount=total_amount,
                     authorization_url=response["data"]["authorization_url"],
@@ -796,7 +796,7 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
                 message="Pay to the virtual account",
                 data=SavingsMarkingResponse(
                     tracking_number=savings.tracking_number,
-                    unit_id=savings.unit_id,  # Include unit_id from SavingsAccount
+                    unit_id=savings.unit_id,
                     savings_schedule={marking.marked_date.isoformat(): marking.status},
                     total_amount=total_amount,
                     authorization_url=None,
@@ -961,9 +961,9 @@ async def get_savings_metrics(tracking_number: str, db: Session):
     if not markings:
         return error_response(status_code=404, message="No savings schedule found for this account")
 
-    total_amount = sum(marking.amount for marking in markings)
-    amount_marked = sum(marking.amount for marking in markings if marking.status == SavingsStatus.PAID.value)
-    days_remaining = sum(1 for marking in markings if marking.status == SavingsStatus.PENDING.value)
+    total_amount = savings_account.target_amount or sum(marking.amount for marking in markings)
+    amount_marked = sum(marking.amount for marking in markings if marking.status == SavingsStatus.PAID)
+    days_remaining = sum(1 for marking in markings if marking.status == SavingsStatus.PENDING)
 
     response_data = SavingsMetricsResponse(
         tracking_number=tracking_number,
