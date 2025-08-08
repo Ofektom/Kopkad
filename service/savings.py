@@ -43,10 +43,14 @@ async def initiate_virtual_account_payment(amount: Decimal, email: str, customer
             "Authorization": f"Bearer {os.getenv('PAYSTACK_SECRET_KEY')}",
             "Content-Type": "application/json",
         }
-        # Check if customer exists in Paystack
         user = db.query(User).filter(User.id == customer_id).first()
-        if not user or not user.paystack_customer_id:
-            # Create Paystack customer
+        if not user:
+            logger.error(f"User {customer_id} not found in database")
+            return error_response(status_code=404, message="User not found")
+
+        # Check if payment_provider_customer_id exists; if not, create Paystack customer
+        payment_provider_customer_id = getattr(user, 'payment_provider_customer_id', None)
+        if not payment_provider_customer_id:
             customer_payload = {
                 "email": email,
                 "first_name": "Customer",
@@ -65,13 +69,17 @@ async def initiate_virtual_account_payment(amount: Decimal, email: str, customer
                     status_code=customer_response.status_code,
                     message=f"Failed to create customer: {customer_data.get('message', 'Unknown error')}",
                 )
-            user.paystack_customer_id = customer_data["data"]["customer_code"]
-            db.commit()
-        paystack_customer_id = user.paystack_customer_id
+            payment_provider_customer_id = customer_data["data"]["customer_code"]
+            try:
+                user.payment_provider_customer_id = payment_provider_customer_id
+                db.commit()
+            except AttributeError:
+                logger.warning(f"User model lacks payment_provider_customer_id field; proceeding without storing")
+                # Continue without storing if migration hasn't been applied
 
         # Check for existing dedicated account
         dedicated_response = requests.get(
-            f"https://api.paystack.co/dedicated_account?customer={paystack_customer_id}",
+            f"https://api.paystack.co/dedicated_account?customer={payment_provider_customer_id}",
             headers=headers,
         )
         dedicated_data = dedicated_response.json()
@@ -84,11 +92,11 @@ async def initiate_virtual_account_payment(amount: Decimal, email: str, customer
                 "account_number": account_data["account_number"],
                 "account_name": account_data["account_name"],
             }
-            logger.info(f"Using existing dedicated account for customer {paystack_customer_id}: {virtual_account}")
+            logger.info(f"Using existing dedicated account for customer {payment_provider_customer_id}: {virtual_account}")
         else:
             # Create new dedicated account
             payload = {
-                "customer": paystack_customer_id,
+                "customer": payment_provider_customer_id,
                 "preferred_bank": "wema-bank",
             }
             response = requests.post(
@@ -143,7 +151,7 @@ async def confirm_bank_transfer(reference: str, current_user: dict, db: Session)
     if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
         return error_response(status_code=403, message="Not your savings account")
     elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
-        return error_response(status_code=403, message="Unauthorized role")
+        return error_response(status_code=401, message="Unauthorized role")
 
     total_amount = sum(m.amount for m in markings)
     response = Transaction.verify(reference=reference)
@@ -673,7 +681,7 @@ async def delete_savings(savings_id: int, current_user: dict, db: Session):
     if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
         return error_response(status_code=403, message="Not your savings account")
     elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
-        return error_response(status_code=403, message="Unauthorized role")
+        return error_response(status_code=401, message="Unauthorized role")
 
     has_paid_markings = db.query(SavingsMarking).filter(
         SavingsMarking.savings_account_id == savings_id,
@@ -738,7 +746,7 @@ async def get_all_savings(
                 return error_response(status_code=400, message=f"Unit {unit_id} not found in business {business_id}")
             query = query.filter(SavingsAccount.unit_id == unit_id)
     elif current_user["role"] != "super_admin":
-        return error_response(status_code=403, message="Unauthorized role")
+        return error_response(status_code=401, message="Unauthorized role")
 
     if business_id:
         query = query.filter(SavingsAccount.business_id == business_id)
@@ -968,7 +976,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
         if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
             return error_response(status_code=403, message=f"Not your savings {mark_request.tracking_number}")
         elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
-            return error_response(status_code=403, message="Unauthorized role")
+            return error_response(status_code=401, message="Unauthorized role")
 
         if mark_request.unit_id:
             unit_exists = db.query(exists().where(
@@ -1007,7 +1015,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
         return error_response(status_code=400, message="Customer email required")
 
     total_amount_kobo = int(total_amount * 100)
-    reference = f"bulk_savings_{datetime.now().timestamp()}"
+    reference = f"bulk_savings_{uuid.uuid4()}"
 
     for savings_id, savings in savings_accounts.items():
         if savings.marking_status == MarkingStatus.NOT_STARTED:
@@ -1032,7 +1040,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
                 message="Proceed to payment for bulk marking",
                 data={
                     "authorization_url": response["data"]["authorization_url"],
-                    "reference": reference,
+                    "reference": response["data"]["reference"],
                     "total_amount": total_amount,
                     "savings_accounts": [
                         {
@@ -1047,7 +1055,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
         logger.error(f"Paystack initialization failed: {response}")
         return error_response(status_code=500, message=f"Failed to initiate bulk card payment: {response.get('message', 'Unknown error')}")
     elif payment_method == PaymentMethod.BANK_TRANSFER:
-        virtual_account = await initiate_virtual_account_payment(total_amount, customer.email, savings_accounts[list(savings_accounts.keys())[0]].customer_id, reference)
+        virtual_account = await initiate_virtual_account_payment(total_amount, customer.email, savings_accounts[list(savings_accounts.keys())[0]].customer_id, reference, db)
         if isinstance(virtual_account, dict):
             for marking in all_markings:
                 marking.payment_reference = reference

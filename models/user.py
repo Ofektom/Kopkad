@@ -58,6 +58,7 @@ class User(AuditMixin, Base):
     email = Column(String, unique=True, nullable=True)
     username = Column(String(50), unique=True, nullable=False)
     pin = Column(String(255), nullable=False)
+    payment_provider_customer_id = Column(String(255), nullable=True)
     role = Column(
         Enum(
             Role.SUPER_ADMIN,
