@@ -918,7 +918,13 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
         savings.marking_status = MarkingStatus.IN_PROGRESS
         db.commit()
 
-    reference = f"savings_{tracking_number}_{uuid.uuid4()}"
+    # Generate shorter payment reference
+    short_uuid = str(uuid.uuid4())[:8]  # Use first 8 characters of UUID
+    reference = f"sv_{tracking_number}_{short_uuid}"  # e.g., sv_0620476978_09fa0f81
+    if len(reference) > 100:
+        logger.warning(f"Generated reference too long: {reference}; truncating")
+        reference = reference[:100]
+        
     if payment_method == PaymentMethod.CARD:
         total_amount_kobo = int(total_amount * 100)
         response = Transaction.initialize(

@@ -67,7 +67,7 @@ class SavingsMarking(AuditMixin, Base):
     marked_date = Column(Date, nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)
     marked_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    payment_reference = Column(String(50), nullable=True)
+    payment_reference = Column(String(100), nullable=True)
     status = Column(
         Enum(SavingsStatus, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,
