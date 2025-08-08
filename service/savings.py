@@ -37,44 +37,98 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-async def initiate_virtual_account_payment(amount: Decimal, email: str, customer_id: int, reference: str):
+async def initiate_virtual_account_payment(amount: Decimal, email: str, customer_id: int, reference: str, db: Session):
     try:
         headers = {
             "Authorization": f"Bearer {os.getenv('PAYSTACK_SECRET_KEY')}",
             "Content-Type": "application/json",
         }
-        # Set expiration to 1 minute from now
-        expiration_time = datetime.now() + timedelta(seconds=60)
-        payload = {
-            "customer": customer_id,
-            "preferred_bank": "wema-bank",
-            "reference": reference,
-            "amount": int(amount * 100),
-        }
-        response = requests.post(
-            "https://api.paystack.co/dedicated_account",
-            headers=headers,
-            json=payload,
-        )
-        response_data = response.json()
-        logger.info(f"Paystack virtual account response: {response_data}")
-        
-        if response.status_code == 200 and response_data.get("status"):
-            virtual_account = {
-                "bank": response_data["data"]["bank"]["name"],
-                "account_number": response_data["data"]["account_number"],
-                "account_name": response_data["data"]["account_name"],
-                "expires_at": expiration_time.isoformat(),  # Store expiration time
+        # Check if customer exists in Paystack
+        user = db.query(User).filter(User.id == customer_id).first()
+        if not user or not user.paystack_customer_id:
+            # Create Paystack customer
+            customer_payload = {
+                "email": email,
+                "first_name": "Customer",
+                "last_name": f"ID_{customer_id}",
             }
-            return virtual_account
-        else:
-            logger.error(f"Failed to create virtual account: {response_data}")
-            return error_response(
-                status_code=response.status_code,
-                message=f"Failed to initiate virtual account: {response_data.get('message', 'Unknown error')}",
+            customer_response = requests.post(
+                "https://api.paystack.co/customer",
+                headers=headers,
+                json=customer_payload,
             )
+            customer_data = customer_response.json()
+            logger.info(f"Paystack customer creation response: {customer_data}")
+            if customer_response.status_code != 200 or not customer_data.get("status"):
+                logger.error(f"Failed to create Paystack customer: {customer_data}")
+                return error_response(
+                    status_code=customer_response.status_code,
+                    message=f"Failed to create customer: {customer_data.get('message', 'Unknown error')}",
+                )
+            user.paystack_customer_id = customer_data["data"]["customer_code"]
+            db.commit()
+        paystack_customer_id = user.paystack_customer_id
+
+        # Check for existing dedicated account
+        dedicated_response = requests.get(
+            f"https://api.paystack.co/dedicated_account?customer={paystack_customer_id}",
+            headers=headers,
+        )
+        dedicated_data = dedicated_response.json()
+        logger.info(f"Paystack dedicated account check response: {dedicated_data}")
+
+        if dedicated_response.status_code == 200 and dedicated_data.get("status") and dedicated_data["data"]:
+            account_data = dedicated_data["data"][0]
+            virtual_account = {
+                "bank": account_data["bank"]["name"],
+                "account_number": account_data["account_number"],
+                "account_name": account_data["account_name"],
+            }
+            logger.info(f"Using existing dedicated account for customer {paystack_customer_id}: {virtual_account}")
+        else:
+            # Create new dedicated account
+            payload = {
+                "customer": paystack_customer_id,
+                "preferred_bank": "wema-bank",
+            }
+            response = requests.post(
+                "https://api.paystack.co/dedicated_account",
+                headers=headers,
+                json=payload,
+            )
+            response_data = response.json()
+            logger.info(f"Paystack dedicated account creation response: {response_data}")
+            if response.status_code == 200 and response_data.get("status"):
+                virtual_account = {
+                    "bank": response_data["data"]["bank"]["name"],
+                    "account_number": response_data["data"]["account_number"],
+                    "account_name": response_data["data"]["account_name"],
+                }
+            else:
+                logger.error(f"Failed to create dedicated account: {response_data}")
+                return error_response(
+                    status_code=response.status_code,
+                    message=f"Failed to initiate virtual account: {response_data.get('message', 'Dedicated NUBAN not available')}",
+                )
+
+        # Initialize transaction for payment tracking
+        transaction = Transaction.initialize(
+            reference=reference,
+            amount=int(amount * 100),
+            email=email,
+            callback_url="https://kopkad-frontend.vercel.app/payment-confirmation",
+        )
+        logger.info(f"Paystack transaction initialize response: {transaction}")
+        if not transaction["status"]:
+            logger.error(f"Failed to initialize transaction: {transaction}")
+            return error_response(
+                status_code=500,
+                message=f"Failed to initialize transaction: {transaction.get('message', 'Unknown error')}",
+            )
+
+        return virtual_account
     except Exception as e:
-        logger.error(f"Error initiating virtual account: {str(e)}")
+        logger.error(f"Error initiating virtual account: {str(e)}", exc_info=True)
         return error_response(status_code=500, message=f"Error initiating virtual account: {str(e)}")
 
 async def confirm_bank_transfer(reference: str, current_user: dict, db: Session):
@@ -92,44 +146,68 @@ async def confirm_bank_transfer(reference: str, current_user: dict, db: Session)
         return error_response(status_code=403, message="Unauthorized role")
 
     total_amount = sum(m.amount for m in markings)
+    response = Transaction.verify(reference=reference)
+    logger.info(f"Paystack verify response for bank transfer: {response}")
+
     completion_message = None
-    for marking in markings:
-        if marking.status != SavingsStatus.PENDING:
-            logger.warning(f"Marking for date {marking.marked_date} is not PENDING (status: {marking.status})")
-            continue
-        marking.status = SavingsStatus.PAID
-        marking.marked_by_id = current_user["user_id"]
-        marking.updated_at = datetime.now()
-        marking.updated_by = current_user["user_id"]
-
-    for savings_id in {m.savings_account_id for m in markings}:
-        savings = db.query(SavingsAccount).filter(SavingsAccount.id == savings_id).first()
-        latest_marked_date = max(m.marked_date for m in markings if m.savings_account_id == savings_id)
-        remaining_pending = db.query(SavingsMarking).filter(
-            SavingsMarking.savings_account_id == savings_id,
-            SavingsStatus.PENDING,
-            SavingsMarking.marked_date > latest_marked_date
-        ).count()
-        if remaining_pending == 0:
-            savings.marking_status = MarkingStatus.COMPLETED
-            completion_message = f"Congratulations! You have successfully completed your savings plan {savings.tracking_number}!"
-
-    db.commit()
-    logger.info(f"Bank transfer confirmed for reference {reference}, marked as PAID")
-    response_data = {
-        "reference": reference,
-        "status": SavingsStatus.PAID,
-        "amount": str(total_amount),
-        "tracking_numbers": list({m.savings_account.tracking_number for m in markings}),
-        "marked_dates": [m.marked_date.isoformat() for m in markings],
-    }
-    if completion_message:
-        response_data["completion_message"] = completion_message
-    return success_response(
-        status_code=200,
-        message="Bank transfer confirmed successfully",
-        data=response_data
-    )
+    if response["status"] and response["data"]["status"] == "success":
+        total_paid = Decimal(response["data"]["amount"]) / 100
+        if total_paid < total_amount:
+            logger.error(f"Underpayment for {reference}: expected {total_amount}, paid {total_paid}")
+            return error_response(
+                status_code=400,
+                message=f"Paid amount {total_paid} less than expected {total_amount}"
+            )
+        for marking in markings:
+            if marking.status != SavingsStatus.PENDING:
+                logger.warning(f"Marking for date {marking.marked_date} is not PENDING (status: {marking.status})")
+                continue
+            marking.status = SavingsStatus.PAID
+            marking.marked_by_id = current_user["user_id"]
+            marking.updated_at = datetime.now()
+            marking.updated_by = current_user["user_id"]
+        for savings_id in {m.savings_account_id for m in markings}:
+            savings = db.query(SavingsAccount).filter(SavingsAccount.id == savings_id).first()
+            latest_marked_date = max(m.marked_date for m in markings if m.savings_account_id == savings_id)
+            remaining_pending = db.query(SavingsMarking).filter(
+                SavingsMarking.savings_account_id == savings_id,
+                SavingsMarking.status == SavingsStatus.PENDING,
+                SavingsMarking.marked_date > latest_marked_date
+            ).count()
+            if remaining_pending == 0:
+                savings.marking_status = MarkingStatus.COMPLETED
+                completion_message = f"Congratulations! You have successfully completed your savings plan {savings.tracking_number}!"
+        db.commit()
+        logger.info(f"Bank transfer confirmed for reference {reference}, marked as PAID")
+        response_data = {
+            "reference": reference,
+            "status": SavingsStatus.PAID,
+            "amount": str(total_amount),
+            "tracking_numbers": list({m.savings_account.tracking_number for m in markings}),
+            "marked_dates": [m.marked_date.isoformat() for m in markings],
+        }
+        if completion_message:
+            response_data["completion_message"] = completion_message
+        return success_response(
+            status_code=200,
+            message="Bank transfer confirmed successfully",
+            data=response_data
+        )
+    else:
+        logger.error(f"Bank transfer verification failed: {response.get('message', 'No message')}")
+        virtual_account = markings[0].virtual_account_details or {"bank": "Unknown", "account_number": "Unknown", "account_name": "Unknown"}
+        return success_response(
+            status_code=200,
+            message="Bank transfer not yet verified, please confirm after payment",
+            data={
+                "reference": reference,
+                "status": SavingsStatus.PENDING,
+                "amount": str(total_amount),
+                "tracking_numbers": list({m.savings_account.tracking_number for m in markings}),
+                "marked_dates": [m.marked_date.isoformat() for m in markings],
+                "virtual_account": virtual_account,
+            }
+        )
 
 def has_permission(user: User, permission: str, db: Session) -> bool:
     return permission in user.permissions
@@ -581,7 +659,6 @@ async def update_savings(savings_id: int, request: SavingsUpdate, current_user: 
     savings.updated_by = current_user["user_id"]
     db.commit()
     logger.info(f"Updated savings {savings.tracking_number} for customer {current_user['user_id']}")
-
     return _savings_response(savings)
 
 async def delete_savings(savings_id: int, current_user: dict, db: Session):
@@ -767,7 +844,7 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
     if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
         return error_response(status_code=403, message=f"Not your savings {tracking_number}")
     elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
-        return error_response(status_code=403, message="Unauthorized role")
+        return error_response(status_code=401, message="Unauthorized role")
 
     if request.unit_id:
         unit_exists = db.query(exists().where(
@@ -810,7 +887,7 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
         savings.marking_status = MarkingStatus.IN_PROGRESS
         db.commit()
 
-    reference = f"savings_{tracking_number}_{datetime.now().timestamp()}"
+    reference = f"savings_{tracking_number}_{uuid.uuid4()}"
     if payment_method == PaymentMethod.CARD:
         total_amount_kobo = int(total_amount * 100)
         response = Transaction.initialize(
@@ -833,14 +910,14 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
                     savings_schedule={marking.marked_date.isoformat(): marking.status},
                     total_amount=total_amount,
                     authorization_url=response["data"]["authorization_url"],
-                    payment_reference=reference,
+                    payment_reference=response["data"]["reference"],
                     virtual_account=None
                 ).model_dump()
             )
         logger.error(f"Paystack initialization failed: {response}")
         return error_response(status_code=500, message=f"Failed to initiate card payment: {response.get('message', 'Unknown error')}")
     elif payment_method == PaymentMethod.BANK_TRANSFER:
-        virtual_account = await initiate_virtual_account_payment(total_amount, customer.email, savings.customer_id, reference)
+        virtual_account = await initiate_virtual_account_payment(total_amount, customer.email, savings.customer_id, reference, db)
         if isinstance(virtual_account, dict):
             marking.payment_reference = reference
             marking.status = SavingsStatus.PENDING
@@ -1009,7 +1086,7 @@ async def end_savings_markings(tracking_number: str, current_user: dict, db: Ses
     if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
         return error_response(status_code=403, message=f"Not your savings {tracking_number}")
     elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
-        return error_response(status_code=403, message="Unauthorized role")
+        return error_response(status_code=401, message="Unauthorized role")
 
     markings = db.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings.id).all()
     if not markings:
@@ -1114,34 +1191,12 @@ async def verify_savings_payment(reference: str, db: Session):
             logger.error(f"Card payment verification failed: {response.get('message', 'No message')}")
             return error_response(status_code=400, message="Payment verification failed")
     elif payment_method == PaymentMethod.BANK_TRANSFER:
-        # Check if virtual account details are stored
         virtual_account = markings[0].virtual_account_details
         if not virtual_account:
-            headers = {
-                "Authorization": f"Bearer {os.getenv('PAYSTACK_SECRET_KEY')}",
-                "Content-Type": "application/json",
-            }
-            response = requests.get(
-                f"https://api.paystack.co/dedicated_account/{reference}",
-                headers=headers,
-            )
-            response_data_api = response.json()
-            logger.info(f"Paystack virtual account retrieval response: {response_data_api}")
-            if response.status_code == 200 and response_data_api.get("status"):
-                virtual_account = {
-                    "bank": response_data_api["data"]["bank"]["name"],
-                    "account_number": response_data_api["data"]["account_number"],
-                    "account_name": response_data_api["data"]["account_name"],
-                }
-                for marking in markings:
-                    marking.virtual_account_details = virtual_account
-                db.commit()
-            else:
-                virtual_account = {"bank": "Unknown", "account_number": "Unknown", "account_name": "Unknown"}
-                logger.error(f"Failed to retrieve virtual account: {response_data_api.get('message', 'No message')}")
-        
+            logger.error(f"No virtual account details stored for reference {reference}")
+            return error_response(status_code=400, message="Virtual account details not found")
+
         response_data["virtual_account"] = virtual_account
-        # Attempt to verify with Paystack
         response = Transaction.verify(reference=reference)
         logger.info(f"Paystack verify response for bank transfer: {response}")
         if response["status"] and response["data"]["status"] == "success":
