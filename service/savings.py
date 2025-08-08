@@ -194,7 +194,7 @@ async def confirm_bank_transfer(reference: str, current_user: dict, db: Session)
                 logger.warning(f"Marking for date {marking.marked_date} is not PENDING (status: {marking.status})")
                 continue
             marking.status = SavingsStatus.PAID
-            marking.marked_by_id = current_user["user_id"]
+            marking.marked_by_id = current_user["user_id"]  # Ensure marked_by_id is set
             marking.updated_at = datetime.now()
             marking.updated_by = current_user["user_id"]
         for savings_id in {m.savings_account_id for m in markings}:
@@ -911,6 +911,7 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
 
     marking.payment_method = payment_method
     marking.unit_id = request.unit_id or savings.unit_id
+    marking.marked_by_id = current_user["user_id"]  # Set marked_by_id
     marking.updated_by = current_user["user_id"]
     total_amount = marking.amount
 
@@ -924,7 +925,7 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
     if len(reference) > 100:
         logger.warning(f"Generated reference too long: {reference}; truncating")
         reference = reference[:100]
-        
+
     if payment_method == PaymentMethod.CARD:
         total_amount_kobo = int(total_amount * 100)
         response = Transaction.initialize(
@@ -1030,6 +1031,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
 
         marking.payment_method = payment_method
         marking.unit_id = mark_request.unit_id or savings.unit_id
+        marking.marked_by_id = current_user["user_id"]  # Set marked_by_id
         marking.updated_by = current_user["user_id"]
         total_amount += marking.amount
         all_markings.append(marking)
@@ -1043,8 +1045,13 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
     if not customer.email:
         return error_response(status_code=400, message="Customer email required")
 
-    total_amount_kobo = int(total_amount * 100)
-    reference = f"bulk_savings_{uuid.uuid4()}"
+    # Generate shorter payment reference using the first tracking number
+    first_tracking_number = list(marked_dates_by_tracking.keys())[0]
+    short_uuid = str(uuid.uuid4())[:8]  # Use first 8 characters of UUID
+    reference = f"sv_{first_tracking_number}_{short_uuid}"  # e.g., sv_0620476978_09fa0f81
+    if len(reference) > 100:
+        logger.warning(f"Generated reference too long: {reference}; truncating")
+        reference = reference[:100]
 
     for savings_id, savings in savings_accounts.items():
         if savings.marking_status == MarkingStatus.NOT_STARTED:
@@ -1052,6 +1059,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
     db.commit()
 
     if payment_method == PaymentMethod.CARD:
+        total_amount_kobo = int(total_amount * 100)
         response = Transaction.initialize(
             reference=reference,
             amount=total_amount_kobo,
@@ -1061,7 +1069,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
         logger.info(f"Paystack initialize response: {response}")
         if response["status"]:
             for marking in all_markings:
-                marking.payment_reference = response["data"]["reference"]
+                marking.payment_reference = reference
                 marking.status = SavingsStatus.PENDING
             db.commit()
             return success_response(
@@ -1207,7 +1215,7 @@ async def verify_savings_payment(reference: str, db: Session):
                     logger.error(f"Marking for date {marking.marked_date} is not PENDING (status: {marking.status})")
                     continue
                 marking.status = SavingsStatus.PAID
-                marking.marked_by_id = marking.updated_by
+                marking.marked_by_id = marking.updated_by  # Use updated_by to set marked_by_id
                 marking.updated_at = datetime.now()
             db.commit()
             for savings_id in {m.savings_account_id for m in markings}:
@@ -1249,7 +1257,7 @@ async def verify_savings_payment(reference: str, db: Session):
                     logger.error(f"Marking for date {marking.marked_date} is not PENDING (status: {marking.status})")
                     continue
                 marking.status = SavingsStatus.PAID
-                marking.marked_by_id = marking.updated_by
+                marking.marked_by_id = marking.updated_by  # Use updated_by to set marked_by_id
                 marking.updated_at = datetime.now()
             db.commit()
             for savings_id in {m.savings_account_id for m in markings}:
