@@ -26,13 +26,14 @@ from service.savings import (
     get_all_savings,
     delete_savings,
     get_savings_metrics,
+    end_savings_markings,
+    confirm_bank_transfer,
 )
 from database.postgres import get_db
 from utils.auth import get_current_user
 from typing import List
 
 savings_router = APIRouter(tags=["savings"], prefix="/savings")
-
 
 @savings_router.post("/daily", response_model=SavingsResponse)
 async def create_daily_savings(
@@ -42,13 +43,11 @@ async def create_daily_savings(
 ):
     return await create_savings_daily(request, current_user, db)
 
-
 @savings_router.post("/target/calculate", response_model=SavingsTargetCalculationResponse)
 async def calculate_target_savings_endpoint(
     request: SavingsCreateTarget,
 ):
     return await calculate_target_savings(request)
-
 
 @savings_router.post("/target", response_model=SavingsResponse)
 async def create_target_savings(
@@ -58,7 +57,6 @@ async def create_target_savings(
 ):
     return await create_savings_target(request, current_user, db)
 
-
 @savings_router.post("/reinitiate/daily", response_model=SavingsResponse)
 async def reinitiate_daily_savings(
     request: SavingsReinitiateDaily,
@@ -67,7 +65,6 @@ async def reinitiate_daily_savings(
 ):
     return await reinitiate_savings_daily(request, current_user, db)
 
-
 @savings_router.post("/reinitiate/target", response_model=SavingsResponse)
 async def reinitiate_target_savings(
     request: SavingsReinitiateTarget,
@@ -75,7 +72,6 @@ async def reinitiate_target_savings(
     db: Session = Depends(get_db),
 ):
     return await reinitiate_savings_target(request, current_user, db)
-
 
 @savings_router.put("/{savings_id}", response_model=SavingsResponse)
 async def update_savings_endpoint(
@@ -86,7 +82,6 @@ async def update_savings_endpoint(
 ):
     return await update_savings(savings_id, request, current_user, db)
 
-
 @savings_router.delete("/{savings_id}", response_model=dict)
 async def delete_savings_account(
     savings_id: int,
@@ -94,7 +89,6 @@ async def delete_savings_account(
     db: Session = Depends(get_db),
 ):
     return await delete_savings(savings_id, current_user, db)
-
 
 @savings_router.get("/all", response_model=dict)
 async def savings_list_route(
@@ -108,7 +102,6 @@ async def savings_list_route(
     db: Session = Depends(get_db), 
 ):
     return await get_all_savings(customer_id, business_id, unit_id, savings_type, limit, offset, current_user, db)
-
 
 @savings_router.get("/markings/{tracking_number}", response_model=dict)
 async def get_savings_markings(
@@ -124,7 +117,6 @@ async def get_savings_metrics_endpoint(
 ):
     return await get_savings_metrics(tracking_number, db)
 
-
 @savings_router.post("/mark/{tracking_number}", response_model=dict)
 async def mark_savings(
     tracking_number: str,
@@ -134,7 +126,6 @@ async def mark_savings(
 ):
     return await mark_savings_payment(tracking_number, request, current_user, db)
 
-
 @savings_router.post("/markings/bulk", response_model=dict)
 async def mark_savings_bulk_endpoint(
     request: BulkMarkSavingsRequest,
@@ -143,6 +134,13 @@ async def mark_savings_bulk_endpoint(
 ):
     return await mark_savings_bulk(request, current_user, db)
 
+@savings_router.post("/end_marking/{tracking_number}", response_model=dict)
+async def end_savings_markings_endpoint(
+    tracking_number: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return await end_savings_markings(tracking_number, current_user, db)
 
 @savings_router.get("/verify/{reference}", response_model=dict)
 async def verify_payment(
@@ -150,3 +148,11 @@ async def verify_payment(
     db: Session = Depends(get_db),
 ):
     return await verify_savings_payment(reference, db)
+
+@savings_router.post("/confirm_transfer/{reference}", response_model=dict)
+async def confirm_bank_transfer_endpoint(
+    reference: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return await confirm_bank_transfer(reference, current_user, db)

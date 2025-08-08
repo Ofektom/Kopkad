@@ -1,6 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.orm import Session
-from database.postgres import get_db
+
 from config.settings import settings
 import hmac
 import hashlib
@@ -8,6 +6,27 @@ import logging
 from decimal import Decimal
 from models.savings import SavingsMarking, SavingsStatus
 from datetime import datetime
+
+from fastapi import APIRouter, Depends, Query, HTTPException, Request
+from sqlalchemy.orm import Session
+from schemas.payments import (
+    AccountDetailsCreate,
+    PaymentAccountCreate,
+    PaymentAccountResponse,
+    PaymentInitiateResponse,
+    PaymentAccountUpdate,
+)
+from service.payments import (
+    create_account_details,
+    create_payment_account,
+    initiate_payment,
+    get_payment_accounts,
+    update_payment_account,
+    delete_account_details,
+)
+from database.postgres import get_db
+from utils.auth import get_current_user
+from typing import Optional
 
 payment_router = APIRouter(tags=["payments"], prefix="/payments")
 
@@ -78,3 +97,64 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
         logger.warning(f"Ignored webhook event: {event} for reference {reference}")
     
     return {"status": "success"}
+
+
+@payment_router.post("/account-details", response_model=dict)
+async def add_account_details(
+    request: AccountDetailsCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Add bank account details for a customer."""
+    return await create_account_details(request, current_user, db)
+
+@payment_router.post("/account", response_model=PaymentAccountResponse)
+async def create_payment_account_endpoint(
+    request: PaymentAccountCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create a payment account for a customer's completed savings."""
+    return await create_payment_account(request, current_user, db)
+
+@payment_router.put("/account/{payment_account_id}", response_model=PaymentAccountResponse)
+async def update_payment_account_endpoint(
+    payment_account_id: int,
+    request: PaymentAccountUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update a payment account and its associated account details."""
+    return await update_payment_account(payment_account_id, request, current_user, db)
+
+@payment_router.delete("/account-details/{account_details_id}", response_model=dict)
+async def delete_account_details_endpoint(
+    account_details_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete specific account details for a payment account."""
+    return await delete_account_details(account_details_id, current_user, db)
+
+@payment_router.post("/initiate/{payment_account_id}", response_model=PaymentInitiateResponse)
+async def initiate_payment_endpoint(
+    payment_account_id: int,
+    account_details_id: Optional[int] = Query(None, description="ID of the specific account details to use for payment"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Initiate payment for a completed savings account."""
+    return await initiate_payment(payment_account_id, current_user, db, account_details_id)
+
+@payment_router.get("/accounts", response_model=dict)
+async def list_payment_accounts(
+    customer_id: Optional[int] = None,
+    savings_account_id: Optional[int] = None,
+    status: Optional[str] = None,
+    limit: int = 10,
+    offset: int = 0,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Retrieve payment accounts with optional filtering."""
+    return await get_payment_accounts(customer_id, savings_account_id, status, limit, offset, current_user, db)
