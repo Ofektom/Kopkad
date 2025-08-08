@@ -75,49 +75,72 @@ async def initiate_virtual_account_payment(amount: Decimal, email: str, customer
                 db.commit()
             except AttributeError:
                 logger.warning(f"User model lacks payment_provider_customer_id field; proceeding without storing")
-                # Continue without storing if migration hasn't been applied
 
-        # Check for existing dedicated account
-        dedicated_response = requests.get(
-            f"https://api.paystack.co/dedicated_account?customer={payment_provider_customer_id}",
-            headers=headers,
-        )
-        dedicated_data = dedicated_response.json()
-        logger.info(f"Paystack dedicated account check response: {dedicated_data}")
-
-        if dedicated_response.status_code == 200 and dedicated_data.get("status") and dedicated_data["data"]:
-            account_data = dedicated_data["data"][0]
+        # Check if in test mode (based on PAYSTACK_SECRET_KEY or environment variable)
+        is_test_mode = "test" in os.getenv("PAYSTACK_SECRET_KEY", "").lower() or os.getenv("PAYSTACK_ENV", "production") == "test"
+        if is_test_mode:
+            logger.info(f"Running in test mode; generating mock virtual account for customer {payment_provider_customer_id}")
             virtual_account = {
-                "bank": account_data["bank"]["name"],
-                "account_number": account_data["account_number"],
-                "account_name": account_data["account_name"],
+                "bank": "Test Bank",
+                "account_number": f"TEST{str(customer_id).zfill(10)}",
+                "account_name": f"Test Account - ID_{customer_id}",
             }
-            logger.info(f"Using existing dedicated account for customer {payment_provider_customer_id}: {virtual_account}")
+            logger.info(f"Generated mock virtual account: {virtual_account}")
         else:
-            # Create new dedicated account
-            payload = {
-                "customer": payment_provider_customer_id,
-                "preferred_bank": "wema-bank",
-            }
-            response = requests.post(
-                "https://api.paystack.co/dedicated_account",
+            # Check for existing dedicated account
+            dedicated_response = requests.get(
+                f"https://api.paystack.co/dedicated_account?customer={payment_provider_customer_id}",
                 headers=headers,
-                json=payload,
             )
-            response_data = response.json()
-            logger.info(f"Paystack dedicated account creation response: {response_data}")
-            if response.status_code == 200 and response_data.get("status"):
+            dedicated_data = dedicated_response.json()
+            logger.info(f"Paystack dedicated account check response: {dedicated_data}")
+
+            if dedicated_response.status_code == 200 and dedicated_data.get("status") and dedicated_data["data"]:
+                account_data = dedicated_data["data"][0]
                 virtual_account = {
-                    "bank": response_data["data"]["bank"]["name"],
-                    "account_number": response_data["data"]["account_number"],
-                    "account_name": response_data["data"]["account_name"],
+                    "bank": account_data["bank"]["name"],
+                    "account_number": account_data["account_number"],
+                    "account_name": account_data["account_name"],
                 }
+                logger.info(f"Using existing dedicated account for customer {payment_provider_customer_id}: {virtual_account}")
             else:
-                logger.error(f"Failed to create dedicated account: {response_data}")
-                return error_response(
-                    status_code=response.status_code,
-                    message=f"Failed to initiate virtual account: {response_data.get('message', 'Dedicated NUBAN not available')}",
+                # Check if NUBAN is unavailable
+                if dedicated_data.get("code") == "feature_unavailable":
+                    logger.error(f"Dedicated NUBAN not available: {dedicated_data}")
+                    return error_response(
+                        status_code=400,
+                        message="Virtual account payments are currently unavailable. Please contact support@paystack.com to enable this feature.",
+                    )
+                # Attempt to create new dedicated account
+                payload = {
+                    "customer": payment_provider_customer_id,
+                    "preferred_bank": "wema-bank",
+                }
+                response = requests.post(
+                    "https://api.paystack.co/dedicated_account",
+                    headers=headers,
+                    json=payload,
                 )
+                response_data = response.json()
+                logger.info(f"Paystack dedicated account creation response: {response_data}")
+                if response.status_code == 200 and response_data.get("status"):
+                    virtual_account = {
+                        "bank": response_data["data"]["bank"]["name"],
+                        "account_number": response_data["data"]["account_number"],
+                        "account_name": response_data["data"]["account_name"],
+                    }
+                else:
+                    if response_data.get("code") == "feature_unavailable":
+                        logger.error(f"Dedicated NUBAN not available: {response_data}")
+                        return error_response(
+                            status_code=400,
+                            message="Virtual account payments are currently unavailable. Please contact support@paystack.com to enable this feature.",
+                        )
+                    logger.error(f"Failed to create dedicated account: {response_data}")
+                    return error_response(
+                        status_code=response.status_code,
+                        message=f"Failed to initiate virtual account: {response_data.get('message', 'Dedicated NUBAN creation failed')}",
+                    )
 
         # Initialize transaction for payment tracking
         transaction = Transaction.initialize(
