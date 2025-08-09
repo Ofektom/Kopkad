@@ -1185,56 +1185,47 @@ async def verify_savings_payment(reference: str, db: Session):
             logger.error(f"Card payment verification failed: {response.get('message', 'No message')}")
             return error_response(status_code=400, message="Payment verification failed")
     elif payment_method == PaymentMethod.BANK_TRANSFER:
-        virtual_account = markings[0].virtual_account_details
-        if not virtual_account:
-            logger.error(f"No virtual account details stored for reference {reference}")
-            return error_response(status_code=400, message="Virtual account details not found")
-
-        response_data["virtual_account"] = virtual_account
-        response = Transaction.verify(reference=reference)
-        logger.info(f"Paystack verify response for bank transfer: {response}")
         is_test_mode = "test" in os.getenv("PAYSTACK_SECRET_KEY", "").lower() or os.getenv("PAYSTACK_ENV", "production") == "test"
-        if response["status"] and response["data"]["status"] == "success":
-            total_paid = Decimal(response["data"]["amount"]) / 100
-            if total_paid < total_amount:
-                logger.error(f"Underpayment for {reference}: expected {total_amount}, paid {total_paid}")
-                return error_response(
-                    status_code=400,
-                    message=f"Paid amount {total_paid} less than expected {total_amount}"
-                )
-            for marking in markings:
-                if marking.status != SavingsStatus.PENDING:
-                    logger.error(f"Marking for date {marking.marked_date} is not PENDING (status: {marking.status})")
-                    continue
-                marking.status = SavingsStatus.PAID
-                marking.marked_by_id = marking.updated_by
-                marking.updated_at = datetime.now()
-            db.commit()
-            for savings_id in {m.savings_account_id for m in markings}:
-                savings = db.query(SavingsAccount).filter(SavingsAccount.id == savings_id).first()
-                latest_marked_date = max(m.marked_date for m in markings if m.savings_account_id == savings_id)
-                remaining_pending = db.query(SavingsMarking).filter(
-                    SavingsMarking.savings_account_id == savings_id,
-                    SavingsMarking.status == SavingsStatus.PENDING,
-                    SavingsMarking.marked_date > latest_marked_date
-                ).count()
-                if remaining_pending == 0:
-                    savings.marking_status = MarkingStatus.COMPLETED
-                    completion_message = f"Congratulations! You have successfully completed your savings plan {savings.tracking_number}!"
-            db.commit()
-            response_data["status"] = SavingsStatus.PAID
-            logger.info(f"Bank transfer payment verified and marked as PAID for reference {reference}")
+        if not is_test_mode:
+            response = Transaction.verify(reference=reference)
+            logger.info(f"Paystack verify response for bank transfer: {response}")
+            if response["status"] and response["data"]["status"] == "success":
+                total_paid = Decimal(response["data"]["amount"]) / 100
+                if total_paid < total_amount:
+                    logger.error(f"Underpayment for {reference}: expected {total_amount}, paid {total_paid}")
+                    return error_response(
+                        status_code=400,
+                        message=f"Paid amount {total_paid} less than expected {total_amount}"
+                    )
+                for marking in markings:
+                    if marking.status != SavingsStatus.PENDING:
+                        logger.error(f"Marking for date {marking.marked_date} is not PENDING (status: {marking.status})")
+                        continue
+                    marking.status = SavingsStatus.PAID
+                    marking.marked_by_id = marking.updated_by
+                    marking.updated_at = datetime.now()
+                db.commit()
+                for savings_id in {m.savings_account_id for m in markings}:
+                    savings = db.query(SavingsAccount).filter(SavingsAccount.id == savings_id).first()
+                    latest_marked_date = max(m.marked_date for m in markings if m.savings_account_id == savings_id)
+                    remaining_pending = db.query(SavingsMarking).filter(
+                        SavingsMarking.savings_account_id == savings_id,
+                        SavingsMarking.status == SavingsStatus.PENDING,
+                        SavingsMarking.marked_date > latest_marked_date
+                    ).count()
+                    if remaining_pending == 0:
+                        savings.marking_status = MarkingStatus.COMPLETED
+                        completion_message = f"Congratulations! You have successfully completed your savings plan {savings.tracking_number}!"
+                db.commit()
+                response_data["status"] = SavingsStatus.PAID
+                logger.info(f"Bank transfer payment verified and marked as PAID for reference {reference}")
+            else:
+                logger.error(f"Bank transfer verification failed: {response.get('message', 'No message')}")
+                return error_response(status_code=400, message="Payment verification failed")
         else:
-            if is_test_mode:
-                logger.info(f"Bank transfer not yet verified for reference {reference}, falling back to confirm_bank_transfer")
-                current_user = {"user_id": markings[0].updated_by, "role": "customer"}
-                return await confirm_bank_transfer(reference, current_user, db)
-            logger.info(f"Bank transfer not yet verified for reference {reference}, returning virtual account details")
-            return success_response(
-                status_code=200,
-                message="Bank transfer not yet verified, please confirm after payment",
-                data=response_data
-            )
+            logger.info(f"Test mode: Using confirm_bank_transfer for reference {reference}")
+            current_user = {"user_id": markings[0].updated_by, "role": "customer"}
+            return await confirm_bank_transfer(reference, current_user, db)
     else:
         return error_response(status_code=400, message=f"Unsupported payment method: {payment_method}")
 
@@ -1271,61 +1262,45 @@ async def confirm_bank_transfer(reference: str, current_user: dict, db: Session)
     logger.info(f"Mock Paystack verify response for bank transfer: {response}")
 
     completion_message = None
-    if response["status"] and response["data"]["status"] == "success":
-        total_paid = Decimal(response["data"]["amount"]) / 100
-        if total_paid < total_amount:
-            logger.error(f"Underpayment for {reference}: expected {total_amount}, paid {total_paid}")
-            return error_response(
-                status_code=400,
-                message=f"Paid amount {total_paid} less than expected {total_amount}"
-            )
-        for marking in markings:
-            if marking.status != SavingsStatus.PENDING:
-                logger.warning(f"Marking for date {marking.marked_date} is not PENDING (status: {marking.status})")
-                continue
-            marking.status = SavingsStatus.PAID
-            marking.marked_by_id = current_user["user_id"]
-            marking.updated_at = datetime.now()
-            marking.updated_by = current_user["user_id"]
-        for savings_id in {m.savings_account_id for m in markings}:
-            savings = db.query(SavingsAccount).filter(SavingsAccount.id == savings_id).first()
-            latest_marked_date = max(m.marked_date for m in markings if m.savings_account_id == savings_id)
-            remaining_pending = db.query(SavingsMarking).filter(
-                SavingsMarking.savings_account_id == savings_id,
-                SavingsMarking.status == SavingsStatus.PENDING,
-                SavingsMarking.marked_date > latest_marked_date
-            ).count()
-            if remaining_pending == 0:
-                savings.marking_status = MarkingStatus.COMPLETED
-                completion_message = f"Congratulations! You have successfully completed your savings plan {savings.tracking_number}!"
-        db.commit()
-        logger.info(f"Bank transfer confirmed for reference {reference}, marked as PAID")
-        response_data = {
-            "reference": reference,
-            "status": SavingsStatus.PAID,
-            "amount": str(total_amount),
-            "tracking_numbers": list({m.savings_account.tracking_number for m in markings}),
-            "marked_dates": [m.marked_date.isoformat() for m in markings],
-        }
-        if completion_message:
-            response_data["completion_message"] = completion_message
-        return success_response(
-            status_code=200,
-            message="Bank transfer confirmed successfully",
-            data=response_data
+    total_paid = Decimal(response["data"]["amount"]) / 100
+    if total_paid < total_amount:
+        logger.error(f"Underpayment for {reference}: expected {total_amount}, paid {total_paid}")
+        return error_response(
+            status_code=400,
+            message=f"Paid amount {total_paid} less than expected {total_amount}"
         )
-    else:
-        logger.error(f"Mock bank transfer verification failed for reference {reference}")
-        virtual_account = markings[0].virtual_account_details or {"bank": "Unknown", "account_number": "Unknown", "account_name": "Unknown"}
-        return success_response(
-            status_code=200,
-            message="Bank transfer not yet verified, please confirm after payment",
-            data={
-                "reference": reference,
-                "status": SavingsStatus.PENDING,
-                "amount": str(total_amount),
-                "tracking_numbers": list({m.savings_account.tracking_number for m in markings}),
-                "marked_dates": [m.marked_date.isoformat() for m in markings],
-                "virtual_account": virtual_account,
-            }
-        )
+    for marking in markings:
+        if marking.status != SavingsStatus.PENDING:
+            logger.warning(f"Marking for date {marking.marked_date} is not PENDING (status: {marking.status})")
+            continue
+        marking.status = SavingsStatus.PAID
+        marking.marked_by_id = current_user["user_id"]
+        marking.updated_at = datetime.now()
+        marking.updated_by = current_user["user_id"]
+    for savings_id in {m.savings_account_id for m in markings}:
+        savings = db.query(SavingsAccount).filter(SavingsAccount.id == savings_id).first()
+        latest_marked_date = max(m.marked_date for m in markings if m.savings_account_id == savings_id)
+        remaining_pending = db.query(SavingsMarking).filter(
+            SavingsMarking.savings_account_id == savings_id,
+            SavingsMarking.status == SavingsStatus.PENDING,
+            SavingsMarking.marked_date > latest_marked_date
+        ).count()
+        if remaining_pending == 0:
+            savings.marking_status = MarkingStatus.COMPLETED
+            completion_message = f"Congratulations! You have successfully completed your savings plan {savings.tracking_number}!"
+    db.commit()
+    logger.info(f"Bank transfer confirmed for reference {reference}, marked as PAID")
+    response_data = {
+        "reference": reference,
+        "status": SavingsStatus.PAID,
+        "amount": str(total_amount),
+        "tracking_numbers": list({m.savings_account.tracking_number for m in markings}),
+        "marked_dates": [m.marked_date.isoformat() for m in markings],
+    }
+    if completion_message:
+        response_data["completion_message"] = completion_message
+    return success_response(
+        status_code=200,
+        message="Bank transfer confirmed successfully",
+        data=response_data
+    )
