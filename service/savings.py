@@ -8,8 +8,7 @@ from schemas.savings import (
     SavingsMarkingRequest,
     SavingsMarkingResponse,
     SavingsUpdate,
-    SavingsReinitiateDaily,
-    SavingsReinitiateTarget,
+    SavingsExtend,
     BulkMarkSavingsRequest,
     SavingsTargetCalculationResponse,
     SavingsMetricsResponse,
@@ -48,7 +47,6 @@ async def initiate_virtual_account_payment(amount: Decimal, email: str, customer
             logger.error(f"User {customer_id} not found in database")
             return error_response(status_code=404, message="User not found")
 
-        # Check if payment_provider_customer_id exists; if not, create Paystack customer
         payment_provider_customer_id = getattr(user, 'payment_provider_customer_id', None)
         if not payment_provider_customer_id:
             customer_payload = {
@@ -76,7 +74,6 @@ async def initiate_virtual_account_payment(amount: Decimal, email: str, customer
             except AttributeError:
                 logger.warning(f"User model lacks payment_provider_customer_id field; proceeding without storing")
 
-        # Check if in test mode
         is_test_mode = "test" in os.getenv("PAYSTACK_SECRET_KEY", "").lower() or os.getenv("PAYSTACK_ENV", "production") == "test"
         if is_test_mode:
             logger.info(f"Running in test mode; generating mock virtual account for customer {payment_provider_customer_id}")
@@ -87,7 +84,6 @@ async def initiate_virtual_account_payment(amount: Decimal, email: str, customer
             }
             logger.info(f"Generated mock virtual account: {virtual_account}")
         else:
-            # Check for existing dedicated account
             dedicated_response = requests.get(
                 f"https://api.paystack.co/dedicated_account?customer={payment_provider_customer_id}",
                 headers=headers,
@@ -104,14 +100,12 @@ async def initiate_virtual_account_payment(amount: Decimal, email: str, customer
                 }
                 logger.info(f"Using existing dedicated account for customer {payment_provider_customer_id}: {virtual_account}")
             else:
-                # Check if NUBAN is unavailable
                 if dedicated_data.get("code") == "feature_unavailable":
                     logger.error(f"Dedicated NUBAN not available: {dedicated_data}")
                     return error_response(
                         status_code=400,
                         message="Virtual account payments are currently unavailable. Please contact support@paystack.com to enable this feature.",
                     )
-                # Attempt to create new dedicated account
                 payload = {
                     "customer": payment_provider_customer_id,
                     "preferred_bank": "wema-bank",
@@ -142,7 +136,6 @@ async def initiate_virtual_account_payment(amount: Decimal, email: str, customer
                         message=f"Failed to initiate virtual account: {response_data.get('message', 'Dedicated NUBAN creation failed')}",
                     )
 
-        # Initialize transaction for payment tracking
         transaction = Transaction.initialize(
             reference=reference,
             amount=int(amount * 100),
@@ -183,12 +176,16 @@ def _adjust_savings_markings(savings: SavingsAccount, markings: list[SavingsMark
     existing_days = len(markings)
 
     if existing_days < total_days:
+        last_marking_date = max([m.marked_date for m in markings]) if markings else savings.start_date - timedelta(days=1)
         for day in range(existing_days, total_days):
+            new_marking_date = savings.start_date + timedelta(days=day)
+            if new_marking_date <= last_marking_date:
+                continue
             new_marking = SavingsMarking(
                 savings_account_id=savings.id,
                 unit_id=savings.unit_id,
                 amount=savings.daily_amount,
-                marked_date=savings.start_date + timedelta(days=day),
+                marked_date=new_marking_date,
                 status=SavingsStatus.PENDING,
             )
             db.add(new_marking)
@@ -398,10 +395,10 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
     logger.info(f"Created target savings {tracking_number} for customer {customer_id}")
     return _savings_response(savings)
 
-async def reinitiate_savings_daily(request: SavingsReinitiateDaily, current_user: dict, db: Session):
+async def extend_savings(request: SavingsExtend, current_user: dict, db: Session):
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
-    if not has_permission(current_user_obj, Permission.REINITIATE_SAVINGS, db):
-        return error_response(status_code=403, message="No permission to reinitiate savings")
+    if not has_permission(current_user_obj, Permission.UPDATE_SAVINGS, db):
+        return error_response(status_code=403, message="No permission to extend savings")
 
     savings = db.query(SavingsAccount).filter(
         SavingsAccount.tracking_number == request.tracking_number,
@@ -410,129 +407,32 @@ async def reinitiate_savings_daily(request: SavingsReinitiateDaily, current_user
     if not savings:
         return error_response(status_code=404, message=f"Savings {request.tracking_number} not found or not owned")
 
-    if savings.marking_status != MarkingStatus.COMPLETED:
+    if savings.marking_status == MarkingStatus.COMPLETED:
         return error_response(
             status_code=400,
-            message=f"Savings {savings.tracking_number} not fully completed (status: {savings.marking_status})",
+            message=f"Savings {savings.tracking_number} is completed and cannot be extended",
         )
 
-    if request.daily_amount <= 0 or request.duration_months <= 0:
-        return error_response(status_code=400, message="Daily amount and duration must be positive")
+    if request.additional_months <= 0:
+        return error_response(status_code=400, message="Additional months must be positive")
 
-    unit_exists = db.query(exists().where(
-        user_units.c.user_id == savings.customer_id
-    ).where(
-        user_units.c.unit_id == request.unit_id
-    ).where(
-        Unit.id == request.unit_id
-    ).where(
-        Unit.business_id == request.business_id
-    )).scalar()
-    if not unit_exists:
-        return error_response(status_code=400, message=f"Customer {savings.customer_id} is not associated with unit {request.unit_id} in business {request.business_id}")
+    current_end_date = savings.end_date
+    today = date.today()
+    if today > current_end_date:
+        return error_response(status_code=400, message=f"Savings {savings.tracking_number} has ended and cannot be extended")
 
-    total_days = _calculate_total_days(request.start_date, request.duration_months)
-    total_amount = request.daily_amount * Decimal(total_days)
-    end_date = request.start_date + relativedelta(months=request.duration_months) - timedelta(days=1)
-    savings.daily_amount = request.daily_amount
-    savings.duration_months = request.duration_months
-    savings.start_date = request.start_date
-    savings.end_date = end_date
-    savings.commission_days = request.commission_days
-    savings.target_amount = total_amount
-    savings.savings_type = SavingsType.DAILY
-    savings.business_id = request.business_id
-    savings.unit_id = request.unit_id
+    savings.duration_months += request.additional_months
+    savings.end_date = current_end_date + relativedelta(months=request.additional_months)
     savings.updated_by = current_user["user_id"]
-    savings.marking_status = MarkingStatus.NOT_STARTED
-    db.flush()
 
-    db.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings.id).delete()
-    markings = [
-        SavingsMarking(
-            savings_account_id=savings.id,
-            unit_id=savings.unit_id,
-            marked_date=request.start_date + timedelta(days=i),
-            amount=request.daily_amount,
-            marked_by_id=None,
-            status=SavingsStatus.PENDING,
-        )
-        for i in range(total_days)
-    ]
-    db.add_all(markings)
+    total_days = _calculate_total_days(savings.start_date, savings.duration_months)
+    savings.target_amount = savings.daily_amount * Decimal(total_days) if savings.savings_type == SavingsType.DAILY else savings.target_amount
+
+    markings = db.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings.id).all()
+    _adjust_savings_markings(savings, markings, db)
+
     db.commit()
-
-    logger.info(f"Reinitiated daily savings {savings.tracking_number} with target_amount={total_amount} for customer {current_user['user_id']}")
-    return _savings_response(savings)
-
-async def reinitiate_savings_target(request: SavingsReinitiateTarget, current_user: dict, db: Session):
-    current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
-    if not has_permission(current_user_obj, Permission.REINITIATE_SAVINGS, db):
-        return error_response(status_code=403, message="No permission to reinitiate savings")
-
-    savings = db.query(SavingsAccount).filter(
-        SavingsAccount.tracking_number == request.tracking_number,
-        SavingsAccount.customer_id == current_user["user_id"],
-    ).first()
-    if not savings:
-        return error_response(status_code=404, message=f"Savings {request.tracking_number} not found or not owned")
-
-    if savings.marking_status != MarkingStatus.COMPLETED:
-        return error_response(
-            status_code=400,
-            message=f"Savings {savings.tracking_number} not fully completed (status: {savings.marking_status})",
-        )
-
-    if request.target_amount <= 0:
-        return error_response(status_code=400, message="Target amount must be positive")
-    total_days = (request.end_date - request.start_date).days + 1
-    if total_days <= 0:
-        return error_response(status_code=400, message="End date must be after start date")
-
-    unit_exists = db.query(exists().where(
-        user_units.c.user_id == savings.customer_id
-    ).where(
-        user_units.c.unit_id == request.unit_id
-    ).where(
-        Unit.id == request.unit_id
-    ).where(
-        Unit.business_id == request.business_id
-    )).scalar()
-    if not unit_exists:
-        return error_response(status_code=400, message=f"Customer {savings.customer_id} is not associated with unit {request.unit_id} in business {request.business_id}")
-
-    duration_months = (request.end_date.year - request.start_date.year) * 12 + request.end_date.month - request.start_date.month + 1
-    daily_amount = request.target_amount / Decimal(total_days)
-
-    savings.daily_amount = daily_amount.quantize(Decimal("0.01"))
-    savings.duration_months = duration_months
-    savings.start_date = request.start_date
-    savings.end_date = request.end_date
-    savings.target_amount = request.target_amount
-    savings.commission_days = request.commission_days
-    savings.savings_type = SavingsType.TARGET
-    savings.business_id = request.business_id
-    savings.unit_id = request.unit_id
-    savings.updated_by = current_user["user_id"]
-    savings.marking_status = MarkingStatus.NOT_STARTED
-    db.flush()
-
-    db.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings.id).delete()
-    markings = [
-        SavingsMarking(
-            savings_account_id=savings.id,
-            unit_id=savings.unit_id,
-            marked_date=request.start_date + timedelta(days=i),
-            amount=daily_amount.quantize(Decimal("0.01")),
-            marked_by_id=None,
-            status=SavingsStatus.PENDING,
-        )
-        for i in range(total_days)
-    ]
-    db.add_all(markings)
-    db.commit()
-
-    logger.info(f"Reinitiated target savings {savings.tracking_number} for customer {current_user['user_id']}")
+    logger.info(f"Extended savings {savings.tracking_number} by {request.additional_months} months for customer {current_user['user_id']}")
     return _savings_response(savings)
 
 async def update_savings(savings_id: int, request: SavingsUpdate, current_user: dict, db: Session):
@@ -817,19 +717,15 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
             logger.error(f"Customer {savings.customer_id} not associated with unit {request.unit_id} in business {savings.business_id}")
             return error_response(status_code=400, message=f"Customer {savings.customer_id} is not associated with unit {request.unit_id} in business {savings.business_id}")
 
-    # Log the incoming marked_date for debugging
     logger.info(f"Attempting to mark date {request.marked_date} for savings {tracking_number}")
 
-    # Query for the marking
     marking = db.query(SavingsMarking).filter(
         SavingsMarking.savings_account_id == savings.id,
         SavingsMarking.marked_date == request.marked_date,
         SavingsMarking.status == SavingsStatus.PENDING
     ).first()
 
-    # Detailed error handling
     if not marking:
-        # Check if the date exists at all
         existing_marking = db.query(SavingsMarking).filter(
             SavingsMarking.savings_account_id == savings.id,
             SavingsMarking.marked_date == request.marked_date
@@ -864,7 +760,6 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
         savings.marking_status = MarkingStatus.IN_PROGRESS
         db.commit()
 
-    # Generate shorter payment reference
     short_uuid = str(uuid.uuid4())[:8]
     reference = f"sv_{tracking_number}_{short_uuid}"
     if len(reference) > 100:
@@ -947,7 +842,6 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
     marked_dates_by_tracking = {}
     savings_accounts = {}
 
-    # Group markings by tracking_number for validation
     markings_by_tracking = {}
     for mark_request in request.markings:
         tracking_number = mark_request.tracking_number
@@ -955,7 +849,6 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
             markings_by_tracking[tracking_number] = []
         markings_by_tracking[tracking_number].append(mark_request)
 
-    # Validate each savings account and its dates
     for tracking_number, mark_requests in markings_by_tracking.items():
         savings = db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tracking_number).first()
         if not savings:
@@ -973,7 +866,6 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
             logger.warning(f"Unauthorized role {current_user['role']} attempted to mark savings {tracking_number}")
             return error_response(status_code=401, message="Unauthorized role")
 
-        # Validate unit_id if provided
         unit_id = mark_requests[0].unit_id
         if unit_id:
             unit_exists = db.query(exists().where(
@@ -989,7 +881,6 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
                 logger.error(f"Customer {savings.customer_id} not associated with unit {unit_id} in business {savings.business_id}")
                 return error_response(status_code=400, message=f"Customer {savings.customer_id} is not associated with unit {unit_id} in business {savings.business_id}")
 
-        # Get all markings for this savings account, ordered by date
         all_account_markings = db.query(SavingsMarking).filter(
             SavingsMarking.savings_account_id == savings.id
         ).order_by(SavingsMarking.marked_date.asc()).all()
@@ -998,7 +889,6 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
             logger.error(f"No markings found for savings {tracking_number}")
             return error_response(status_code=400, message=f"No markings found for savings {tracking_number}")
 
-        # Find the earliest PENDING date
         earliest_pending = None
         for marking in all_account_markings:
             if marking.status == SavingsStatus.PENDING:
@@ -1009,13 +899,11 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
             logger.error(f"No pending markings found for savings {tracking_number}")
             return error_response(status_code=400, message=f"No pending markings available for savings {tracking_number}")
 
-        # Validate requested dates are sequential and start from earliest_pending
         requested_dates = sorted([mark_request.marked_date for mark_request in mark_requests])
         if not requested_dates:
             logger.error(f"No valid dates provided for savings {tracking_number}")
             return error_response(status_code=400, message="No valid dates provided")
 
-        # Check if the earliest requested date matches the earliest pending date
         if requested_dates[0] != earliest_pending:
             logger.error(f"Requested dates for {tracking_number} do not start with earliest pending date {earliest_pending}")
             return error_response(
@@ -1023,11 +911,9 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
                 message=f"Dates must start with the earliest unmarked date {earliest_pending} for savings {tracking_number}"
             )
 
-        # Validate sequential dates, allowing for PAID dates to be skipped
         current_date = earliest_pending
         expected_date = current_date
         for requested_date in requested_dates:
-            # Find the marking for the requested date
             marking = next((m for m in all_account_markings if m.marked_date == requested_date), None)
             if not marking or marking.status != SavingsStatus.PENDING or marking.marked_by_id:
                 logger.error(f"Invalid or already marked date {requested_date} for {tracking_number}, status: {marking.status if marking else 'not found'}")
@@ -1036,7 +922,6 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
                     message=f"Invalid or already marked date {requested_date} for {tracking_number}"
                 )
 
-            # Check if the requested date is the expected sequential date
             while expected_date < requested_date:
                 intermediate_marking = next((m for m in all_account_markings if m.marked_date == expected_date), None)
                 if intermediate_marking and intermediate_marking.status == SavingsStatus.PENDING:
@@ -1055,7 +940,6 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
                 )
             expected_date += timedelta(days=1)
 
-        # If validation passes, process the markings
         for mark_request in mark_requests:
             marking = db.query(SavingsMarking).filter(
                 SavingsMarking.savings_account_id == savings.id,
@@ -1078,7 +962,6 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
         logger.error(f"Customer {savings.customer_id} has no email")
         return error_response(status_code=400, message="Customer email required")
 
-    # Generate shorter payment reference using the first tracking number
     first_tracking_number = list(marked_dates_by_tracking.keys())[0]
     short_uuid = str(uuid.uuid4())[:8]
     reference = f"sv_{first_tracking_number}_{short_uuid}"
@@ -1204,15 +1087,17 @@ async def get_savings_metrics(tracking_number: str, db: Session):
     total_amount = savings_account.target_amount or sum(marking.amount for marking in markings)
     amount_marked = sum(marking.amount for marking in markings if marking.status == SavingsStatus.PAID)
     days_remaining = sum(1 for marking in markings if marking.status == SavingsStatus.PENDING)
+    can_extend = savings_account.marking_status != MarkingStatus.COMPLETED and date.today() <= savings_account.end_date
 
     response_data = SavingsMetricsResponse(
         tracking_number=tracking_number,
         total_amount=total_amount,
         amount_marked=amount_marked,
-        days_remaining=days_remaining
+        days_remaining=days_remaining,
+        can_extend=can_extend
     ).model_dump()
 
-    logger.info(f"Retrieved metrics for savings {tracking_number}: total={total_amount}, marked={amount_marked}, days_remaining={days_remaining}")
+    logger.info(f"Retrieved metrics for savings {tracking_number}: total={total_amount}, marked={amount_marked}, days_remaining={days_remaining}, can_extend={can_extend}")
     return success_response(status_code=200, message="Savings metrics retrieved successfully", data=response_data)
 
 async def verify_savings_payment(reference: str, db: Session):

@@ -7,8 +7,7 @@ from schemas.savings import (
     SavingsMarkingRequest,
     SavingsMarkingResponse,
     SavingsUpdate,
-    SavingsReinitiateDaily,
-    SavingsReinitiateTarget,
+    SavingsExtend,
     BulkMarkSavingsRequest,
     SavingsTargetCalculationResponse,
 )
@@ -19,8 +18,7 @@ from service.savings import (
     update_savings,
     get_savings_markings_by_tracking_number,
     mark_savings_bulk,
-    reinitiate_savings_daily,
-    reinitiate_savings_target,
+    extend_savings,
     verify_savings_payment,
     calculate_target_savings,
     get_all_savings,
@@ -57,21 +55,13 @@ async def create_target_savings(
 ):
     return await create_savings_target(request, current_user, db)
 
-@savings_router.post("/reinitiate/daily", response_model=SavingsResponse)
-async def reinitiate_daily_savings(
-    request: SavingsReinitiateDaily,
+@savings_router.post("/extend", response_model=SavingsResponse)
+async def extend_savings_endpoint(
+    request: SavingsExtend,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return await reinitiate_savings_daily(request, current_user, db)
-
-@savings_router.post("/reinitiate/target", response_model=SavingsResponse)
-async def reinitiate_target_savings(
-    request: SavingsReinitiateTarget,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    return await reinitiate_savings_target(request, current_user, db)
+    return await extend_savings(request, current_user, db)
 
 @savings_router.put("/{savings_id}", response_model=SavingsResponse)
 async def update_savings_endpoint(

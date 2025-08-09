@@ -7,7 +7,7 @@ from models.savings import SavingsType, SavingsStatus, PaymentMethod
 class SavingsCreateDaily(BaseModel):
     customer_id: Optional[int] = None
     business_id: int
-    unit_id: int  # Added unit_id
+    unit_id: int
     daily_amount: Decimal
     duration_months: int
     start_date: date
@@ -18,8 +18,8 @@ class SavingsCreateDaily(BaseModel):
 
 class SavingsCreateTarget(BaseModel):
     customer_id: Optional[int] = None
-    business_id: int  # Made business_id required
-    unit_id: int  # Added unit_id
+    business_id: int
+    unit_id: int
     target_amount: Decimal
     start_date: date
     end_date: date
@@ -28,33 +28,16 @@ class SavingsCreateTarget(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-class SavingsReinitiateDaily(BaseModel):
+class SavingsExtend(BaseModel):
     tracking_number: str
-    business_id: int  # Added business_id
-    unit_id: int  # Added unit_id
-    daily_amount: Decimal
-    duration_months: int
-    start_date: date
-    commission_days: int = 30
-
-    class Config:
-        arbitrary_types_allowed = True
-
-class SavingsReinitiateTarget(BaseModel):
-    tracking_number: str
-    business_id: int  # Added business_id
-    unit_id: int  # Added unit_id
-    target_amount: Decimal
-    start_date: date
-    end_date: date
-    commission_days: int = 30
+    additional_months: int
 
     class Config:
         arbitrary_types_allowed = True
 
 class SavingsUpdate(BaseModel):
-    business_id: Optional[int] = None  # Added business_id
-    unit_id: Optional[int] = None  # Added unit_id
+    business_id: Optional[int] = None
+    unit_id: Optional[int] = None
     daily_amount: Optional[Decimal] = None
     duration_months: Optional[int] = None
     start_date: Optional[date] = None
@@ -69,7 +52,7 @@ class SavingsResponse(BaseModel):
     id: int
     customer_id: int
     business_id: int
-    unit_id: Optional[int]  # Added unit_id
+    unit_id: Optional[int]
     tracking_number: str
     savings_type: SavingsType
     daily_amount: Decimal
@@ -87,12 +70,11 @@ class SavingsResponse(BaseModel):
 class SavingsMarkingRequest(BaseModel):
     marked_date: date
     payment_method: PaymentMethod
-    unit_id: Optional[int] = None  # Added unit_id
+    unit_id: Optional[int] = None
 
     class Config:
         arbitrary_types_allowed = True
 
-# New schema for bulk marking entries
 class BulkSavingsMarkingRequest(BaseModel):
     tracking_number: str
     marked_date: date
@@ -132,6 +114,7 @@ class SavingsMetricsResponse(BaseModel):
     total_amount: Decimal
     amount_marked: Decimal
     days_remaining: int
+    can_extend: bool
 
     class Config:
         arbitrary_types_allowed = True
