@@ -12,6 +12,7 @@ class SavingsCreateDaily(BaseModel):
     duration_months: int
     start_date: date
     commission_days: int = 30
+    commission_amount: Optional[Decimal] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -24,6 +25,7 @@ class SavingsCreateTarget(BaseModel):
     start_date: date
     end_date: date
     commission_days: int = 30
+    commission_amount: Optional[Decimal] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -44,6 +46,7 @@ class SavingsUpdate(BaseModel):
     end_date: Optional[date] = None
     target_amount: Optional[Decimal] = None
     commission_days: Optional[int] = None
+    commission_amount: Optional[Decimal] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -61,6 +64,7 @@ class SavingsResponse(BaseModel):
     target_amount: Optional[Decimal]
     end_date: Optional[date]
     commission_days: int
+    commission_amount: Decimal
     created_at: datetime
     updated_at: Optional[datetime]
 
@@ -115,6 +119,7 @@ class SavingsMetricsResponse(BaseModel):
     amount_marked: Decimal
     days_remaining: int
     can_extend: bool
+    total_commission: Decimal
 
     class Config:
         arbitrary_types_allowed = True

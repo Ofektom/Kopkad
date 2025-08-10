@@ -50,6 +50,7 @@ class SavingsAccount(AuditMixin, Base):
     target_amount = Column(Numeric(10, 2))
     end_date = Column(Date)
     commission_days = Column(Integer, default=30)
+    commission_amount = Column(Numeric(10, 2), nullable=False)
     marking_status = Column(
         Enum(MarkingStatus, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,

@@ -26,6 +26,7 @@ from models.business import Unit, user_units
 from sqlalchemy.sql import exists
 import requests
 import uuid
+import math
 
 paystack = Paystack(secret_key=os.getenv("PAYSTACK_SECRET_KEY"))
 
@@ -35,6 +36,12 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+def calculate_total_commission(savings: SavingsAccount) -> Decimal:
+    total_days = _calculate_total_days(savings.start_date, savings.duration_months)
+    commission_periods = math.ceil(total_days / savings.commission_days)
+    total_commission = savings.commission_amount * Decimal(commission_periods)
+    return total_commission.quantize(Decimal("0.01"))
 
 async def initiate_virtual_account_payment(amount: Decimal, email: str, customer_id: int, reference: str, db: Session):
     try:
@@ -221,6 +228,7 @@ def _savings_response(savings: SavingsAccount) -> dict:
             target_amount=savings.target_amount,
             end_date=savings.end_date,
             commission_days=savings.commission_days,
+            commission_amount=savings.commission_amount,
             created_at=savings.created_at,
             updated_at=savings.updated_at,
         ).model_dump(),
@@ -246,6 +254,9 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
     if request.daily_amount <= 0 or request.duration_months <= 0:
         return error_response(status_code=400, message="Daily amount and duration must be positive")
 
+    if request.commission_days <= 0:
+        return error_response(status_code=400, message="Commission days must be positive")
+
     unit_exists = db.query(exists().where(
         user_units.c.user_id == customer_id
     ).where(
@@ -260,6 +271,11 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
 
     total_days = _calculate_total_days(request.start_date, request.duration_months)
     total_amount = request.daily_amount * Decimal(total_days)
+    commission_amount = request.commission_amount if request.commission_amount is not None else request.daily_amount
+
+    if commission_amount < 0:
+        return error_response(status_code=400, message="Commission amount cannot be negative")
+
     tracking_number = _generate_unique_tracking_number(db, SavingsAccount)
     end_date = request.start_date + relativedelta(months=request.duration_months) - timedelta(days=1)
 
@@ -274,6 +290,7 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
         start_date=request.start_date,
         end_date=end_date,
         commission_days=request.commission_days,
+        commission_amount=commission_amount,
         target_amount=total_amount,
         created_by=current_user["user_id"],
         marking_status=MarkingStatus.NOT_STARTED,
@@ -281,7 +298,9 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
     db.add(savings)
     db.flush()
 
+    total_commission = calculate_total_commission(savings)
     logger.info(f"Set target_amount={total_amount} for daily savings {tracking_number} with {total_days} days")
+    logger.info(f"Set commission_amount={commission_amount}, commission_days={request.commission_days}, total_commission={total_commission} for daily savings {tracking_number}")
     logger.info(f"Creating {total_days} markings for daily savings {tracking_number} from {request.start_date} to {end_date}")
 
     markings = [
@@ -344,6 +363,9 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
     if total_days <= 0:
         return error_response(status_code=400, message="End date must be after start date")
 
+    if request.commission_days <= 0:
+        return error_response(status_code=400, message="Commission days must be positive")
+
     unit_exists = db.query(exists().where(
         user_units.c.user_id == customer_id
     ).where(
@@ -359,6 +381,10 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
     duration_months = (request.end_date.year - request.start_date.year) * 12 + request.end_date.month - request.start_date.month + 1
     tracking_number = _generate_unique_tracking_number(db, SavingsAccount)
     daily_amount = request.target_amount / Decimal(total_days)
+    commission_amount = request.commission_amount if request.commission_amount is not None else daily_amount.quantize(Decimal("0.01"))
+
+    if commission_amount < 0:
+        return error_response(status_code=400, message="Commission amount cannot be negative")
 
     savings = SavingsAccount(
         customer_id=customer_id,
@@ -372,11 +398,15 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
         target_amount=request.target_amount,
         end_date=request.end_date,
         commission_days=request.commission_days,
+        commission_amount=commission_amount,
         created_by=current_user["user_id"],
         marking_status=MarkingStatus.NOT_STARTED,
     )
     db.add(savings)
     db.flush()
+
+    total_commission = calculate_total_commission(savings)
+    logger.info(f"Created target savings {tracking_number} with commission_amount={commission_amount}, commission_days={request.commission_days}, total_commission={total_commission} for customer {customer_id}")
 
     markings = [
         SavingsMarking(
@@ -392,7 +422,6 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
     db.add_all(markings)
     db.commit()
 
-    logger.info(f"Created target savings {tracking_number} for customer {customer_id}")
     return _savings_response(savings)
 
 async def extend_savings(request: SavingsExtend, current_user: dict, db: Session):
@@ -431,8 +460,10 @@ async def extend_savings(request: SavingsExtend, current_user: dict, db: Session
     markings = db.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings.id).all()
     _adjust_savings_markings(savings, markings, db)
 
+    total_commission = calculate_total_commission(savings)
+    logger.info(f"Extended savings {savings.tracking_number} by {request.additional_months} months, new total_commission={total_commission} for customer {current_user['user_id']}")
+
     db.commit()
-    logger.info(f"Extended savings {savings.tracking_number} by {request.additional_months} months for customer {current_user['user_id']}")
     return _savings_response(savings)
 
 async def update_savings(savings_id: int, request: SavingsUpdate, current_user: dict, db: Session):
@@ -471,6 +502,8 @@ async def update_savings(savings_id: int, request: SavingsUpdate, current_user: 
         if request.daily_amount <= 0:
             return error_response(status_code=400, message="Daily amount must be positive")
         savings.daily_amount = request.daily_amount
+        if request.commission_amount is None and savings.commission_amount == savings.daily_amount:
+            savings.commission_amount = request.daily_amount
 
         for marking in markings:
             marking.amount = request.daily_amount
@@ -505,13 +538,19 @@ async def update_savings(savings_id: int, request: SavingsUpdate, current_user: 
         savings.target_amount = request.target_amount
 
     if request.commission_days is not None:
-        if request.commission_days < 0:
-            return error_response(status_code=400, message="Commission days cannot be negative")
+        if request.commission_days <= 0:
+            return error_response(status_code=400, message="Commission days must be positive")
         savings.commission_days = request.commission_days
+
+    if request.commission_amount is not None:
+        if request.commission_amount < 0:
+            return error_response(status_code=400, message="Commission amount cannot be negative")
+        savings.commission_amount = request.commission_amount
 
     savings.updated_by = current_user["user_id"]
     db.commit()
-    logger.info(f"Updated savings {savings.tracking_number} for customer {current_user['user_id']}")
+    total_commission = calculate_total_commission(savings)
+    logger.info(f"Updated savings {savings.tracking_number} with commission_amount={savings.commission_amount}, commission_days={savings.commission_days}, total_commission={total_commission} for customer {current_user['user_id']}")
     return _savings_response(savings)
 
 async def delete_savings(savings_id: int, current_user: dict, db: Session):
@@ -640,6 +679,7 @@ async def get_all_savings(
             target_amount=s.target_amount,
             end_date=s.end_date,
             commission_days=s.commission_days,
+            commission_amount=s.commission_amount,
             created_at=s.created_at,
             updated_at=s.updated_at,
         ).model_dump()
@@ -754,7 +794,11 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
     marking.unit_id = request.unit_id or savings.unit_id
     marking.marked_by_id = current_user["user_id"]
     marking.updated_by = current_user["user_id"]
-    total_amount = marking.amount
+
+    days_since_start = (request.marked_date - savings.start_date).days + 1
+    commission_periods = math.floor(days_since_start / savings.commission_days) + 1
+    commission_due = savings.commission_amount if days_since_start % savings.commission_days == 0 or commission_periods == 1 else Decimal("0")
+    total_amount = marking.amount + commission_due
 
     if savings.marking_status == MarkingStatus.NOT_STARTED:
         savings.marking_status = MarkingStatus.IN_PROGRESS
@@ -779,7 +823,7 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
             marking.payment_reference = response["data"]["reference"]
             marking.status = SavingsStatus.PENDING
             db.commit()
-            logger.info(f"Card payment initiated for {tracking_number}, date {request.marked_date}, reference {reference}")
+            logger.info(f"Card payment initiated for {tracking_number}, date {request.marked_date}, reference {reference}, includes commission_due={commission_due}")
             return success_response(
                 status_code=200,
                 message="Proceed to payment",
@@ -802,7 +846,7 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
             marking.status = SavingsStatus.PENDING
             marking.virtual_account_details = virtual_account
             db.commit()
-            logger.info(f"Bank transfer initiated for {tracking_number}, date {request.marked_date}, reference {reference}")
+            logger.info(f"Bank transfer initiated for {tracking_number}, date {request.marked_date}, reference {reference}, includes commission_due={commission_due}")
             return success_response(
                 status_code=200,
                 message="Pay to the virtual account",
@@ -841,6 +885,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
     total_amount = Decimal("0")
     marked_dates_by_tracking = {}
     savings_accounts = {}
+    commission_due_by_savings = {}
 
     markings_by_tracking = {}
     for mark_request in request.markings:
@@ -940,6 +985,8 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
                 )
             expected_date += timedelta(days=1)
 
+        commission_due = Decimal("0")
+        start_date = savings.start_date
         for mark_request in mark_requests:
             marking = db.query(SavingsMarking).filter(
                 SavingsMarking.savings_account_id == savings.id,
@@ -951,12 +998,18 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
             marking.marked_by_id = current_user["user_id"]
             marking.updated_by = current_user["user_id"]
             total_amount += marking.amount
+            days_since_start = (mark_request.marked_date - start_date).days + 1
+            commission_periods = math.floor(days_since_start / savings.commission_days) + 1
+            if days_since_start % savings.commission_days == 0 or (commission_periods == 1 and days_since_start <= savings.commission_days):
+                commission_due += savings.commission_amount
             all_markings.append(marking)
             savings_accounts[savings.id] = savings
             if tracking_number not in marked_dates_by_tracking:
                 marked_dates_by_tracking[tracking_number] = []
             marked_dates_by_tracking[tracking_number].append(marking.marked_date.isoformat())
+        commission_due_by_savings[savings.id] = commission_due
 
+    total_amount += sum(commission_due_by_savings.values())
     customer = db.query(User).filter(User.id == savings_accounts[list(savings_accounts.keys())[0]].customer_id).first()
     if not customer.email:
         logger.error(f"Customer {savings.customer_id} has no email")
@@ -988,7 +1041,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
                 marking.payment_reference = reference
                 marking.status = SavingsStatus.PENDING
             db.commit()
-            logger.info(f"Card payment initiated for bulk marking, reference {reference}, dates: {marked_dates_by_tracking}")
+            logger.info(f"Card payment initiated for bulk marking, reference {reference}, dates: {marked_dates_by_tracking}, total_amount={total_amount}, includes commission_due={sum(commission_due_by_savings.values())}")
             return success_response(
                 status_code=200,
                 message="Proceed to payment for bulk marking",
@@ -1016,7 +1069,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
                 marking.status = SavingsStatus.PENDING
                 marking.virtual_account_details = virtual_account
             db.commit()
-            logger.info(f"Bank transfer initiated for bulk marking, reference {reference}, dates: {marked_dates_by_tracking}")
+            logger.info(f"Bank transfer initiated for bulk marking, reference {reference}, dates: {marked_dates_by_tracking}, total_amount={total_amount}, includes commission_due={sum(commission_due_by_savings.values())}")
             return success_response(
                 status_code=200,
                 message="Pay to the virtual account for bulk marking",
@@ -1062,8 +1115,9 @@ async def end_savings_markings(tracking_number: str, current_user: dict, db: Ses
         marking.updated_by = current_user["user_id"]
         marking.updated_at = datetime.now()
 
+    total_commission = calculate_total_commission(savings)
+    logger.info(f"Abruptly ended markings for savings {tracking_number} with total_commission={total_commission} for customer {savings.customer_id}")
     db.commit()
-    logger.info(f"Abruptly ended markings for savings {tracking_number} for customer {savings.customer_id}")
     return success_response(
         status_code=200,
         message="Savings markings ended successfully",
@@ -1088,16 +1142,18 @@ async def get_savings_metrics(tracking_number: str, db: Session):
     amount_marked = sum(marking.amount for marking in markings if marking.status == SavingsStatus.PAID)
     days_remaining = sum(1 for marking in markings if marking.status == SavingsStatus.PENDING)
     can_extend = savings_account.marking_status != MarkingStatus.COMPLETED and date.today() <= savings_account.end_date
+    total_commission = calculate_total_commission(savings_account)
 
     response_data = SavingsMetricsResponse(
         tracking_number=tracking_number,
         total_amount=total_amount,
         amount_marked=amount_marked,
         days_remaining=days_remaining,
-        can_extend=can_extend
+        can_extend=can_extend,
+        total_commission=total_commission
     ).model_dump()
 
-    logger.info(f"Retrieved metrics for savings {tracking_number}: total={total_amount}, marked={amount_marked}, days_remaining={days_remaining}, can_extend={can_extend}")
+    logger.info(f"Retrieved metrics for savings {tracking_number}: total={total_amount}, marked={amount_marked}, days_remaining={days_remaining}, can_extend={can_extend}, total_commission={total_commission}")
     return success_response(status_code=200, message="Savings metrics retrieved successfully", data=response_data)
 
 async def verify_savings_payment(reference: str, db: Session):
@@ -1106,11 +1162,23 @@ async def verify_savings_payment(reference: str, db: Session):
         return error_response(status_code=404, message="Payment reference not found")
 
     payment_method = markings[0].payment_method
-    total_amount = sum(m.amount for m in markings)
+    savings_accounts = {m.savings_account_id: m.savings_account for m in markings}
+    commission_due_by_savings = {}
+    for savings_id, savings in savings_accounts.items():
+        commission_due = Decimal("0")
+        for marking in markings:
+            if marking.savings_account_id == savings_id:
+                days_since_start = (marking.marked_date - savings.start_date).days + 1
+                commission_periods = math.floor(days_since_start / savings.commission_days) + 1
+                if days_since_start % savings.commission_days == 0 or (commission_periods == 1 and days_since_start <= savings.commission_days):
+                    commission_due += savings.commission_amount
+        commission_due_by_savings[savings_id] = commission_due
+
+    total_amount = sum(m.amount for m in markings) + sum(commission_due_by_savings.values())
     tracking_numbers = list({m.savings_account.tracking_number for m in markings})
     marked_dates = [m.marked_date.isoformat() for m in markings]
 
-    logger.info(f"Verifying payment for reference {reference} with method {payment_method}")
+    logger.info(f"Verifying payment for reference {reference} with method {payment_method}, total_amount={total_amount}, includes commission_due={sum(commission_due_by_savings.values())}")
 
     response_data = {
         "reference": reference,
@@ -1150,7 +1218,8 @@ async def verify_savings_payment(reference: str, db: Session):
                 ).count()
                 if remaining_pending == 0:
                     savings.marking_status = MarkingStatus.COMPLETED
-                    completion_message = f"Congratulations! You have successfully completed your savings plan {savings.tracking_number}!"
+                    total_commission = calculate_total_commission(savings)
+                    completion_message = f"Congratulations! You have successfully completed your savings plan {savings.tracking_number}! Total commission: {total_commission}"
             db.commit()
             response_data["status"] = SavingsStatus.PAID
             logger.info(f"Card payment verified and marked as PAID for reference {reference}")
@@ -1188,7 +1257,8 @@ async def verify_savings_payment(reference: str, db: Session):
                     ).count()
                     if remaining_pending == 0:
                         savings.marking_status = MarkingStatus.COMPLETED
-                        completion_message = f"Congratulations! You have successfully completed your savings plan {savings.tracking_number}!"
+                        total_commission = calculate_total_commission(savings)
+                        completion_message = f"Congratulations! You have successfully completed your savings plan {savings.tracking_number}! Total commission: {total_commission}"
                 db.commit()
                 response_data["status"] = SavingsStatus.PAID
                 logger.info(f"Bank transfer payment verified and marked as PAID for reference {reference}")
@@ -1224,7 +1294,19 @@ async def confirm_bank_transfer(reference: str, current_user: dict, db: Session)
     elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
         return error_response(status_code=401, message="Unauthorized role")
 
-    total_amount = sum(m.amount for m in markings)
+    savings_accounts = {m.savings_account_id: m.savings_account for m in markings}
+    commission_due_by_savings = {}
+    for savings_id, savings in savings_accounts.items():
+        commission_due = Decimal("0")
+        for marking in markings:
+            if marking.savings_account_id == savings_id:
+                days_since_start = (marking.marked_date - savings.start_date).days + 1
+                commission_periods = math.floor(days_since_start / savings.commission_days) + 1
+                if days_since_start % savings.commission_days == 0 or (commission_periods == 1 and days_since_start <= savings.commission_days):
+                    commission_due += savings.commission_amount
+        commission_due_by_savings[savings_id] = commission_due
+
+    total_amount = sum(m.amount for m in markings) + sum(commission_due_by_savings.values())
     response = {
         "status": True,
         "data": {
@@ -1260,7 +1342,8 @@ async def confirm_bank_transfer(reference: str, current_user: dict, db: Session)
         ).count()
         if remaining_pending == 0:
             savings.marking_status = MarkingStatus.COMPLETED
-            completion_message = f"Congratulations! You have successfully completed your savings plan {savings.tracking_number}!"
+            total_commission = calculate_total_commission(savings)
+            completion_message = f"Congratulations! You have successfully completed your savings plan {savings.tracking_number}! Total commission: {total_commission}"
     db.commit()
     logger.info(f"Bank transfer confirmed for reference {reference}, marked as PAID")
     response_data = {
