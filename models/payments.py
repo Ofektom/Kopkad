@@ -25,7 +25,7 @@ class Commission(Base, AuditMixin):
     commission_date = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     savings_account = relationship("SavingsAccount", back_populates="commissions")
-    agent = relationship("User")
+    agent = relationship("User", foreign_keys=[agent_id])
 
 class AccountDetails(AuditMixin, Base):
     __tablename__ = "account_details"
