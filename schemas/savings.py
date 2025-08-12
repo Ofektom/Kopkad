@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional, List, Dict
-from models.savings import SavingsType, SavingsStatus, PaymentMethod
+from models.savings import SavingsType, PaymentMethod, MarkingStatus
 
 class SavingsCreateDaily(BaseModel):
     customer_id: Optional[int] = None
@@ -120,6 +120,7 @@ class SavingsMetricsResponse(BaseModel):
     days_remaining: int
     can_extend: bool
     total_commission: Decimal
+    marking_status: MarkingStatus  # Added
 
     class Config:
         arbitrary_types_allowed = True

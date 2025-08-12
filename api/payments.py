@@ -1,4 +1,3 @@
-
 from config.settings import settings
 import hmac
 import hashlib
@@ -12,17 +11,20 @@ from sqlalchemy.orm import Session
 from schemas.payments import (
     AccountDetailsCreate,
     PaymentAccountCreate,
-    PaymentAccountResponse,
-    PaymentInitiateResponse,
+    PaymentRequestCreate,
     PaymentAccountUpdate,
 )
 from service.payments import (
     create_account_details,
     create_payment_account,
-    initiate_payment,
-    get_payment_accounts,
     update_payment_account,
     delete_account_details,
+    create_payment_request,
+    get_payment_requests,
+    approve_payment_request,
+    reject_payment_request,
+    get_agent_commissions,
+    get_customer_payments,
 )
 from database.postgres import get_db
 from utils.auth import get_current_user
@@ -42,7 +44,6 @@ logger = logging.getLogger(__name__)
 async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
     logger.info("Received Paystack webhook request")
     
-    # Read request body and verify signature
     body = await request.body()
     signature = request.headers.get("x-paystack-signature")
     if not signature:
@@ -64,7 +65,6 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
         logger.error("No reference provided in webhook payload")
         raise HTTPException(status_code=400, detail="No reference provided")
 
-    # Check if payment is already processed
     if db.query(SavingsMarking).filter(
         SavingsMarking.payment_reference == reference,
         SavingsMarking.status == SavingsStatus.PAID.value
@@ -77,7 +77,6 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
         logger.warning(f"No markings found for reference {reference}")
         return {"status": "success"}
 
-    # Verify payment amount
     expected_amount = sum(m.amount for m in markings)
     amount_paid = Decimal(data["amount"]) / 100  # Convert kobo to naira
 
@@ -98,34 +97,39 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
     
     return {"status": "success"}
 
-
 @payment_router.post("/account-details", response_model=dict)
 async def add_account_details(
     request: AccountDetailsCreate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Add bank account details for a customer."""
+    """Add bank account details for a payment account."""
     return await create_account_details(request, current_user, db)
 
-@payment_router.post("/account", response_model=PaymentAccountResponse)
+@payment_router.post("/account", response_model=dict)
 async def create_payment_account_endpoint(
     request: PaymentAccountCreate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create a payment account for a customer's completed savings."""
-    return await create_payment_account(request, current_user, db)
+    """Create a payment account for a customer to store payment details."""
+    response = await create_payment_account(request, current_user, db)
+    if response.get("status") == "success":
+        return {"status": "success", "message": response["message"], "data": response["data"]}
+    raise HTTPException(status_code=response["status_code"], detail=response["message"])
 
-@payment_router.put("/account/{payment_account_id}", response_model=PaymentAccountResponse)
+@payment_router.put("/account/{payment_account_id}", response_model=dict)
 async def update_payment_account_endpoint(
     payment_account_id: int,
     request: PaymentAccountUpdate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Update a payment account and its associated account details."""
-    return await update_payment_account(payment_account_id, request, current_user, db)
+    """Update a payment account by adding or updating account details."""
+    response = await update_payment_account(payment_account_id, request, current_user, db)
+    if response.get("status") == "success":
+        return {"status": "success", "message": response["message"], "data": response["data"]}
+    raise HTTPException(status_code=response["status_code"], detail=response["message"])
 
 @payment_router.delete("/account-details/{account_details_id}", response_model=dict)
 async def delete_account_details_endpoint(
@@ -136,25 +140,69 @@ async def delete_account_details_endpoint(
     """Delete specific account details for a payment account."""
     return await delete_account_details(account_details_id, current_user, db)
 
-@payment_router.post("/initiate/{payment_account_id}", response_model=PaymentInitiateResponse)
-async def initiate_payment_endpoint(
-    payment_account_id: int,
-    account_details_id: Optional[int] = Query(None, description="ID of the specific account details to use for payment"),
+@payment_router.post("/request", response_model=dict)
+async def create_payment_request_endpoint(
+    request: PaymentRequestCreate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Initiate payment for a completed savings account."""
-    return await initiate_payment(payment_account_id, current_user, db, account_details_id)
+    """Customer requests payment for a completed savings account."""
+    response = await create_payment_request(request, current_user, db)
+    if response.get("status") == "success":
+        return {"status": "success", "message": response["message"], "data": response["data"]}
+    raise HTTPException(status_code=response["status_code"], detail=response["message"])
 
-@payment_router.get("/accounts", response_model=dict)
-async def list_payment_accounts(
-    customer_id: Optional[int] = None,
-    savings_account_id: Optional[int] = None,
-    status: Optional[str] = None,
-    limit: int = 10,
-    offset: int = 0,
+@payment_router.get("/requests", response_model=dict)
+async def get_payment_requests_endpoint(
+    business_id: Optional[int] = Query(None, description="Filter by business ID"),
+    customer_id: Optional[int] = Query(None, description="Filter by customer ID"),
+    status: Optional[str] = Query(None, description="Filter by status (pending, completed, rejected)"),
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Retrieve payment accounts with optional filtering."""
-    return await get_payment_accounts(customer_id, savings_account_id, status, limit, offset, current_user, db)
+    """Retrieve payment requests for agents or admins."""
+    return await get_payment_requests(business_id, customer_id, status, limit, offset, current_user, db)
+
+@payment_router.post("/request/{request_id}/approve", response_model=dict)
+async def approve_payment_request_endpoint(
+    request_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Approve a payment request (manual transfer assumed)."""
+    return await approve_payment_request(request_id, current_user, db)
+
+@payment_router.post("/request/{request_id}/reject", response_model=dict)
+async def reject_payment_request_endpoint(
+    request_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Reject a payment request."""
+    return await reject_payment_request(request_id, current_user, db)
+
+@payment_router.get("/commissions", response_model=dict)
+async def get_commissions_endpoint(
+    business_id: Optional[int] = Query(None, description="Filter by business ID"),
+    savings_account_id: Optional[int] = Query(None, description="Filter by savings account ID"),
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Retrieve commissions for agents with customer and savings details."""
+    return await get_agent_commissions(business_id, savings_account_id, limit, offset, current_user, db)
+
+@payment_router.get("/customer-payments", response_model=dict)
+async def get_customer_payments_endpoint(
+    customer_id: Optional[int] = Query(None, description="Filter by customer ID"),
+    savings_account_id: Optional[int] = Query(None, description="Filter by savings account ID"),
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Retrieve customer payments for completed savings, including total amount, commission, and payout."""
+    return await get_customer_payments(customer_id, savings_account_id, limit, offset, current_user, db)
