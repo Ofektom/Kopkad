@@ -642,9 +642,15 @@ async def get_all_savings(
         query = query.filter(SavingsAccount.customer_id == customer_id)
 
     if savings_type:
-        if savings_type not in [SavingsType.DAILY, SavingsType.TARGET]:
-            return error_response(status_code=400, message="Invalid savings type. Use DAILY or TARGET")
-        query = query.filter(SavingsAccount.savings_type == savings_type)
+        # Map legacy savings types to enum values
+        savings_type_map = {
+            "single": SavingsType.DAILY,
+            "target": SavingsType.TARGET,
+            "daily": SavingsType.DAILY
+        }
+        if savings_type.lower() not in savings_type_map and savings_type not in [SavingsType.DAILY, SavingsType.TARGET]:
+            return error_response(status_code=400, message="Invalid savings type. Use DAILY, TARGET, single, or target")
+        query = query.filter(SavingsAccount.savings_type == savings_type_map.get(savings_type.lower(), savings_type))
     
     if limit < 1 or offset < 0:
         return error_response(status_code=400, message="Limit must be positive and offset non-negative")
