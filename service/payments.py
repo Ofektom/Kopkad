@@ -392,36 +392,51 @@ async def create_payment_request(request: PaymentRequestCreate, current_user: di
         return error_response(status_code=500, message=f"Failed to create payment request: {str(e)}")
 
 async def get_payment_requests(
-    business_id: Optional[int],
-    customer_id: Optional[int],
-    status: Optional[str],
-    limit: int,
-    offset: int,
-    current_user: dict,
-    db: Session
+    business_id: Optional[int] = None,
+    customer_id: Optional[int] = None,
+    status: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0,
+    current_user: dict = None,
+    db: Session = None
 ):
-    """Retrieve payment requests for agents or admins."""
+    """Retrieve payment requests based on user role and filters."""
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not current_user_obj:
         return error_response(status_code=404, message="User not found")
 
-    if current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin"]:
-        return error_response(status_code=403, message="Only agents, sub-agents, admins, or super-admins can view payment requests")
-
     query = db.query(PaymentRequest).join(PaymentAccount).join(SavingsAccount).join(User, User.id == PaymentAccount.customer_id)
 
-    if current_user["role"] in ["agent", "sub_agent"]:
+    if current_user["role"] == "customer":
+        # Customers only see their own requests, limited to 20, including all pending and only approved
+        if customer_id and customer_id != current_user["user_id"]:
+            return error_response(status_code=403, message="Customers can only view their own payment requests")
+        query = query.filter(
+            PaymentAccount.customer_id == current_user["user_id"],
+            PaymentRequest.status.in_([PaymentRequestStatus.PENDING, PaymentRequestStatus.APPROVED])
+        )
+    elif current_user["role"] in ["agent", "sub_agent"]:
+        # Agents/sub-agents see requests for their business
         business_ids = [b.id for b in current_user_obj.businesses]
         if not business_ids:
             return error_response(status_code=400, message="No business associated with user")
         query = query.filter(SavingsAccount.business_id.in_(business_ids))
+    elif current_user["role"] not in ["admin", "super_admin"]:
+        # Only admins/super_admins can see all requests
+        return error_response(status_code=403, message="Unauthorized role")
 
+    # Apply business_id filter if provided
     if business_id:
         query = query.filter(SavingsAccount.business_id == business_id)
 
+    # Apply customer_id filter if provided
     if customer_id:
+        customer = db.query(User).filter(User.id == customer_id, User.role == "customer").first()
+        if not customer:
+            return error_response(status_code=400, message=f"User {customer_id} is not a customer")
         query = query.filter(PaymentAccount.customer_id == customer_id)
 
+    # Apply status filter if provided
     if status:
         try:
             payment_request_status = PaymentRequestStatus(status.lower())
@@ -429,8 +444,14 @@ async def get_payment_requests(
         except ValueError:
             return error_response(status_code=400, message=f"Invalid status: {status}")
 
-    total_count = query.count()
-    payment_requests = query.order_by(PaymentRequest.request_date.desc()).offset(offset).limit(limit).all()
+    # Apply limit for customers (max 20) or use provided limit for others
+    if current_user["role"] == "customer":
+        limit = min(limit, 20)  # Enforce max limit of 20 for customers
+        total_count = query.count()
+        payment_requests = query.order_by(PaymentRequest.request_date.desc()).offset(offset).limit(limit).all()
+    else:
+        total_count = query.count()
+        payment_requests = query.order_by(PaymentRequest.request_date.desc()).offset(offset).limit(limit).all()
 
     response_data = []
     for request in payment_requests:
