@@ -13,6 +13,7 @@ from schemas.payments import (
     PaymentAccountCreate,
     PaymentRequestCreate,
     PaymentAccountUpdate,
+    PaymentAccountResponse,
 )
 from service.payments import (
     create_account_details,
@@ -106,7 +107,7 @@ async def add_account_details(
     """Add bank account details for a payment account."""
     return await create_account_details(request, current_user, db)
 
-@payment_router.post("/account", response_model=dict)
+@payment_router.post("/account", response_model=PaymentAccountResponse)
 async def create_payment_account_endpoint(
     request: PaymentAccountCreate,
     current_user: dict = Depends(get_current_user),
@@ -114,11 +115,11 @@ async def create_payment_account_endpoint(
 ):
     """Create a payment account for a customer to store payment details."""
     response = await create_payment_account(request, current_user, db)
-    if response.get("status") == "success":
-        return {"status": "success", "message": response["message"], "data": response["data"]}
+    if response["status"] == "success":
+        return response["data"]
     raise HTTPException(status_code=response["status_code"], detail=response["message"])
 
-@payment_router.put("/account/{payment_account_id}", response_model=dict)
+@payment_router.put("/account/{payment_account_id}", response_model=PaymentAccountResponse)
 async def update_payment_account_endpoint(
     payment_account_id: int,
     request: PaymentAccountUpdate,
@@ -127,8 +128,8 @@ async def update_payment_account_endpoint(
 ):
     """Update a payment account by adding or updating account details."""
     response = await update_payment_account(payment_account_id, request, current_user, db)
-    if response.get("status") == "success":
-        return {"status": "success", "message": response["message"], "data": response["data"]}
+    if response["status"] == "success":
+        return response["data"]
     raise HTTPException(status_code=response["status_code"], detail=response["message"])
 
 @payment_router.delete("/account-details/{account_details_id}", response_model=dict)
@@ -148,7 +149,7 @@ async def create_payment_request_endpoint(
 ):
     """Customer requests payment for a completed savings account."""
     response = await create_payment_request(request, current_user, db)
-    if response.get("status") == "success":
+    if response["status"] == "success":
         return {"status": "success", "message": response["message"], "data": response["data"]}
     raise HTTPException(status_code=response["status_code"], detail=response["message"])
 
