@@ -22,7 +22,7 @@ class AccountDetailsResponse(BaseModel):
     updated_at: Optional[datetime]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class PaymentAccountCreate(BaseModel):
     account_details: List[AccountDetailsCreate]
@@ -36,7 +36,7 @@ class PaymentAccountResponse(BaseModel):
     updated_at: Optional[datetime]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class PaymentAccountUpdate(BaseModel):
     account_details: List[AccountDetailsCreate]
@@ -59,7 +59,7 @@ class PaymentRequestResponse(BaseModel):
     tracking_number: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class CommissionResponse(BaseModel):
     id: int
@@ -73,7 +73,7 @@ class CommissionResponse(BaseModel):
     tracking_number: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class CustomerPaymentResponse(BaseModel):
     payment_request_id: int
@@ -90,4 +90,4 @@ class CustomerPaymentResponse(BaseModel):
     updated_at: Optional[datetime]
 
     class Config:
-        orm_mode = True
+        from_attributes = True

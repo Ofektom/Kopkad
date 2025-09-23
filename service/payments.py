@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from fastapi import status
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
-from models.payments import AccountDetails, PaymentAccount, PaymentStatus, Commission, PaymentRequest, PaymentRequestStatus
+from models.payments import AccountDetails, PaymentAccount, Commission, PaymentRequest, PaymentRequestStatus
 from models.savings import SavingsAccount, SavingsMarking, MarkingStatus, SavingsStatus
 from models.user import User, Permission
 from schemas.payments import (
