@@ -107,17 +107,14 @@ async def add_account_details(
     """Add bank account details for a payment account."""
     return await create_account_details(request, current_user, db)
 
-@payment_router.post("/account", response_model=PaymentAccountResponse)
+@payment_router.post("/account", response_model=dict)
 async def create_payment_account_endpoint(
     request: PaymentAccountCreate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Create a payment account for a customer to store payment details."""
-    response = await create_payment_account(request, current_user, db)
-    if response["status"] == "success":
-        return response["data"]
-    raise HTTPException(status_code=response["status_code"], detail=response["message"])
+    return await create_payment_account(request, current_user, db)
 
 @payment_router.put("/account/{payment_account_id}", response_model=PaymentAccountResponse)
 async def update_payment_account_endpoint(
