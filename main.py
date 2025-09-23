@@ -4,6 +4,7 @@ from api.user import user_router
 from api.business import business_router
 from api.savings import savings_router
 from api.payments import payment_router
+from api.expenses import expenses_router
 from middleware.auth import AuditMiddleware
 from database.postgres import engine, get_db
 from scripts.bootstrap_super_admin import bootstrap_super_admin
@@ -51,6 +52,7 @@ app.include_router(user_router, prefix="/api/v1")
 app.include_router(business_router, prefix="/api/v1")
 app.include_router(savings_router, prefix="/api/v1")
 app.include_router(payment_router, prefix="/api/v1")
+app.include_router(expenses_router, prefix="/api/v1")
 
 # Startup event for database connection and superadmin bootstrap
 @app.on_event("startup")

@@ -3,26 +3,21 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool, text
 from alembic import context
 
-# Load config from alembic.ini
 config = context.config
-
-# Load .env variables
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Import your settings and models
 from config.settings import settings
 from database.postgres import Base
 from models.user import User
-from models.business import Business
 from models.user_business import user_business
+from models.business import Business, Unit, PendingBusinessRequest
+from models.savings import SavingsAccount, SavingsMarking
+from models.expenses import ExpenseCard, Expense
+from models.payments import Commission, PaymentAccount, AccountDetails, PaymentRequest
 from models.settings import Settings
-from models.audit import AuditMixin
 
-# Set the SQLAlchemy URL dynamically from settings
 config.set_main_option("sqlalchemy.url", settings.POSTGRES_URI)
-
-# Define target metadata
 target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
@@ -44,15 +39,13 @@ def run_migrations_online() -> None:
     )
     print(f"Connecting to database: {config.get_main_option('sqlalchemy.url')}")
     with connectable.connect() as connection:
-        # Set and verify search_path
         connection.execute(text("SET search_path TO public"))
         result = connection.execute(text("SHOW search_path")).fetchone()
         print(f"Database search_path: {result}")
-        # Debug: Check for paymentrequeststatus ENUM
         result = connection.execute(
-            text("SELECT typname FROM pg_type WHERE typname = 'paymentrequeststatus'")
-        ).fetchone()
-        print(f"ENUM paymentrequeststatus exists: {bool(result)}")
+            text("SELECT typname FROM pg_type WHERE typname IN ('expensecategory', 'income_type', 'markingstatus', 'notificationmethod', 'paymentmethod', 'paymentrequeststatus', 'permission', 'role', 'savingsstatus', 'savingstype')")
+        ).fetchall()
+        print(f"Enums exist: {[row[0] for row in result]}")
         context.configure(
             connection=connection,
             target_metadata=target_metadata,

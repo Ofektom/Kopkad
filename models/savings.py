@@ -59,6 +59,7 @@ class SavingsAccount(AuditMixin, Base):
 
     markings = relationship("SavingsMarking", back_populates="savings_account", cascade="all, delete")
     commissions = relationship("Commission", back_populates="savings_account", cascade="all, delete")
+    expense_cards = relationship("ExpenseCard", back_populates="savings_account", cascade="all, delete")
 
 class SavingsMarking(AuditMixin, Base):
     __tablename__ = "savings_markings"
