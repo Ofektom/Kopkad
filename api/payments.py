@@ -26,6 +26,7 @@ from service.payments import (
     reject_payment_request,
     get_agent_commissions,
     get_customer_payments,
+    get_payment_accounts,  # Added import
 )
 from database.postgres import get_db
 from utils.auth import get_current_user
@@ -40,6 +41,17 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+@payment_router.get("/accounts", response_model=dict)
+async def get_payment_accounts_endpoint(
+    customer_id: Optional[int] = Query(None, description="Filter by customer ID"),
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Retrieve payment accounts with associated details."""
+    return await get_payment_accounts(customer_id, limit, offset, current_user, db)
 
 @payment_router.post("/webhook/paystack")
 async def paystack_webhook(request: Request, db: Session = Depends(get_db)):

@@ -30,9 +30,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def has_permission(user: User, permission: str, db: Session) -> bool:
-    return permission in user.permissions
-
 async def create_account_details(request: AccountDetailsCreate, current_user: dict, db: Session):
     """Add bank account details for a payment account."""
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
@@ -203,7 +200,7 @@ async def update_payment_account(payment_account_id: int, request: PaymentAccoun
         db.commit()
         db.refresh(payment_account)
 
-        account_details = db.query(AccountDetails).filter(AccountDetails.payment_account_id == payment_account.id).all()
+        account_details = db.query(AccountDetails).filter(AccountDetails.payment_account_id == account.id).all()
         account_details_response = [
             AccountDetailsResponse(
                 id=detail.id,
@@ -238,7 +235,7 @@ async def update_payment_account(payment_account_id: int, request: PaymentAccoun
         logger.error(f"Failed to update payment account: {str(e)}")
         return error_response(status_code=500, message=f"Failed to update payment account: {str(e)}")
 
-async def delete_account_details(account_details_id: int, current_user: dict, db: Session):
+async def delete_account_details(account_details_id: int, current_user: dict, db: Session, force_delete: bool = False):
     """Delete specific account details for a payment account."""
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not current_user_obj:
@@ -266,15 +263,24 @@ async def delete_account_details(account_details_id: int, current_user: dict, db
             AccountDetails.payment_account_id == account_details.payment_account_id,
             AccountDetails.id != account_details_id
         ).count()
-        if remaining_details == 0:
-            return error_response(status_code=400, message="Cannot delete the last account details for a payment account")
+
+        if remaining_details == 0 and not force_delete:
+            return {
+                "status": "warning",
+                "message": "This is the last account detail. Deleting it will also delete the payment account. Proceed?",
+                "data": {"account_details_id": account_details_id}
+            }
 
         db.delete(account_details)
+        if remaining_details == 0:
+            db.delete(payment_account)  # Cascade deletion handled by SQLAlchemy
+            logger.info(f"Deleted payment account {payment_account.id} with last account details {account_details_id} by user {current_user['user_id']}")
+
         db.commit()
         logger.info(f"Deleted account details {account_details_id} by user {current_user['user_id']}")
         return success_response(
             status_code=200,
-            message="Account details deleted successfully",
+            message="Account details deleted successfully" + (", including payment account" if remaining_details == 0 else ""),
             data={"account_details_id": account_details_id}
         )
     except Exception as e:
