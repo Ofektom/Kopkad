@@ -30,13 +30,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-async def create_account_details(request: AccountDetailsCreate, current_user: dict, db: Session):
+async def create_account_details(payment_account_id: int, request: AccountDetailsCreate, current_user: dict, db: Session):
     """Add bank account details for a payment account."""
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not current_user_obj:
         return error_response(status_code=404, message="User not found")
 
-    payment_account = db.query(PaymentAccount).filter(PaymentAccount.id == request.payment_account_id).first()
+    payment_account = db.query(PaymentAccount).filter(PaymentAccount.id == payment_account_id).first()
     if not payment_account:
         return error_response(status_code=404, message="Payment account not found")
 
@@ -48,7 +48,7 @@ async def create_account_details(request: AccountDetailsCreate, current_user: di
 
     try:
         account_details = AccountDetails(
-            payment_account_id=request.payment_account_id,
+            payment_account_id=payment_account_id,
             account_name=request.account_name,
             account_number=request.account_number,
             bank_name=request.bank_name,
@@ -60,7 +60,7 @@ async def create_account_details(request: AccountDetailsCreate, current_user: di
         db.add(account_details)
         db.commit()
         db.refresh(account_details)
-        logger.info(f"Created account details for payment account {request.payment_account_id} by user {current_user['user_id']}")
+        logger.info(f"Created account details for payment account {payment_account_id} by user {current_user['user_id']}")
         return success_response(
             status_code=201,
             message="Account details added successfully",
@@ -133,7 +133,7 @@ async def create_payment_account(request: PaymentAccountCreate, current_user: di
         response_data = PaymentAccountResponse(
             id=payment_account.id,
             customer_id=payment_account.customer_id,
-            customer_name=current_user_obj.name,
+            customer_name=current_user_obj.full_name,
             account_details=account_details_response,
             created_at=payment_account.created_at,
             updated_at=payment_account.updated_at,
@@ -219,7 +219,7 @@ async def update_payment_account(payment_account_id: int, request: PaymentAccoun
         response_data = PaymentAccountResponse(
             id=payment_account.id,
             customer_id=payment_account.customer_id,
-            customer_name=customer.name if customer else "Unknown",
+            customer_name=customer.full_name if customer else "Unknown",
             account_details=account_details_response,
             created_at=payment_account.created_at,
             updated_at=payment_account.updated_at,
@@ -383,7 +383,7 @@ async def create_payment_request(request: PaymentRequestCreate, current_user: di
             status=payment_request.status,
             request_date=payment_request.request_date,
             approval_date=payment_request.approval_date,
-            customer_name=current_user_obj.name,
+            customer_name=current_user_obj.full_name,
             tracking_number=savings_account.tracking_number,
         )
 
@@ -415,7 +415,6 @@ async def get_payment_requests(
     query = db.query(PaymentRequest).join(PaymentAccount).join(SavingsAccount).join(User, User.id == PaymentAccount.customer_id)
 
     if current_user["role"] == "customer":
-        # Customers only see their own requests, limited to 20, including all pending and only approved
         if customer_id and customer_id != current_user["user_id"]:
             return error_response(status_code=403, message="Customers can only view their own payment requests")
         query = query.filter(
@@ -423,27 +422,22 @@ async def get_payment_requests(
             PaymentRequest.status.in_([PaymentRequestStatus.PENDING, PaymentRequestStatus.APPROVED])
         )
     elif current_user["role"] in ["agent", "sub_agent"]:
-        # Agents/sub-agents see requests for their business
         business_ids = [b.id for b in current_user_obj.businesses]
         if not business_ids:
             return error_response(status_code=400, message="No business associated with user")
         query = query.filter(SavingsAccount.business_id.in_(business_ids))
     elif current_user["role"] not in ["admin", "super_admin"]:
-        # Only admins/super_admins can see all requests
         return error_response(status_code=403, message="Unauthorized role")
 
-    # Apply business_id filter if provided
     if business_id:
         query = query.filter(SavingsAccount.business_id == business_id)
 
-    # Apply customer_id filter if provided
     if customer_id:
         customer = db.query(User).filter(User.id == customer_id, User.role == "customer").first()
         if not customer:
             return error_response(status_code=400, message=f"User {customer_id} is not a customer")
         query = query.filter(PaymentAccount.customer_id == customer_id)
 
-    # Apply status filter if provided
     if status:
         try:
             payment_request_status = PaymentRequestStatus(status.lower())
@@ -451,9 +445,8 @@ async def get_payment_requests(
         except ValueError:
             return error_response(status_code=400, message=f"Invalid status: {status}")
 
-    # Apply limit for customers (max 20) or use provided limit for others
     if current_user["role"] == "customer":
-        limit = min(limit, 20)  # Enforce max limit of 20 for customers
+        limit = min(limit, 20)
         total_count = query.count()
         payment_requests = query.order_by(PaymentRequest.request_date.desc()).offset(offset).limit(limit).all()
     else:
@@ -475,7 +468,7 @@ async def get_payment_requests(
                 status=request.status,
                 request_date=request.request_date,
                 approval_date=request.approval_date,
-                customer_name=customer.name if customer else "Unknown",
+                customer_name=customer.full_name if customer else "Unknown",
                 tracking_number=savings_account.tracking_number,
             ).model_dump()
         )
@@ -621,7 +614,7 @@ async def get_agent_commissions(
                 amount=commission.amount,
                 commission_date=commission.commission_date,
                 customer_id=customer.id if customer else None,
-                customer_name=customer.name if customer else "Unknown",
+                customer_name=customer.full_name if customer else "Unknown",
                 savings_type=savings_account.savings_type,
                 tracking_number=savings_account.tracking_number,
             ).model_dump()
@@ -698,7 +691,7 @@ async def get_customer_payments(
         else:
             earliest_date = paid_markings[0].marking_date
             latest_date = paid_markings[-1].marking_date
-            total_savings_days = (latest_date - earliest_date).days + 1  # Include both start and end dates
+            total_savings_days = (latest_date - earliest_date).days + 1
             if savings_account.commission_days == 0:
                 total_commission = Decimal(0)
             else:
@@ -711,7 +704,7 @@ async def get_customer_payments(
                 payment_request_id=request.id,
                 savings_account_id=savings_account.id,
                 customer_id=customer.id if customer else None,
-                customer_name=customer.name if customer else "Unknown",
+                customer_name=customer.full_name if customer else "Unknown",
                 savings_type=savings_account.savings_type,
                 tracking_number=savings_account.tracking_number,
                 total_amount=total_amount,
@@ -777,6 +770,7 @@ async def get_payment_accounts(
     for account in payment_accounts:
         customer = db.query(User).filter(User.id == account.customer_id).first()
         account_details = db.query(AccountDetails).filter(AccountDetails.payment_account_id == account.id).all()
+        logger.info(f"Queried account_details for payment_account_id={account.id}, found {len(account_details)} records")
         account_details_response = [
             AccountDetailsResponse(
                 id=detail.id,

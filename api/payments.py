@@ -42,17 +42,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-@payment_router.get("/accounts", response_model=dict)
-async def get_payment_accounts_endpoint(
-    customer_id: Optional[int] = Query(None, description="Filter by customer ID"),
-    limit: int = Query(10, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Retrieve payment accounts with associated details."""
-    return await get_payment_accounts(customer_id, limit, offset, current_user, db)
-
 @payment_router.post("/webhook/paystack")
 async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
     logger.info("Received Paystack webhook request")
@@ -110,14 +99,26 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
     
     return {"status": "success"}
 
+@payment_router.get("/accounts", response_model=dict)
+async def get_payment_accounts_endpoint(
+    customer_id: Optional[int] = Query(None, description="Filter by customer ID"),
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Retrieve payment accounts with associated details."""
+    return await get_payment_accounts(customer_id, limit, offset, current_user, db)
+
 @payment_router.post("/account-details", response_model=dict)
 async def add_account_details(
     request: AccountDetailsCreate,
+    payment_account_id: int = Query(..., description="ID of the payment account"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Add bank account details for a payment account."""
-    return await create_account_details(request, current_user, db)
+    return await create_account_details(payment_account_id, request, current_user, db)
 
 @payment_router.post("/account", response_model=dict)
 async def create_payment_account_endpoint(
