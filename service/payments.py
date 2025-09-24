@@ -200,7 +200,7 @@ async def update_payment_account(payment_account_id: int, request: PaymentAccoun
         db.commit()
         db.refresh(payment_account)
 
-        account_details = db.query(AccountDetails).filter(AccountDetails.payment_account_id == account.id).all()
+        account_details = db.query(AccountDetails).filter(AccountDetails.payment_account_id == payment_account_id).all()
         account_details_response = [
             AccountDetailsResponse(
                 id=detail.id,
@@ -215,10 +215,11 @@ async def update_payment_account(payment_account_id: int, request: PaymentAccoun
             ) for detail in account_details
         ]
 
+        customer = db.query(User).filter(User.id == payment_account.customer_id).first()
         response_data = PaymentAccountResponse(
             id=payment_account.id,
             customer_id=payment_account.customer_id,
-            customer_name=current_user_obj.name,
+            customer_name=customer.name if customer else "Unknown",
             account_details=account_details_response,
             created_at=payment_account.created_at,
             updated_at=payment_account.updated_at,
@@ -463,7 +464,7 @@ async def get_payment_requests(
     for request in payment_requests:
         payment_account = request.payment_account
         savings_account = request.savings_account
-        customer = payment_account.customer
+        customer = db.query(User).filter(User.id == payment_account.customer_id).first()
         response_data.append(
             PaymentRequestResponse(
                 id=request.id,
@@ -474,7 +475,7 @@ async def get_payment_requests(
                 status=request.status,
                 request_date=request.request_date,
                 approval_date=request.approval_date,
-                customer_name=customer.name,
+                customer_name=customer.name if customer else "Unknown",
                 tracking_number=savings_account.tracking_number,
             ).model_dump()
         )
@@ -611,7 +612,7 @@ async def get_agent_commissions(
     response_data = []
     for commission in commissions:
         savings_account = commission.savings_account
-        customer = savings_account.customer
+        customer = db.query(User).filter(User.id == savings_account.customer_id).first()
         response_data.append(
             CommissionResponse(
                 id=commission.id,
@@ -619,8 +620,8 @@ async def get_agent_commissions(
                 agent_id=commission.agent_id,
                 amount=commission.amount,
                 commission_date=commission.commission_date,
-                customer_id=customer.id,
-                customer_name=customer.name,
+                customer_id=customer.id if customer else None,
+                customer_name=customer.name if customer else "Unknown",
                 savings_type=savings_account.savings_type,
                 tracking_number=savings_account.tracking_number,
             ).model_dump()
@@ -685,7 +686,7 @@ async def get_customer_payments(
     response_data = []
     for request in payment_requests:
         savings_account = request.savings_account
-        customer = request.payment_account.customer
+        customer = db.query(User).filter(User.id == request.payment_account.customer_id).first()
         paid_markings = db.query(SavingsMarking).filter(
             SavingsMarking.savings_account_id == savings_account.id,
             SavingsMarking.status == SavingsStatus.PAID
@@ -709,8 +710,8 @@ async def get_customer_payments(
             CustomerPaymentResponse(
                 payment_request_id=request.id,
                 savings_account_id=savings_account.id,
-                customer_id=customer.id,
-                customer_name=customer.name,
+                customer_id=customer.id if customer else None,
+                customer_name=customer.name if customer else "Unknown",
                 savings_type=savings_account.savings_type,
                 tracking_number=savings_account.tracking_number,
                 total_amount=total_amount,
@@ -774,7 +775,7 @@ async def get_payment_accounts(
 
     response_data = []
     for account in payment_accounts:
-        customer = account.customer
+        customer = db.query(User).filter(User.id == account.customer_id).first()
         account_details = db.query(AccountDetails).filter(AccountDetails.payment_account_id == account.id).all()
         account_details_response = [
             AccountDetailsResponse(
@@ -794,7 +795,7 @@ async def get_payment_accounts(
             PaymentAccountResponse(
                 id=account.id,
                 customer_id=account.customer_id,
-                customer_name=customer.name,
+                customer_name=customer.full_name if customer else "Unknown",
                 account_details=account_details_response,
                 created_at=account.created_at,
                 updated_at=account.updated_at,
