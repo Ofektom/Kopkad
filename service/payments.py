@@ -12,6 +12,7 @@ from models.savings import SavingsAccount, SavingsMarking, MarkingStatus, Saving
 from models.user import User, Permission
 from schemas.payments import (
     AccountDetailsCreate,
+    AccountDetailsUpdate,
     AccountDetailsResponse,
     PaymentAccountCreate,
     PaymentAccountResponse,
@@ -60,7 +61,7 @@ async def create_account_details(payment_account_id: int, request: AccountDetail
         db.add(account_details)
         db.commit()
         db.refresh(account_details)
-        logger.info(f"Created account details for payment account {payment_account_id} by user {current_user['user_id']}")
+        logger.info(f"Created account details {account_details.id} for payment account {payment_account_id} by user {current_user['user_id']}")
         return success_response(
             status_code=201,
             message="Account details added successfully",
@@ -70,6 +71,108 @@ async def create_account_details(payment_account_id: int, request: AccountDetail
         db.rollback()
         logger.error(f"Failed to create account details: {str(e)}")
         return error_response(status_code=500, message=f"Failed to create account details: {str(e)}")
+
+async def update_account_details(account_details_id: int, request: AccountDetailsUpdate, current_user: dict, db: Session):
+    """Update specific account details for a payment account."""
+    current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not current_user_obj:
+        return error_response(status_code=404, message="User not found")
+
+    account_details = db.query(AccountDetails).filter(AccountDetails.id == account_details_id).first()
+    if not account_details:
+        return error_response(status_code=404, message="Account details not found")
+
+    payment_account = db.query(PaymentAccount).filter(PaymentAccount.id == account_details.payment_account_id).first()
+    if not payment_account:
+        return error_response(status_code=404, message="Payment account not found")
+
+    if current_user["role"] == "customer" and payment_account.customer_id != current_user["user_id"]:
+        return error_response(status_code=403, message="Not your payment account")
+
+    if current_user["role"] not in ["customer", "agent", "sub_agent", "admin", "super_admin"]:
+        return error_response(status_code=403, message="Unauthorized role")
+
+    try:
+        # Update only provided fields
+        if request.account_name is not None:
+            account_details.account_name = request.account_name
+        if request.account_number is not None:
+            account_details.account_number = request.account_number
+        if request.bank_name is not None:
+            account_details.bank_name = request.bank_name
+        if request.bank_code is not None:
+            account_details.bank_code = request.bank_code
+        if request.account_type is not None:
+            account_details.account_type = request.account_type
+
+        account_details.updated_by = current_user["user_id"]
+        account_details.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(account_details)
+
+        response_data = AccountDetailsResponse(
+            id=account_details.id,
+            payment_account_id=account_details.payment_account_id,
+            account_name=account_details.account_name,
+            account_number=account_details.account_number,
+            bank_name=account_details.bank_name,
+            bank_code=account_details.bank_code,
+            account_type=account_details.account_type,
+            created_at=account_details.created_at,
+            updated_at=account_details.updated_at,
+        )
+
+        logger.info(f"Updated account details {account_details_id} by user {current_user['user_id']}")
+        return success_response(
+            status_code=200,
+            message="Account details updated successfully",
+            data=response_data.model_dump()
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to update account details: {str(e)}")
+        return error_response(status_code=500, message=f"Failed to update account details: {str(e)}")
+
+async def delete_payment_account(payment_account_id: int, current_user: dict, db: Session):
+    """Delete a payment account and its associated account details."""
+    current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not current_user_obj:
+        return error_response(status_code=404, message="User not found")
+
+    payment_account = db.query(PaymentAccount).filter(PaymentAccount.id == payment_account_id).first()
+    if not payment_account:
+        return error_response(status_code=404, message="Payment account not found")
+
+    if current_user["role"] == "customer" and payment_account.customer_id != current_user["user_id"]:
+        return error_response(status_code=403, message="Not your payment account")
+
+    if current_user["role"] not in ["customer", "admin", "super_admin"]:
+        return error_response(status_code=403, message="Unauthorized role")
+
+    # Check for active payment requests
+    if db.query(PaymentRequest).filter(PaymentRequest.payment_account_id == payment_account_id).first():
+        return error_response(status_code=400, message="Cannot delete payment account with active payment requests")
+
+    try:
+        # Delete all associated account details
+        account_details = db.query(AccountDetails).filter(AccountDetails.payment_account_id == payment_account_id).all()
+        for detail in account_details:
+            db.delete(detail)
+
+        # Delete the payment account
+        db.delete(payment_account)
+        db.commit()
+
+        logger.info(f"Deleted payment account {payment_account_id} and its account details by user {current_user['user_id']}")
+        return success_response(
+            status_code=200,
+            message="Payment account deleted successfully",
+            data={"payment_account_id": payment_account_id}
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to delete payment account: {str(e)}")
+        return error_response(status_code=500, message=f"Failed to delete payment account: {str(e)}")
 
 async def create_payment_account(request: PaymentAccountCreate, current_user: dict, db: Session):
     """Create a payment account for a customer to store payment details."""
@@ -273,15 +376,11 @@ async def delete_account_details(account_details_id: int, current_user: dict, db
             }
 
         db.delete(account_details)
-        if remaining_details == 0:
-            db.delete(payment_account)  # Cascade deletion handled by SQLAlchemy
-            logger.info(f"Deleted payment account {payment_account.id} with last account details {account_details_id} by user {current_user['user_id']}")
-
         db.commit()
         logger.info(f"Deleted account details {account_details_id} by user {current_user['user_id']}")
         return success_response(
             status_code=200,
-            message="Account details deleted successfully" + (", including payment account" if remaining_details == 0 else ""),
+            message="Account details deleted successfully",
             data={"account_details_id": account_details_id}
         )
     except Exception as e:

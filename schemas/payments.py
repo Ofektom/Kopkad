@@ -10,6 +10,13 @@ class AccountDetailsCreate(BaseModel):
     bank_code: Optional[str] = None
     account_type: Optional[str] = None
 
+class AccountDetailsUpdate(BaseModel):
+    account_name: Optional[str] = None
+    account_number: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_code: Optional[str] = None
+    account_type: Optional[str] = None
+
 class AccountDetailsResponse(BaseModel):
     id: int
     payment_account_id: int

@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from sqlalchemy.orm import Session
 from schemas.payments import (
     AccountDetailsCreate,
+    AccountDetailsUpdate,
     PaymentAccountCreate,
     PaymentRequestCreate,
     PaymentAccountUpdate,
@@ -17,6 +18,8 @@ from schemas.payments import (
 )
 from service.payments import (
     create_account_details,
+    update_account_details,
+    delete_payment_account,
     create_payment_account,
     update_payment_account,
     delete_account_details,
@@ -26,7 +29,7 @@ from service.payments import (
     reject_payment_request,
     get_agent_commissions,
     get_customer_payments,
-    get_payment_accounts,  # Added import
+    get_payment_accounts,
 )
 from database.postgres import get_db
 from utils.auth import get_current_user
@@ -117,6 +120,25 @@ async def add_account_details(
 ):
     """Add bank account details for a payment account."""
     return await create_account_details(payment_account_id, request, current_user, db)
+
+@payment_router.put("/account-details/{account_details_id}", response_model=dict)
+async def update_account_details_endpoint(
+    account_details_id: int,
+    request: AccountDetailsUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update specific account details for a payment account."""
+    return await update_account_details(account_details_id, request, current_user, db)
+
+@payment_router.delete("/account/{payment_account_id}", response_model=dict)
+async def delete_payment_account_endpoint(
+    payment_account_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete a payment account and its associated account details."""
+    return await delete_payment_account(payment_account_id, current_user, db)
 
 @payment_router.get("/accounts", response_model=dict)
 async def get_payment_accounts_endpoint(
