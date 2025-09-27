@@ -99,16 +99,14 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
     
     return {"status": "success"}
 
-@payment_router.get("/accounts", response_model=dict)
-async def get_payment_accounts_endpoint(
-    customer_id: Optional[int] = Query(None, description="Filter by customer ID"),
-    limit: int = Query(10, ge=1, le=100),
-    offset: int = Query(0, ge=0),
+@payment_router.post("/account", response_model=dict)
+async def create_payment_account_endpoint(
+    request: PaymentAccountCreate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Retrieve payment accounts with associated details."""
-    return await get_payment_accounts(customer_id, limit, offset, current_user, db)
+    """Create a payment account for a customer to store payment details."""
+    return await create_payment_account(request, current_user, db)
 
 @payment_router.post("/account-details", response_model=dict)
 async def add_account_details(
@@ -120,14 +118,16 @@ async def add_account_details(
     """Add bank account details for a payment account."""
     return await create_account_details(payment_account_id, request, current_user, db)
 
-@payment_router.post("/account", response_model=dict)
-async def create_payment_account_endpoint(
-    request: PaymentAccountCreate,
+@payment_router.get("/accounts", response_model=dict)
+async def get_payment_accounts_endpoint(
+    customer_id: Optional[int] = Query(None, description="Filter by customer ID"),
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create a payment account for a customer to store payment details."""
-    return await create_payment_account(request, current_user, db)
+    """Retrieve payment accounts with associated details."""
+    return await get_payment_accounts(customer_id, limit, offset, current_user, db)
 
 @payment_router.put("/account/{payment_account_id}", response_model=PaymentAccountResponse)
 async def update_payment_account_endpoint(
