@@ -49,7 +49,6 @@ class PaymentAccountUpdate(BaseModel):
     account_details: List[AccountDetailsCreate]
 
 class PaymentRequestCreate(BaseModel):
-    payment_account_id: int
     account_details_id: int
     savings_account_id: int
 

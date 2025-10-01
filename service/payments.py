@@ -392,75 +392,51 @@ async def create_payment_request(request: PaymentRequestCreate, current_user: di
     """Create a payment request for a completed savings account."""
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not current_user_obj:
+        logger.error(f"User not found: {current_user['user_id']}")
         return error_response(status_code=404, message="User not found")
 
-    if current_user["role"] != "customer":
-        return error_response(status_code=403, message="Only customers can create payment requests")
+    if current_user["role"] not in ["customer", "admin", "super_admin"]:
+        logger.error(f"Unauthorized role: {current_user['role']} for user {current_user['user_id']}")
+        return error_response(status_code=403, message="Unauthorized role")
 
-    payment_account = db.query(PaymentAccount).filter(PaymentAccount.id == request.payment_account_id).first()
+    payment_account = db.query(PaymentAccount).filter(PaymentAccount.customer_id == current_user["user_id"]).first()
     if not payment_account:
-        return error_response(status_code=404, message="Payment account not found")
-
-    if payment_account.customer_id != current_user["user_id"]:
-        return error_response(status_code=403, message="Not your payment account")
+        logger.error(f"No payment account found for customer {current_user['user_id']}")
+        return error_response(status_code=404, message="No payment account found. Please add a payment account in Settings.")
 
     account_details = db.query(AccountDetails).filter(
         AccountDetails.id == request.account_details_id,
-        AccountDetails.payment_account_id == request.payment_account_id
+        AccountDetails.payment_account_id == payment_account.id
     ).first()
     if not account_details:
-        return error_response(status_code=404, message="Account details not found")
+        logger.error(f"Account details {request.account_details_id} not found or not associated with payment account {payment_account.id}")
+        return error_response(status_code=404, message="Account details not found or not associated with your payment account")
 
-    savings_account = db.query(SavingsAccount).filter(SavingsAccount.id == request.savings_account_id).first()
-    if not savings_account or savings_account.marking_status != MarkingStatus.COMPLETED:
-        return error_response(status_code=400, message="Savings account must be completed to request payment")
+    savings_account = db.query(SavingsAccount).filter(
+        SavingsAccount.id == request.savings_account_id,
+        SavingsAccount.customer_id == current_user["user_id"],
+        SavingsAccount.status == SavingsStatus.COMPLETED
+    ).first()
+    if not savings_account:
+        logger.error(f"Savings account {request.savings_account_id} not found, not owned by user {current_user['user_id']}, or not completed")
+        return error_response(status_code=404, message="Savings account not found, not owned by you, or not completed")
 
-    if savings_account.customer_id != current_user["user_id"]:
-        return error_response(status_code=403, message="Not your savings account")
+    total_marked_amount = db.query(func.sum(SavingsMarking.amount)).filter(
+        SavingsMarking.savings_account_id == request.savings_account_id,
+        SavingsMarking.status == MarkingStatus.PAID
+    ).scalar() or Decimal('0.00')
 
-    paid_markings = db.query(SavingsMarking).filter(
-        SavingsMarking.savings_account_id == savings_account.id,
-        SavingsMarking.status == SavingsStatus.PAID
-    ).order_by(SavingsMarking.marking_date).all()
-    if not paid_markings:
-        return error_response(status_code=400, message="No paid markings found for this savings account")
+    commission_rate = Decimal(str(settings.COMMISSION_RATE))
+    total_commission = total_marked_amount * commission_rate
+    payout_amount = total_marked_amount - total_commission
 
-    total_amount = sum(marking.amount for marking in paid_markings)
-    if total_amount <= 0:
-        return error_response(status_code=400, message="Total paid amount must be positive")
-
-    # Calculate total savings days from earliest to latest paid marking date
-    earliest_date = paid_markings[0].marking_date
-    latest_date = paid_markings[-1].marking_date
-    total_savings_days = (latest_date - earliest_date).days + 1  # Include both start and end dates
-    if savings_account.commission_days == 0:
-        total_commission = Decimal(0)
-    else:
-        total_commission = savings_account.commission_amount * Decimal(total_savings_days / savings_account.commission_days)
-        total_commission = round(total_commission, 2)
-    payout_amount = total_amount - total_commission
     if payout_amount <= 0:
-        return error_response(status_code=400, message="Payout amount must be positive")
+        logger.error(f"Payout amount is zero or negative for savings account {request.savings_account_id}")
+        return error_response(status_code=400, message="No positive payout amount available")
 
     try:
-        # Create commission record for the agent
-        agent = db.query(User).filter(
-            User.id == savings_account.created_by,
-            User.role.in_(["agent", "sub_agent"])
-        ).first()
-        if agent and not db.query(Commission).filter(Commission.savings_account_id == savings_account.id).first():
-            commission = Commission(
-                savings_account_id=savings_account.id,
-                agent_id=agent.id,
-                amount=total_commission,
-                commission_date=datetime.now(timezone.utc),
-                created_by=current_user["user_id"],
-                created_at=datetime.now(timezone.utc),
-            )
-            db.add(commission)
-
         payment_request = PaymentRequest(
-            payment_account_id=request.payment_account_id,
+            payment_account_id=payment_account.id,
             account_details_id=request.account_details_id,
             savings_account_id=request.savings_account_id,
             amount=payout_amount,
@@ -468,10 +444,30 @@ async def create_payment_request(request: PaymentRequestCreate, current_user: di
             request_date=datetime.now(timezone.utc),
             created_by=current_user["user_id"],
             created_at=datetime.now(timezone.utc),
+            reference=f"PR-{current_user['user_id']}-{int(datetime.now(timezone.utc).timestamp())}"
         )
         db.add(payment_request)
         db.commit()
         db.refresh(payment_request)
+
+        if total_commission > 0 and savings_account.agent_id:
+            commission = Commission(
+                payment_request_id=payment_request.id,
+                savings_account_id=request.savings_account_id,
+                agent_id=savings_account.agent_id,
+                amount=total_commission,
+                created_by=current_user["user_id"],
+                created_at=datetime.now(timezone.utc),
+                commission_date=datetime.now(timezone.utc),
+                customer_id=savings_account.customer_id,
+                customer_name=current_user_obj.full_name,
+                savings_type=savings_account.savings_type,
+                tracking_number=savings_account.tracking_number
+            )
+            db.add(commission)
+            db.commit()
+            db.refresh(commission)
+            logger.info(f"Created commission {commission.id} for payment request {payment_request.id}")
 
         response_data = PaymentRequestResponse(
             id=payment_request.id,
@@ -483,10 +479,10 @@ async def create_payment_request(request: PaymentRequestCreate, current_user: di
             request_date=payment_request.request_date,
             approval_date=payment_request.approval_date,
             customer_name=current_user_obj.full_name,
-            tracking_number=savings_account.tracking_number,
+            tracking_number=savings_account.tracking_number
         )
 
-        logger.info(f"Created payment request {payment_request.id} for savings account {request.savings_account_id} by user {current_user['user_id']}")
+        logger.info(f"Created payment request {payment_request.id} for user {current_user['user_id']}")
         return success_response(
             status_code=201,
             message="Payment request created successfully",
@@ -544,13 +540,8 @@ async def get_payment_requests(
         except ValueError:
             return error_response(status_code=400, message=f"Invalid status: {status}")
 
-    if current_user["role"] == "customer":
-        limit = min(limit, 20)
-        total_count = query.count()
-        payment_requests = query.order_by(PaymentRequest.request_date.desc()).offset(offset).limit(limit).all()
-    else:
-        total_count = query.count()
-        payment_requests = query.order_by(PaymentRequest.request_date.desc()).offset(offset).limit(limit).all()
+    total_count = query.count()
+    payment_requests = query.order_by(PaymentRequest.request_date.desc()).offset(offset).limit(limit).all()
 
     response_data = []
     for request in payment_requests:
