@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from models.payments import AccountDetails, PaymentAccount, Commission, PaymentRequest, PaymentRequestStatus
 from models.savings import SavingsAccount, SavingsMarking, MarkingStatus, SavingsStatus
-from models.user import User, Permission
+from models.user import User
+from service.savings import calculate_total_commission
 from schemas.payments import (
     AccountDetailsCreate,
     AccountDetailsUpdate,
@@ -415,7 +416,7 @@ async def create_payment_request(request: PaymentRequestCreate, current_user: di
     savings_account = db.query(SavingsAccount).filter(
         SavingsAccount.id == request.savings_account_id,
         SavingsAccount.customer_id == current_user["user_id"],
-        SavingsAccount.status == SavingsStatus.COMPLETED
+        SavingsAccount.marking_status == MarkingStatus.COMPLETED,
     ).first()
     if not savings_account:
         logger.error(f"Savings account {request.savings_account_id} not found, not owned by user {current_user['user_id']}, or not completed")
@@ -423,11 +424,10 @@ async def create_payment_request(request: PaymentRequestCreate, current_user: di
 
     total_marked_amount = db.query(func.sum(SavingsMarking.amount)).filter(
         SavingsMarking.savings_account_id == request.savings_account_id,
-        SavingsMarking.status == MarkingStatus.PAID
+        SavingsMarking.status == SavingsStatus.PAID
     ).scalar() or Decimal('0.00')
 
-    commission_rate = Decimal(str(settings.COMMISSION_RATE))
-    total_commission = total_marked_amount * commission_rate
+    total_commission = calculate_total_commission(savings_account)
     payout_amount = total_marked_amount - total_commission
 
     if payout_amount <= 0:
@@ -440,7 +440,6 @@ async def create_payment_request(request: PaymentRequestCreate, current_user: di
             account_details_id=request.account_details_id,
             savings_account_id=request.savings_account_id,
             amount=payout_amount,
-            status=PaymentRequestStatus.PENDING,
             request_date=datetime.now(timezone.utc),
             created_by=current_user["user_id"],
             created_at=datetime.now(timezone.utc),
@@ -514,7 +513,7 @@ async def get_payment_requests(
             return error_response(status_code=403, message="Customers can only view their own payment requests")
         query = query.filter(
             PaymentAccount.customer_id == current_user["user_id"],
-            PaymentRequest.status.in_([PaymentRequestStatus.PENDING, PaymentRequestStatus.APPROVED])
+            PaymentRequest.status.in_([PaymentRequestStatus.PENDING.value, PaymentRequestStatus.APPROVED.value])
         )
     elif current_user["role"] in ["agent", "sub_agent"]:
         business_ids = [b.id for b in current_user_obj.businesses]

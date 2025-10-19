@@ -48,6 +48,7 @@ class PaymentRequest(AuditMixin, Base):
     status = Column(Enum(PaymentRequestStatus, name="paymentrequeststatus"), nullable=False, default=PaymentRequestStatus.PENDING)
     request_date = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     approval_date = Column(DateTime(timezone=True), nullable=True)
+    reference = Column(String(50), nullable=False)  # Added reference field
     payment_account = relationship("PaymentAccount", back_populates="payment_requests")
     account_details = relationship("AccountDetails")
     savings_account = relationship("SavingsAccount")

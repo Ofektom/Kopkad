@@ -5,12 +5,14 @@ from api.business import business_router
 from api.savings import savings_router
 from api.payments import payment_router
 from api.expenses import expenses_router
+from api.financial_advisor import financial_advisor_router
 from middleware.auth import AuditMiddleware
 from database.postgres import engine, get_db
 from scripts.bootstrap_super_admin import bootstrap_super_admin
 from schemas.user import UserResponse
 from schemas.business import BusinessResponse, UnitResponse
 from sqlalchemy import text
+from utils.scheduler import init_scheduler, start_scheduler, shutdown_scheduler
 import logging
 
 # Configure logging
@@ -53,6 +55,7 @@ app.include_router(business_router, prefix="/api/v1")
 app.include_router(savings_router, prefix="/api/v1")
 app.include_router(payment_router, prefix="/api/v1")
 app.include_router(expenses_router, prefix="/api/v1")
+app.include_router(financial_advisor_router, prefix="/api/v1")
 
 # Startup event for database connection and superadmin bootstrap
 @app.on_event("startup")
@@ -70,12 +73,29 @@ async def on_startup():
         logger.info("Starting SUPER_ADMIN bootstrap process...")
         bootstrap_super_admin(db)
         logger.info("SUPER_ADMIN bootstrap completed successfully")
+        
+        # Initialize and start the financial advisor scheduler
+        logger.info("Initializing Financial Advisor Scheduler...")
+        init_scheduler()
+        start_scheduler()
+        logger.info("Financial Advisor Scheduler started successfully")
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}")
-        # Don’t raise to allow app to start
+        # Don't raise to allow app to start
     finally:
         db.close()
         logger.info("Startup process completed.")
+
+# Shutdown event to gracefully stop the scheduler
+@app.on_event("shutdown")
+async def on_shutdown():
+    logger.info("Application shutting down...")
+    try:
+        shutdown_scheduler()
+        logger.info("Scheduler shutdown successfully")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {str(e)}")
+    logger.info("Shutdown process completed.")
 
 @app.get("/")
 def read_root():

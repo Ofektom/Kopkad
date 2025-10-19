@@ -32,6 +32,29 @@ class Settings(BaseSettings):
     APP_BASE_URL: str
     PAYSTACK_SECRET_KEY: str
     ENV: str
+    
+    # Financial Advisor ML Parameters
+    ANOMALY_DETECTION_CONTAMINATION: float = 0.1
+    ANOMALY_DEVIATION_THRESHOLD: float = 50.0  # percentage
+    RECURRING_EXPENSE_MIN_OCCURRENCES: int = 3
+    RECURRING_INTERVAL_TOLERANCE: float = 0.3  # 30% variation
+    SAVINGS_RATE_TARGET_MIN: float = 10.0  # percentage
+    SAVINGS_RATE_TARGET_OPTIMAL: float = 20.0  # percentage
+    SAVINGS_RATE_TARGET_AGGRESSIVE: float = 30.0  # percentage
+    
+    # Notification Settings
+    ENABLE_EMAIL_NOTIFICATIONS: bool = True
+    ENABLE_PROACTIVE_ALERTS: bool = True
+    OVERSPENDING_ALERT_THRESHOLD: float = 20.0  # percentage increase
+    GOAL_BEHIND_SCHEDULE_THRESHOLD: float = 20.0  # percentage behind
+    HEALTH_SCORE_UPDATE_DAYS: int = 7  # days between auto-updates
+    
+    # Score Calculation Weights (should sum to 100)
+    SCORE_WEIGHT_EXPENSE_RATIO: int = 30
+    SCORE_WEIGHT_SAVINGS_RATE: int = 25
+    SCORE_WEIGHT_GOAL_ACHIEVEMENT: int = 20
+    SCORE_WEIGHT_SPENDING_CONSISTENCY: int = 15
+    SCORE_WEIGHT_SAVINGS_ACTIVITY: int = 10
 
     model_config = SettingsConfigDict(
         env_file="/Users/decagon/Documents/Ofektom/savings-system/.env",

@@ -1152,6 +1152,7 @@ async def get_savings_metrics(tracking_number: str, db: Session):
 
     response_data = SavingsMetricsResponse(
         tracking_number=tracking_number,
+        savings_account_id=savings_account.id,
         total_amount=total_amount,
         amount_marked=amount_marked,
         days_remaining=days_remaining,
@@ -1160,7 +1161,7 @@ async def get_savings_metrics(tracking_number: str, db: Session):
         marking_status=savings_account.marking_status  # Added
     ).model_dump()
 
-    logger.info(f"Retrieved metrics for savings {tracking_number}: total={total_amount}, marked={amount_marked}, days_remaining={days_remaining}, can_extend={can_extend}, total_commission={total_commission}, marking_status={savings_account.marking_status}")
+    logger.info(f"Retrieved metrics for savings {tracking_number}: savings_account_id={savings_account.id}, total={total_amount}, marked={amount_marked}, days_remaining={days_remaining}, can_extend={can_extend}, total_commission={total_commission}, marking_status={savings_account.marking_status}")
     return success_response(status_code=200, message="Savings metrics retrieved successfully", data=response_data)
 
 

@@ -115,6 +115,7 @@ class SavingsMarkingResponse(BaseModel):
 
 class SavingsMetricsResponse(BaseModel):
     tracking_number: str
+    savings_account_id: int
     total_amount: Decimal
     amount_marked: Decimal
     days_remaining: int

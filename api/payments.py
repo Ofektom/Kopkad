@@ -180,10 +180,7 @@ async def create_payment_request_endpoint(
     db: Session = Depends(get_db),
 ):
     """Customer requests payment for a completed savings account."""
-    response = await create_payment_request(request, current_user, db)
-    if response["status"] == "success":
-        return {"status": "success", "message": response["message"], "data": response["data"]}
-    raise HTTPException(status_code=response["status_code"], detail=response["message"])
+    return await create_payment_request(request, current_user, db)
 
 @payment_router.get("/requests", response_model=dict)
 async def get_payment_requests_endpoint(
