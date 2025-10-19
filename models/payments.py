@@ -45,7 +45,11 @@ class PaymentRequest(AuditMixin, Base):
     account_details_id = Column(Integer, ForeignKey("account_details.id", ondelete="CASCADE"), nullable=False)
     savings_account_id = Column(Integer, ForeignKey("savings_accounts.id", ondelete="SET NULL"), nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)
-    status = Column(Enum(PaymentRequestStatus, name="paymentrequeststatus"), nullable=False, default=PaymentRequestStatus.PENDING)
+    status = Column(
+        Enum(PaymentRequestStatus, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+        default=PaymentRequestStatus.PENDING
+    )
     request_date = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     approval_date = Column(DateTime(timezone=True), nullable=True)
     reference = Column(String(50), nullable=False)  # Added reference field
