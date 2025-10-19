@@ -10,6 +10,7 @@ from sqlalchemy.sql import func
 from models.payments import AccountDetails, PaymentAccount, Commission, PaymentRequest, PaymentRequestStatus
 from models.savings import SavingsAccount, SavingsMarking, MarkingStatus, SavingsStatus
 from models.user import User
+from models.business import Business
 from service.savings import calculate_total_commission
 from schemas.payments import (
     AccountDetailsCreate,
@@ -449,11 +450,15 @@ async def create_payment_request(request: PaymentRequestCreate, current_user: di
         db.commit()
         db.refresh(payment_request)
 
-        if total_commission > 0 and savings_account.agent_id:
+        # Get agent_id from the business
+        business = db.query(Business).filter(Business.id == savings_account.business_id).first()
+        agent_id = business.agent_id if business else None
+
+        if total_commission > 0 and agent_id:
             commission = Commission(
                 payment_request_id=payment_request.id,
                 savings_account_id=request.savings_account_id,
-                agent_id=savings_account.agent_id,
+                agent_id=agent_id,
                 amount=total_commission,
                 created_by=current_user["user_id"],
                 created_at=datetime.now(timezone.utc),
@@ -466,7 +471,7 @@ async def create_payment_request(request: PaymentRequestCreate, current_user: di
             db.add(commission)
             db.commit()
             db.refresh(commission)
-            logger.info(f"Created commission {commission.id} for payment request {payment_request.id}")
+            logger.info(f"Created commission {commission.id} for payment request {payment_request.id} with agent {agent_id}")
 
         response_data = PaymentRequestResponse(
             id=payment_request.id,
