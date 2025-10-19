@@ -456,17 +456,12 @@ async def create_payment_request(request: PaymentRequestCreate, current_user: di
 
         if total_commission > 0 and agent_id:
             commission = Commission(
-                payment_request_id=payment_request.id,
                 savings_account_id=request.savings_account_id,
                 agent_id=agent_id,
                 amount=total_commission,
                 created_by=current_user["user_id"],
                 created_at=datetime.now(timezone.utc),
-                commission_date=datetime.now(timezone.utc),
-                customer_id=savings_account.customer_id,
-                customer_name=current_user_obj.full_name,
-                savings_type=savings_account.savings_type,
-                tracking_number=savings_account.tracking_number
+                commission_date=datetime.now(timezone.utc)
             )
             db.add(commission)
             db.commit()
