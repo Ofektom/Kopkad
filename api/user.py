@@ -63,6 +63,50 @@ async def change_user_password(
     """Resets a users password"""
     return await change_password(request, current_user, db)
 
+@user_router.get("/me", response_model=dict)
+async def get_current_user_info(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get the current authenticated user's information."""
+    from models.user import User
+    from models.business import Business
+    
+    user = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not user:
+        return {
+            "success": False,
+            "message": "User not found"
+        }
+    
+    # Get user's businesses
+    businesses = [
+        {
+            "id": b.id,
+            "name": b.name,
+            "unique_code": b.unique_code,
+            "is_default": b.is_default
+        }
+        for b in user.businesses
+    ]
+    
+    return {
+        "success": True,
+        "message": "User information retrieved successfully",
+        "data": {
+            "user_id": user.id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "phone_number": user.phone_number,
+            "username": user.username,
+            "role": user.role.value if hasattr(user.role, 'value') else user.role,
+            "is_active": user.is_active,
+            "location": getattr(user, 'location', None),
+            "businesses": businesses,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+        }
+    }
+
 @user_router.get("/users", response_model=List[UserResponse])
 async def list_all_users(
     limit: int = Query(8, ge=1, le=100, description="Maximum number of users to return"),
