@@ -13,6 +13,7 @@ from schemas.payments import (
     AccountDetailsUpdate,
     PaymentAccountCreate,
     PaymentRequestCreate,
+    PaymentRequestReject,
     PaymentAccountUpdate,
     PaymentAccountResponse,
 )
@@ -186,14 +187,16 @@ async def create_payment_request_endpoint(
 async def get_payment_requests_endpoint(
     business_id: Optional[int] = Query(None, description="Filter by business ID"),
     customer_id: Optional[int] = Query(None, description="Filter by customer ID"),
-    status: Optional[str] = Query(None, description="Filter by status (pending, completed, rejected)"),
+    status: Optional[str] = Query(None, description="Filter by status (pending, approved, rejected)"),
+    start_date: Optional[str] = Query(None, description="Filter by start date (ISO format)"),
+    end_date: Optional[str] = Query(None, description="Filter by end date (ISO format)"),
     limit: int = Query(10, ge=1, le=100),
     offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Retrieve payment requests for agents or admins."""
-    return await get_payment_requests(business_id, customer_id, status, limit, offset, current_user, db)
+    """Retrieve payment requests for admins and customers. Blocked for agents/sub-agents."""
+    return await get_payment_requests(business_id, customer_id, status, start_date, end_date, limit, offset, current_user, db)
 
 @payment_router.post("/request/{request_id}/approve", response_model=dict)
 async def approve_payment_request_endpoint(
@@ -207,11 +210,12 @@ async def approve_payment_request_endpoint(
 @payment_router.post("/request/{request_id}/reject", response_model=dict)
 async def reject_payment_request_endpoint(
     request_id: int,
+    reject_data: PaymentRequestReject,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Reject a payment request."""
-    return await reject_payment_request(request_id, current_user, db)
+    """Reject a payment request with reason. Only admins/super-admins."""
+    return await reject_payment_request(request_id, reject_data, current_user, db)
 
 @payment_router.get("/commissions", response_model=dict)
 async def get_commissions_endpoint(

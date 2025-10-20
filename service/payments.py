@@ -20,6 +20,7 @@ from schemas.payments import (
     PaymentAccountResponse,
     PaymentRequestCreate,
     PaymentRequestResponse,
+    PaymentRequestReject,
     PaymentAccountUpdate,
     CommissionResponse,
     CustomerPaymentResponse,
@@ -496,6 +497,8 @@ async def get_payment_requests(
     business_id: Optional[int] = None,
     customer_id: Optional[int] = None,
     status: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     limit: int = 20,
     offset: int = 0,
     current_user: dict = None,
@@ -506,20 +509,16 @@ async def get_payment_requests(
     if not current_user_obj:
         return error_response(status_code=404, message="User not found")
 
+    # Block agents and sub-agents from accessing payment requests
+    if current_user["role"] in ["agent", "sub_agent"]:
+        return error_response(status_code=403, message="Agents and sub-agents cannot view payment requests. Please use the Commissions tab instead.")
+
     query = db.query(PaymentRequest).join(PaymentAccount).join(SavingsAccount).join(User, User.id == PaymentAccount.customer_id)
 
     if current_user["role"] == "customer":
         if customer_id and customer_id != current_user["user_id"]:
             return error_response(status_code=403, message="Customers can only view their own payment requests")
-        query = query.filter(
-            PaymentAccount.customer_id == current_user["user_id"],
-            PaymentRequest.status.in_([PaymentRequestStatus.PENDING.value, PaymentRequestStatus.APPROVED.value])
-        )
-    elif current_user["role"] in ["agent", "sub_agent"]:
-        business_ids = [b.id for b in current_user_obj.businesses]
-        if not business_ids:
-            return error_response(status_code=400, message="No business associated with user")
-        query = query.filter(SavingsAccount.business_id.in_(business_ids))
+        query = query.filter(PaymentAccount.customer_id == current_user["user_id"])
     elif current_user["role"] not in ["admin", "super_admin"]:
         return error_response(status_code=403, message="Unauthorized role")
 
@@ -539,6 +538,24 @@ async def get_payment_requests(
         except ValueError:
             return error_response(status_code=400, message=f"Invalid status: {status}")
 
+    # Date filtering
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            query = query.filter(PaymentRequest.request_date >= start_dt)
+        except ValueError:
+            return error_response(status_code=400, message=f"Invalid start_date format: {start_date}")
+    
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            # Add one day to include the entire end date
+            from datetime import timedelta
+            end_dt = end_dt + timedelta(days=1)
+            query = query.filter(PaymentRequest.request_date < end_dt)
+        except ValueError:
+            return error_response(status_code=400, message=f"Invalid end_date format: {end_date}")
+
     total_count = query.count()
     payment_requests = query.order_by(PaymentRequest.request_date.desc()).offset(offset).limit(limit).all()
 
@@ -557,6 +574,7 @@ async def get_payment_requests(
                 status=request.status,
                 request_date=request.request_date,
                 approval_date=request.approval_date,
+                rejection_reason=request.rejection_reason,
                 customer_name=customer.full_name if customer else "Unknown",
                 tracking_number=savings_account.tracking_number,
             ).model_dump()
@@ -614,14 +632,15 @@ async def approve_payment_request(request_id: int, current_user: dict, db: Sessi
         logger.error(f"Failed to approve payment request: {str(e)}")
         return error_response(status_code=500, message=f"Failed to approve payment request: {str(e)}")
 
-async def reject_payment_request(request_id: int, current_user: dict, db: Session):
-    """Reject a payment request."""
+async def reject_payment_request(request_id: int, reject_data: PaymentRequestReject, current_user: dict, db: Session):
+    """Reject a payment request with reason."""
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not current_user_obj:
         return error_response(status_code=404, message="User not found")
 
-    if current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin"]:
-        return error_response(status_code=403, message="Only agents, sub-agents, admins, or super-admins can reject payment requests")
+    # Only admins and super_admins can reject payment requests
+    if current_user["role"] not in ["admin", "super_admin"]:
+        return error_response(status_code=403, message="Only admins or super-admins can reject payment requests")
 
     payment_request = db.query(PaymentRequest).filter(PaymentRequest.id == request_id).first()
     if not payment_request:
@@ -630,23 +649,21 @@ async def reject_payment_request(request_id: int, current_user: dict, db: Sessio
     if payment_request.status != PaymentRequestStatus.PENDING:
         return error_response(status_code=400, message=f"Payment request is in {payment_request.status} status")
 
-    savings_account = payment_request.savings_account
-    if current_user["role"] in ["agent", "sub_agent"]:
-        business_ids = [b.id for b in current_user_obj.businesses]
-        if savings_account.business_id not in business_ids:
-            return error_response(status_code=403, message="Not authorized for this business")
+    if not reject_data.rejection_reason or len(reject_data.rejection_reason.strip()) == 0:
+        return error_response(status_code=400, message="Rejection reason is required")
 
     try:
         payment_request.status = PaymentRequestStatus.REJECTED
+        payment_request.rejection_reason = reject_data.rejection_reason
         payment_request.updated_by = current_user["user_id"]
         payment_request.updated_at = datetime.now(timezone.utc)
         db.commit()
 
-        logger.info(f"Rejected payment request {request_id} by user {current_user['user_id']}")
+        logger.info(f"Rejected payment request {request_id} by user {current_user['user_id']} with reason: {reject_data.rejection_reason}")
         return success_response(
             status_code=200,
             message="Payment request rejected successfully",
-            data={"payment_request_id": request_id}
+            data={"payment_request_id": request_id, "rejection_reason": reject_data.rejection_reason}
         )
     except Exception as e:
         db.rollback()

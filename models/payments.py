@@ -52,7 +52,8 @@ class PaymentRequest(AuditMixin, Base):
     )
     request_date = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     approval_date = Column(DateTime(timezone=True), nullable=True)
-    reference = Column(String(50), nullable=False)  # Added reference field
+    rejection_reason = Column(String, nullable=True)
+    reference = Column(String(50), nullable=False)
     payment_account = relationship("PaymentAccount", back_populates="payment_requests")
     account_details = relationship("AccountDetails")
     savings_account = relationship("SavingsAccount")

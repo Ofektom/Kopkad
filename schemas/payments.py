@@ -61,11 +61,15 @@ class PaymentRequestResponse(BaseModel):
     status: str
     request_date: datetime
     approval_date: Optional[datetime]
+    rejection_reason: Optional[str]
     customer_name: str
     tracking_number: str
 
     class Config:
         from_attributes = True
+
+class PaymentRequestReject(BaseModel):
+    rejection_reason: str
 
 class CommissionResponse(BaseModel):
     id: int
