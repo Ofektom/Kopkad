@@ -121,7 +121,8 @@ class SavingsMetricsResponse(BaseModel):
     days_remaining: int
     can_extend: bool
     total_commission: Decimal
-    marking_status: MarkingStatus  # Added
+    marking_status: MarkingStatus
+    payment_request_status: Optional[str]  # pending, approved, rejected, cancelled, or None
 
     class Config:
         arbitrary_types_allowed = True

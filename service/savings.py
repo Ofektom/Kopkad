@@ -1150,6 +1150,18 @@ async def get_savings_metrics(tracking_number: str, db: Session):
     can_extend = savings_account.marking_status != MarkingStatus.COMPLETED and date.today() <= savings_account.end_date
     total_commission = calculate_total_commission(savings_account)
 
+    # Check for existing payment request
+    from models.payments import PaymentRequest, PaymentRequestStatus
+    payment_request = db.query(PaymentRequest).filter(
+        PaymentRequest.savings_account_id == savings_account.id,
+        PaymentRequest.status.in_([
+            PaymentRequestStatus.PENDING,
+            PaymentRequestStatus.APPROVED
+        ])
+    ).first()
+    
+    payment_request_status = payment_request.status.value if payment_request else None
+
     response_data = SavingsMetricsResponse(
         tracking_number=tracking_number,
         savings_account_id=savings_account.id,
@@ -1158,10 +1170,11 @@ async def get_savings_metrics(tracking_number: str, db: Session):
         days_remaining=days_remaining,
         can_extend=can_extend,
         total_commission=total_commission,
-        marking_status=savings_account.marking_status  # Added
+        marking_status=savings_account.marking_status,
+        payment_request_status=payment_request_status
     ).model_dump()
 
-    logger.info(f"Retrieved metrics for savings {tracking_number}: savings_account_id={savings_account.id}, total={total_amount}, marked={amount_marked}, days_remaining={days_remaining}, can_extend={can_extend}, total_commission={total_commission}, marking_status={savings_account.marking_status}")
+    logger.info(f"Retrieved metrics for savings {tracking_number}: savings_account_id={savings_account.id}, total={total_amount}, marked={amount_marked}, days_remaining={days_remaining}, can_extend={can_extend}, total_commission={total_commission}, marking_status={savings_account.marking_status}, payment_request_status={payment_request_status}")
     return success_response(status_code=200, message="Savings metrics retrieved successfully", data=response_data)
 
 

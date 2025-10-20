@@ -28,6 +28,7 @@ from service.payments import (
     get_payment_requests,
     approve_payment_request,
     reject_payment_request,
+    cancel_payment_request,
     get_agent_commissions,
     get_customer_payments,
     get_payment_accounts,
@@ -216,6 +217,15 @@ async def reject_payment_request_endpoint(
 ):
     """Reject a payment request with reason. Only admins/super-admins."""
     return await reject_payment_request(request_id, reject_data, current_user, db)
+
+@payment_router.post("/request/{request_id}/cancel", response_model=dict)
+async def cancel_payment_request_endpoint(
+    request_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cancel a pending payment request. Only the customer who created it can cancel."""
+    return await cancel_payment_request(request_id, current_user, db)
 
 @payment_router.get("/commissions", response_model=dict)
 async def get_commissions_endpoint(

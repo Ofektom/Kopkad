@@ -424,6 +424,20 @@ async def create_payment_request(request: PaymentRequestCreate, current_user: di
         logger.error(f"Savings account {request.savings_account_id} not found, not owned by user {current_user['user_id']}, or not completed")
         return error_response(status_code=404, message="Savings account not found, not owned by you, or not completed")
 
+    # Check for existing payment requests (pending or approved)
+    existing_request = db.query(PaymentRequest).filter(
+        PaymentRequest.savings_account_id == request.savings_account_id,
+        PaymentRequest.status.in_([PaymentRequestStatus.PENDING, PaymentRequestStatus.APPROVED])
+    ).first()
+    
+    if existing_request:
+        status_text = "pending" if existing_request.status == PaymentRequestStatus.PENDING else "approved"
+        logger.warning(f"Payment request already exists for savings account {request.savings_account_id} with status {status_text}")
+        return error_response(
+            status_code=400, 
+            message=f"A {status_text} payment request already exists for this savings account. Please wait for it to be processed or cancel the pending request."
+        )
+
     total_marked_amount = db.query(func.sum(SavingsMarking.amount)).filter(
         SavingsMarking.savings_account_id == request.savings_account_id,
         SavingsMarking.status == SavingsStatus.PAID
@@ -518,7 +532,11 @@ async def get_payment_requests(
     if current_user["role"] == "customer":
         if customer_id and customer_id != current_user["user_id"]:
             return error_response(status_code=403, message="Customers can only view their own payment requests")
-        query = query.filter(PaymentAccount.customer_id == current_user["user_id"])
+        # Customers can only see pending and approved requests (not rejected or cancelled)
+        query = query.filter(
+            PaymentAccount.customer_id == current_user["user_id"],
+            PaymentRequest.status.in_([PaymentRequestStatus.PENDING, PaymentRequestStatus.APPROVED])
+        )
     elif current_user["role"] not in ["admin", "super_admin"]:
         return error_response(status_code=403, message="Unauthorized role")
 
@@ -669,6 +687,41 @@ async def reject_payment_request(request_id: int, reject_data: PaymentRequestRej
         db.rollback()
         logger.error(f"Failed to reject payment request: {str(e)}")
         return error_response(status_code=500, message=f"Failed to reject payment request: {str(e)}")
+
+async def cancel_payment_request(request_id: int, current_user: dict, db: Session):
+    """Cancel a pending payment request. Only customers can cancel their own requests."""
+    current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not current_user_obj:
+        return error_response(status_code=404, message="User not found")
+
+    payment_request = db.query(PaymentRequest).filter(PaymentRequest.id == request_id).first()
+    if not payment_request:
+        return error_response(status_code=404, message="Payment request not found")
+
+    # Check ownership - only customer who created it can cancel
+    payment_account = db.query(PaymentAccount).filter(PaymentAccount.id == payment_request.payment_account_id).first()
+    if not payment_account or payment_account.customer_id != current_user["user_id"]:
+        return error_response(status_code=403, message="You can only cancel your own payment requests")
+
+    if payment_request.status != PaymentRequestStatus.PENDING:
+        return error_response(status_code=400, message=f"Cannot cancel a {payment_request.status} payment request. Only pending requests can be cancelled.")
+
+    try:
+        payment_request.status = PaymentRequestStatus.CANCELLED
+        payment_request.updated_by = current_user["user_id"]
+        payment_request.updated_at = datetime.now(timezone.utc)
+        db.commit()
+
+        logger.info(f"Cancelled payment request {request_id} by customer {current_user['user_id']}")
+        return success_response(
+            status_code=200,
+            message="Payment request cancelled successfully",
+            data={"payment_request_id": request_id}
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to cancel payment request: {str(e)}")
+        return error_response(status_code=500, message=f"Failed to cancel payment request: {str(e)}")
 
 async def get_agent_commissions(
     business_id: Optional[int],

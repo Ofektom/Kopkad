@@ -9,6 +9,7 @@ class PaymentRequestStatus(PyEnum):
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
+    CANCELLED = "cancelled"
 
 class Commission(Base, AuditMixin):
     __tablename__ = "commissions"
