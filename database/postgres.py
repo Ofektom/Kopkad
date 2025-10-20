@@ -13,8 +13,8 @@ logger.info(f"Application connecting to database: {DATABASE_URL}")
 # Create engine with optimized settings
 engine = create_engine(
     DATABASE_URL, 
-    echo=True,
-    isolation_level="READ COMMITTED"  # Explicit isolation level to avoid transaction issues
+    echo=True
+    # Note: Don't set isolation_level here as it causes "set_session cannot be used inside a transaction" errors
 )
 
 SessionLocal = sessionmaker(
