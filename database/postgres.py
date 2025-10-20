@@ -9,8 +9,20 @@ logger = logging.getLogger(__name__)
 
 DATABASE_URL = settings.POSTGRES_URI
 logger.info(f"Application connecting to database: {DATABASE_URL}")
-engine = create_engine(DATABASE_URL, echo=True)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Create engine with optimized settings
+engine = create_engine(
+    DATABASE_URL, 
+    echo=True,
+    isolation_level="READ COMMITTED"  # Explicit isolation level to avoid transaction issues
+)
+
+SessionLocal = sessionmaker(
+    autocommit=False, 
+    autoflush=False, 
+    bind=engine,
+    expire_on_commit=False  # Prevent detached instance issues
+)
 
 mapper_registry = registry()
 Base = mapper_registry.generate_base()

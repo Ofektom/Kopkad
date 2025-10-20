@@ -128,21 +128,32 @@ async def on_startup():
         logger.warning(f"⚠️  Redis initialization error: {e} - caching disabled")
     
     # Test database connection
-    db = next(get_db())
     try:
-        with engine.connect() as connection:
-            result = connection.execute(text("SELECT current_database(), inet_server_addr(), inet_server_port()"))
-            db_name, host, port = result.fetchone()
-            logger.info(f"✓ Database connected: {db_name} at {host}:{port}")
+        # Test connection in an isolated block
+        try:
+            with engine.connect() as connection:
+                result = connection.execute(text("SELECT current_database(), inet_server_addr(), inet_server_port()"))
+                db_name, host, port = result.fetchone()
+                logger.info(f"✓ Database connected: {db_name} at {host}:{port}")
+            
+            # Show connection pool status
+            pool_status = get_connection_pool_status()
+            logger.info(f"✓ Connection pool initialized: {pool_status}")
+        except Exception as db_test_error:
+            logger.warning(f"⚠️  Database connection test failed: {db_test_error}")
         
-        # Show connection pool status
-        pool_status = get_connection_pool_status()
-        logger.info(f"✓ Connection pool initialized: {pool_status}")
-        
-        # Bootstrap superadmin
+        # Bootstrap superadmin with a fresh session
         logger.info("Starting SUPER_ADMIN bootstrap process...")
-        bootstrap_super_admin(db)
-        logger.info("✓ SUPER_ADMIN bootstrap completed")
+        db = next(get_db())
+        try:
+            bootstrap_super_admin(db)
+            logger.info("✓ SUPER_ADMIN bootstrap completed")
+        except Exception as bootstrap_error:
+            logger.error(f"❌ Bootstrap error: {bootstrap_error}")
+            import traceback
+            logger.error(traceback.format_exc())
+        finally:
+            db.close()
         
         # Initialize and start scheduler
         logger.info("Initializing Financial Advisor Scheduler...")
@@ -152,9 +163,9 @@ async def on_startup():
         
     except Exception as e:
         logger.error(f"❌ Error during startup: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         # Don't raise - allow app to start for health checks
-    finally:
-        db.close()
     
     logger.info("=" * 60)
     logger.info("APPLICATION READY")
