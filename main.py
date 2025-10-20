@@ -22,6 +22,7 @@ from api.savings import savings_router
 from api.payments import payment_router
 from api.expenses import expenses_router
 from api.financial_advisor import financial_advisor_router
+from api.logout import logout_router
 
 # Import scripts
 from scripts.bootstrap_super_admin import bootstrap_super_admin
@@ -98,6 +99,7 @@ app.include_router(savings_router, prefix="/api/v1")
 app.include_router(payment_router, prefix="/api/v1")
 app.include_router(expenses_router, prefix="/api/v1")
 app.include_router(financial_advisor_router, prefix="/api/v1")
+app.include_router(logout_router, prefix="/api/v1")
 
 @app.on_event("startup")
 async def on_startup():
