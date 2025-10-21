@@ -500,3 +500,529 @@ async def get_financial_analytics(from_date: date | None, to_date: date | None, 
 
     logger.info(f"Generated financial analytics for user {current_user['user_id']}")
     return response_data
+
+async def expense_planner(capital: Decimal, planned_expenses: list, current_user: dict, db: Session):
+    """AI-powered expense planner that analyzes if capital is sufficient"""
+    from schemas.expenses import ExpensePlannerResponse
+    
+    # Calculate totals
+    total_planned = sum(expense['amount'] for expense in planned_expenses)
+    remaining_balance = capital - total_planned
+    is_sufficient = remaining_balance >= 0
+    
+    # Category breakdown
+    category_breakdown = {}
+    for expense in planned_expenses:
+        category = expense['category'].value if hasattr(expense['category'], 'value') else expense['category']
+        category_breakdown[category] = category_breakdown.get(category, Decimal(0)) + expense['amount']
+    
+    # AI Advice generation
+    advice_parts = []
+    recommendations = []
+    
+    # Sufficiency check
+    if is_sufficient:
+        buffer_percentage = (remaining_balance / capital * 100) if capital > 0 else 0
+        if buffer_percentage > 20:
+            advice_parts.append(f"Great planning! You have a healthy {buffer_percentage:.1f}% buffer ({remaining_balance:.2f}) remaining.")
+            recommendations.append("Consider saving the remaining balance for emergencies")
+        elif buffer_percentage > 10:
+            advice_parts.append(f"Good budget with a {buffer_percentage:.1f}% buffer. This gives you some flexibility.")
+            recommendations.append("Keep this buffer for unexpected expenses")
+        else:
+            advice_parts.append(f"Your budget is tight with only {buffer_percentage:.1f}% buffer. Plan carefully.")
+            recommendations.append("Look for ways to reduce non-essential expenses")
+    else:
+        shortfall = abs(remaining_balance)
+        shortfall_percentage = (shortfall / capital * 100) if capital > 0 else 0
+        advice_parts.append(f"⚠️ Budget shortfall of {shortfall:.2f} ({shortfall_percentage:.1f}%). You need {shortfall:.2f} more.")
+        recommendations.append(f"Reduce planned expenses by at least {shortfall:.2f}")
+        recommendations.append("Consider prioritizing essential categories only")
+    
+    # Category-specific advice
+    for category, amount in category_breakdown.items():
+        category_percentage = (amount / total_planned * 100) if total_planned > 0 else 0
+        
+        if category == "FOOD" and category_percentage > 40:
+            advice_parts.append(f"Food expenses are {category_percentage:.1f}% of budget - consider meal planning to reduce costs.")
+            recommendations.append("Try batch cooking and grocery budgeting")
+        elif category == "RENT" and category_percentage > 30:
+            advice_parts.append(f"Rent is {category_percentage:.1f}% of budget, which is acceptable but monitor other expenses.")
+        elif category == "ENTERTAINMENT" and category_percentage > 15:
+            advice_parts.append(f"Entertainment ({category_percentage:.1f}%) could be reduced if budget is tight.")
+            recommendations.append("Look for free or low-cost entertainment options")
+        elif category == "TRANSPORT" and category_percentage > 20:
+            advice_parts.append(f"Transport costs are high at {category_percentage:.1f}%. Consider carpooling or public transport.")
+            recommendations.append("Explore cheaper commute alternatives")
+    
+    # Overall financial health
+    if len(planned_expenses) > 10:
+        recommendations.append("You have many expense items - consolidate similar expenses")
+    elif len(planned_expenses) < 3:
+        recommendations.append("Ensure you've planned for all necessary expenses")
+    
+    ai_advice = " ".join(advice_parts)
+    
+    logger.info(f"Generated expense plan for user {current_user['user_id']} - Capital: {capital}, Planned: {total_planned}")
+    
+    return ExpensePlannerResponse(
+        total_planned=total_planned,
+        capital=capital,
+        remaining_balance=remaining_balance,
+        is_sufficient=is_sufficient,
+        ai_advice=ai_advice,
+        category_breakdown=category_breakdown,
+        recommendations=recommendations[:5]  # Limit to top 5 recommendations
+    )
+
+async def get_eligible_savings(current_user: dict, db: Session):
+    """Get list of completed savings accounts eligible for expense cards"""
+    from schemas.expenses import EligibleSavingsResponse
+    
+    # Get completed savings for this user
+    eligible_savings = db.query(SavingsAccount).filter(
+        SavingsAccount.customer_id == current_user["user_id"],
+        SavingsAccount.marking_status == MarkingStatus.COMPLETED
+    ).all()
+    
+    results = []
+    for savings in eligible_savings:
+        # Calculate payout
+        paid_markings = db.query(SavingsMarking).filter(
+            SavingsMarking.savings_account_id == savings.id,
+            SavingsMarking.status == SavingsStatus.PAID
+        ).order_by(SavingsMarking.marked_date).all()
+        
+        if not paid_markings:
+            continue
+        
+        total_amount = sum(marking.amount for marking in paid_markings)
+        earliest_date = paid_markings[0].marked_date
+        latest_date = paid_markings[-1].marked_date
+        total_savings_days = (latest_date - earliest_date).days + 1
+        
+        if savings.commission_days == 0:
+            total_commission = Decimal(0)
+        else:
+            total_commission = savings.commission_amount * Decimal(total_savings_days / savings.commission_days)
+            total_commission = total_commission.quantize(Decimal("0.01"))
+        
+        net_payout = total_amount - total_commission
+        
+        # Check if already linked to expense card
+        already_linked = db.query(ExpenseCard).filter(
+            ExpenseCard.savings_id == savings.id,
+            ExpenseCard.customer_id == current_user["user_id"]
+        ).first() is not None
+        
+        results.append(EligibleSavingsResponse(
+            id=savings.id,
+            tracking_number=savings.tracking_number,
+            savings_type=savings.savings_type.value,
+            total_amount=total_amount,
+            commission=total_commission,
+            net_payout=net_payout,
+            start_date=savings.start_date,
+            completion_date=latest_date,
+            already_linked=already_linked
+        ))
+    
+    logger.info(f"Found {len(results)} eligible savings for user {current_user['user_id']}")
+    return success_response(
+        status_code=200,
+        message="Eligible savings retrieved successfully",
+        data={"savings": results, "count": len(results)}
+    )
+
+async def get_all_expenses(
+    limit: int, offset: int, from_date: date | None, to_date: date | None,
+    category: str | None, min_amount: Decimal | None, max_amount: Decimal | None,
+    search: str | None, current_user: dict, db: Session
+):
+    """Get all expenses across all cards with advanced filtering"""
+    
+    # Base query
+    query = db.query(Expense).join(ExpenseCard).filter(
+        ExpenseCard.customer_id == current_user["user_id"]
+    )
+    
+    # Apply filters
+    if from_date:
+        query = query.filter(Expense.date >= from_date)
+    if to_date:
+        query = query.filter(Expense.date <= to_date)
+    if category:
+        try:
+            cat = ExpenseCategory[category.upper()]
+            query = query.filter(Expense.category == cat)
+        except KeyError:
+            pass
+    if min_amount is not None:
+        query = query.filter(Expense.amount >= min_amount)
+    if max_amount is not None:
+        query = query.filter(Expense.amount <= max_amount)
+    if search:
+        search_pattern = f"%{search}%"
+        query = query.filter(
+            (Expense.description.ilike(search_pattern)) |
+            (ExpenseCard.name.ilike(search_pattern))
+        )
+    
+    # Count and fetch
+    total_count = query.count()
+    total_amount = query.with_entities(func.sum(Expense.amount)).scalar() or Decimal(0)
+    
+    expenses = query.order_by(Expense.date.desc()).offset(offset).limit(limit).all()
+    
+    # Format response
+    from schemas.expenses import ExpenseResponse
+    response_data = [ExpenseResponse.from_orm(exp) for exp in expenses]
+    
+    logger.info(f"Retrieved {len(response_data)} expenses for user {current_user['user_id']}")
+    return success_response(
+        status_code=200,
+        message="Expenses retrieved successfully",
+        data={
+            "expenses": response_data,
+            "total_count": total_count,
+            "total_amount": float(total_amount),
+            "limit": limit,
+            "offset": offset
+        }
+    )
+
+async def update_expense(expense_id: int, updates: dict, current_user: dict, db: Session):
+    """Update an existing expense"""
+    from schemas.expenses import ExpenseResponse
+    
+    expense = db.query(Expense).join(ExpenseCard).filter(
+        Expense.id == expense_id,
+        ExpenseCard.customer_id == current_user["user_id"]
+    ).first()
+    
+    if not expense:
+        return error_response(status_code=404, message="Expense not found or access denied")
+    
+    card = expense.expense_card
+    old_amount = expense.amount
+    
+    # Update fields
+    if 'category' in updates and updates['category'] is not None:
+        expense.category = updates['category']
+    if 'description' in updates and updates['description'] is not None:
+        expense.description = updates['description']
+    if 'date' in updates and updates['date'] is not None:
+        expense.date = updates['date']
+    if 'amount' in updates and updates['amount'] is not None:
+        new_amount = updates['amount']
+        if new_amount <= 0:
+            return error_response(status_code=400, message="Amount must be positive")
+        
+        # Adjust card balance
+        amount_diff = new_amount - old_amount
+        if amount_diff > card.balance:
+            return error_response(status_code=400, message="Insufficient card balance for this update")
+        
+        card.balance -= amount_diff
+        expense.amount = new_amount
+    
+    expense.updated_at = datetime.now(timezone.utc)
+    expense.updated_by = current_user["user_id"]
+    card.updated_at = datetime.now(timezone.utc)
+    card.updated_by = current_user["user_id"]
+    
+    db.commit()
+    db.refresh(expense)
+    
+    logger.info(f"Updated expense {expense_id} for user {current_user['user_id']}")
+    return ExpenseResponse.from_orm(expense)
+
+async def delete_expense(expense_id: int, current_user: dict, db: Session):
+    """Delete an expense and refund card balance"""
+    
+    expense = db.query(Expense).join(ExpenseCard).filter(
+        Expense.id == expense_id,
+        ExpenseCard.customer_id == current_user["user_id"]
+    ).first()
+    
+    if not expense:
+        return error_response(status_code=404, message="Expense not found or access denied")
+    
+    card = expense.expense_card
+    refund_amount = expense.amount
+    
+    # Refund to card balance
+    card.balance += refund_amount
+    card.updated_at = datetime.now(timezone.utc)
+    card.updated_by = current_user["user_id"]
+    
+    db.delete(expense)
+    db.commit()
+    
+    logger.info(f"Deleted expense {expense_id}, refunded {refund_amount} to card {card.id}")
+    return success_response(
+        status_code=200,
+        message="Expense deleted successfully",
+        data={"expense_id": expense_id, "refunded_amount": float(refund_amount)}
+    )
+
+# ==================== NEW PLANNER WORKFLOW FUNCTIONS ====================
+
+async def create_planner_card(name: str, capital: Decimal, planned_expenses: list, current_user: dict, db: Session):
+    """
+    Create a draft expense card (planner) with planned expenses
+    Returns card + AI analysis
+    """
+    from schemas.expenses import PlannerCardResponse, ExpenseCardResponse
+    from models.expenses import CardStatus, IncomeType
+    
+    # Calculate totals
+    total_planned = sum(exp['amount'] for exp in planned_expenses)
+    remaining_balance = capital - total_planned
+    is_sufficient = remaining_balance >= 0
+    
+    # Category breakdown
+    category_breakdown = {}
+    for expense in planned_expenses:
+        category = expense['category'].value if hasattr(expense['category'], 'value') else expense['category']
+        category_breakdown[category] = category_breakdown.get(category, Decimal(0)) + expense['amount']
+    
+    # Create expense card as DRAFT/PLANNER
+    expense_card = ExpenseCard(
+        customer_id=current_user["user_id"],
+        name=name,
+        income_type=IncomeType.PLANNER,
+        income_amount=capital,
+        balance=capital,  # Full capital available (nothing spent yet)
+        status=CardStatus.DRAFT,
+        is_plan=True,
+        created_by=current_user["user_id"],
+        created_at=datetime.now(timezone.utc)
+    )
+    db.add(expense_card)
+    db.flush()  # Get ID without committing
+    
+    # Create planned expenses
+    for expense_data in planned_expenses:
+        expense = Expense(
+            expense_card_id=expense_card.id,
+            category=expense_data['category'],
+            amount=expense_data['amount'],
+            planned_amount=expense_data['amount'],  # Store original plan
+            purpose=expense_data.get('purpose', ''),
+            description=expense_data.get('purpose', ''),
+            date=datetime.now(timezone.utc).date(),
+            is_planned=True,  # This is a planned expense
+            is_completed=False,  # Not yet executed
+            created_by=current_user["user_id"],
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(expense)
+    
+    db.commit()
+    db.refresh(expense_card)
+    
+    # Generate AI advice (reuse existing logic)
+    advice_parts = []
+    recommendations = []
+    
+    # Sufficiency check
+    if is_sufficient:
+        buffer_percentage = (remaining_balance / capital * 100) if capital > 0 else 0
+        if buffer_percentage > 20:
+            advice_parts.append(f"Excellent planning! You have a healthy {buffer_percentage:.1f}% buffer (₦{remaining_balance:.2f}) remaining.")
+            recommendations.append("Consider saving the remaining balance for emergencies")
+        elif buffer_percentage > 10:
+            advice_parts.append(f"Good budget with a {buffer_percentage:.1f}% buffer. This gives you some flexibility.")
+            recommendations.append("Keep this buffer for unexpected expenses")
+        else:
+            advice_parts.append(f"Your budget is tight with only {buffer_percentage:.1f}% buffer. Plan carefully.")
+            recommendations.append("Look for ways to reduce non-essential expenses")
+    else:
+        shortfall = abs(remaining_balance)
+        shortfall_percentage = (shortfall / capital * 100) if capital > 0 else 0
+        advice_parts.append(f"⚠️ Budget shortfall of ₦{shortfall:.2f} ({shortfall_percentage:.1f}%). You need ₦{shortfall:.2f} more or reduce expenses.")
+        recommendations.append(f"Reduce planned expenses by at least ₦{shortfall:.2f}")
+        recommendations.append("Consider prioritizing essential categories only")
+    
+    # Category-specific advice
+    for category, amount in category_breakdown.items():
+        category_percentage = (amount / total_planned * 100) if total_planned > 0 else 0
+        
+        if category == "FOOD" and category_percentage > 40:
+            advice_parts.append(f"Food expenses are {category_percentage:.1f}% of budget - consider meal planning.")
+            recommendations.append("Try batch cooking and grocery budgeting")
+        elif category == "RENT" and category_percentage > 30:
+            advice_parts.append(f"Rent is {category_percentage:.1f}% of budget, which is acceptable.")
+        elif category == "ENTERTAINMENT" and category_percentage > 15:
+            advice_parts.append(f"Entertainment ({category_percentage:.1f}%) could be reduced if budget is tight.")
+            recommendations.append("Look for free or low-cost entertainment options")
+    
+    ai_advice = " ".join(advice_parts)
+    
+    logger.info(f"Created planner card {expense_card.id} for user {current_user['user_id']}")
+    
+    return PlannerCardResponse(
+        card=ExpenseCardResponse.from_orm(expense_card),
+        total_planned=total_planned,
+        remaining_balance=remaining_balance,
+        is_sufficient=is_sufficient,
+        ai_advice=ai_advice,
+        category_breakdown=category_breakdown,
+        recommendations=recommendations[:5]
+    )
+
+async def activate_planner_card(card_id: int, current_user: dict, db: Session):
+    """
+    Activate a draft planner card - converts it to an active expense tracker
+    """
+    from schemas.expenses import ExpenseCardResponse
+    from models.expenses import CardStatus
+    
+    # Get the planner card
+    card = db.query(ExpenseCard).filter(
+        ExpenseCard.id == card_id,
+        ExpenseCard.customer_id == current_user["user_id"],
+        ExpenseCard.is_plan == True,
+        ExpenseCard.status == CardStatus.DRAFT
+    ).first()
+    
+    if not card:
+        return error_response(status_code=404, message="Planner card not found or already activated")
+    
+    # Activate the card
+    card.status = CardStatus.ACTIVE
+    card.updated_at = datetime.now(timezone.utc)
+    card.updated_by = current_user["user_id"]
+    
+    db.commit()
+    db.refresh(card)
+    
+    logger.info(f"Activated planner card {card_id} for user {current_user['user_id']}")
+    
+    return ExpenseCardResponse.from_orm(card)
+
+async def complete_planned_item(expense_id: int, actual_amount: Decimal | None, current_user: dict, db: Session):
+    """
+    Mark a planned expense as completed (checklist)
+    Optionally record actual amount spent
+    """
+    from schemas.expenses import ExpenseResponse
+    
+    # Get the planned expense
+    expense = db.query(Expense).join(ExpenseCard).filter(
+        Expense.id == expense_id,
+        ExpenseCard.customer_id == current_user["user_id"],
+        Expense.is_planned == True
+    ).first()
+    
+    if not expense:
+        return error_response(status_code=404, message="Planned expense not found")
+    
+    card = expense.expense_card
+    
+    # Mark as completed
+    expense.is_completed = True
+    
+    # If actual amount provided, update it and adjust balance
+    if actual_amount is not None:
+        old_amount = expense.amount
+        expense.amount = actual_amount
+        
+        # Adjust card balance
+        difference = actual_amount - old_amount
+        if difference > card.balance:
+            return error_response(status_code=400, message="Insufficient balance for actual amount")
+        
+        card.balance -= difference
+    
+    expense.updated_at = datetime.now(timezone.utc)
+    expense.updated_by = current_user["user_id"]
+    card.updated_at = datetime.now(timezone.utc)
+    card.updated_by = current_user["user_id"]
+    
+    db.commit()
+    db.refresh(expense)
+    
+    logger.info(f"Completed planned item {expense_id} for user {current_user['user_id']}")
+    
+    return ExpenseResponse.from_orm(expense)
+
+async def get_planner_progress(card_id: int, current_user: dict, db: Session):
+    """
+    Get progress tracking for a planner card - planned vs actual
+    """
+    from schemas.expenses import PlannerProgressResponse
+    
+    # Get the planner card
+    card = db.query(ExpenseCard).filter(
+        ExpenseCard.id == card_id,
+        ExpenseCard.customer_id == current_user["user_id"],
+        ExpenseCard.is_plan == True
+    ).first()
+    
+    if not card:
+        return error_response(status_code=404, message="Planner card not found")
+    
+    # Get all planned expenses
+    expenses = db.query(Expense).filter(
+        Expense.expense_card_id == card_id,
+        Expense.is_planned == True
+    ).all()
+    
+    if not expenses:
+        return error_response(status_code=404, message="No planned expenses found")
+    
+    # Calculate totals
+    planned_total = sum(exp.planned_amount or exp.amount for exp in expenses)
+    actual_total = sum(exp.amount if exp.is_completed else Decimal(0) for exp in expenses)
+    completed_items = sum(1 for exp in expenses if exp.is_completed)
+    total_items = len(expenses)
+    completion_percentage = (completed_items / total_items * 100) if total_items > 0 else 0
+    
+    # Variance by category
+    variance_by_category = {}
+    for expense in expenses:
+        category = expense.category.value if expense.category else "Uncategorized"
+        if category not in variance_by_category:
+            variance_by_category[category] = {
+                "planned": Decimal(0),
+                "actual": Decimal(0),
+                "variance": Decimal(0)
+            }
+        
+        variance_by_category[category]["planned"] += (expense.planned_amount or expense.amount)
+        if expense.is_completed:
+            variance_by_category[category]["actual"] += expense.amount
+            variance_by_category[category]["variance"] += (expense.planned_amount or expense.amount) - expense.amount
+    
+    # Items list
+    items = [
+        {
+            "id": exp.id,
+            "category": exp.category.value if exp.category else "Uncategorized",
+            "purpose": exp.purpose or exp.description,
+            "planned_amount": float(exp.planned_amount or exp.amount),
+            "actual_amount": float(exp.amount) if exp.is_completed else None,
+            "is_completed": exp.is_completed,
+            "variance": float((exp.planned_amount or exp.amount) - exp.amount) if exp.is_completed else 0,
+            "date": exp.date.isoformat()
+        }
+        for exp in expenses
+    ]
+    
+    logger.info(f"Retrieved progress for planner card {card_id}")
+    
+    return PlannerProgressResponse(
+        card_id=card.id,
+        card_name=card.name,
+        status=card.status,
+        planned_total=planned_total,
+        actual_total=actual_total,
+        remaining_balance=card.balance,
+        completed_items=completed_items,
+        total_items=total_items,
+        completion_percentage=completion_percentage,
+        variance_by_category=variance_by_category,
+        items=items
+    )

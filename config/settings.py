@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     APP_BASE_URL: str
     PAYSTACK_SECRET_KEY: str
     ENV: str
+    REDIS_URL: str | None = None  # Optional Redis cache URL
     
     # Financial Advisor ML Parameters
     ANOMALY_DETECTION_CONTAMINATION: float = 0.1

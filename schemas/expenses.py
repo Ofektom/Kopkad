@@ -2,7 +2,7 @@ from pydantic import BaseModel, validator
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional, List, Dict
-from models.expenses import IncomeType, ExpenseCategory
+from models.expenses import IncomeType, ExpenseCategory, CardStatus
 
 class ExpenseCardCreate(BaseModel):
     name: str
@@ -32,6 +32,8 @@ class ExpenseCardResponse(BaseModel):
     balance: Decimal
     savings_id: Optional[int]
     income_details: Optional[str]
+    status: CardStatus
+    is_plan: bool
     created_at: datetime
     updated_at: Optional[datetime]
 
@@ -54,6 +56,10 @@ class ExpenseResponse(BaseModel):
     description: Optional[str]
     amount: Decimal
     date: date
+    is_planned: bool
+    is_completed: bool
+    planned_amount: Optional[Decimal]
+    purpose: Optional[str]
     created_at: datetime
     updated_at: Optional[datetime]
 
@@ -107,6 +113,112 @@ class FinancialAnalyticsResponse(BaseModel):
     expense_volatility: float
     top_expense_category: Optional[str]
     top_expense_percentage: float
+
+    class Config:
+        arbitrary_types_allowed = True
+
+# New schemas for expense planner
+class PlannedExpense(BaseModel):
+    category: ExpenseCategory
+    amount: Decimal
+    purpose: str
+
+    class Config:
+        arbitrary_types_allowed = True
+
+class ExpensePlannerRequest(BaseModel):
+    capital: Decimal
+    planned_expenses: List[PlannedExpense]
+
+    class Config:
+        arbitrary_types_allowed = True
+
+class ExpensePlannerResponse(BaseModel):
+    total_planned: Decimal
+    capital: Decimal
+    remaining_balance: Decimal
+    is_sufficient: bool
+    ai_advice: str
+    category_breakdown: Dict[str, Decimal]
+    recommendations: List[str]
+
+    class Config:
+        arbitrary_types_allowed = True
+
+class EligibleSavingsResponse(BaseModel):
+    id: int
+    tracking_number: str
+    savings_type: str
+    total_amount: Decimal
+    commission: Decimal
+    net_payout: Decimal
+    start_date: date
+    completion_date: Optional[date]
+    already_linked: bool
+
+    class Config:
+        arbitrary_types_allowed = True
+
+class ExpenseUpdate(BaseModel):
+    category: Optional[ExpenseCategory] = None
+    description: Optional[str] = None
+    amount: Optional[Decimal] = None
+    date: Optional[date] = None
+
+    class Config:
+        arbitrary_types_allowed = True
+
+# New schemas for enhanced planner workflow
+
+class CreatePlannerCardRequest(BaseModel):
+    """Create a planner/draft expense card with planned expenses"""
+    name: str
+    capital: Decimal
+    planned_expenses: List[PlannedExpense]
+
+    class Config:
+        arbitrary_types_allowed = True
+
+class PlannerCardResponse(BaseModel):
+    """Response after creating planner card with AI analysis"""
+    card: ExpenseCardResponse
+    total_planned: Decimal
+    remaining_balance: Decimal
+    is_sufficient: bool
+    ai_advice: str
+    category_breakdown: Dict[str, Decimal]
+    recommendations: List[str]
+
+    class Config:
+        arbitrary_types_allowed = True
+
+class ActivatePlannerRequest(BaseModel):
+    """Request to activate a draft planner card"""
+    confirm: bool = True  # Safety check
+
+    class Config:
+        arbitrary_types_allowed = True
+
+class CompletePlannedItemRequest(BaseModel):
+    """Mark a planned expense as completed (checklist)"""
+    actual_amount: Optional[Decimal] = None  # If different from planned
+
+    class Config:
+        arbitrary_types_allowed = True
+
+class PlannerProgressResponse(BaseModel):
+    """Progress tracking for a planner card"""
+    card_id: int
+    card_name: str
+    status: CardStatus
+    planned_total: Decimal
+    actual_total: Decimal
+    remaining_balance: Decimal
+    completed_items: int
+    total_items: int
+    completion_percentage: float
+    variance_by_category: Dict[str, Dict[str, Decimal]]  # {category: {planned, actual, variance}}
+    items: List[Dict]  # List of planned items with status
 
     class Config:
         arbitrary_types_allowed = True

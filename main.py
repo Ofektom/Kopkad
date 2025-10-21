@@ -114,20 +114,31 @@ async def on_startup():
     logger.info("APPLICATION STARTING UP")
     logger.info("=" * 60)
     
-    # Initialize Redis cache
+    # Initialize cache (Redis with in-memory fallback)
     try:
-        redis_host = os.getenv('REDIS_HOST', 'localhost')
-        redis_port = int(os.getenv('REDIS_PORT', 6379))
-        redis_password = os.getenv('REDIS_PASSWORD', None)
-        
-        init_cache(host=redis_host, port=redis_port, password=redis_password)
-        
-        if get_cache().ping():
-            logger.info(f"✓ Redis connected at {redis_host}:{redis_port}")
+        from config.settings import settings as app_settings
+        if app_settings.REDIS_URL:
+            logger.info(f"Initializing cache from REDIS_URL")
+            from urllib.parse import urlparse
+            
+            # Parse Redis URL (format: redis://host:port/db or redis://host:port)
+            parsed = urlparse(app_settings.REDIS_URL)
+            host = parsed.hostname or 'localhost'
+            port = parsed.port or 6379
+            db = int(parsed.path.lstrip('/')) if parsed.path and parsed.path != '/' else 0
+            password = parsed.password
+            
+            # Try Redis, auto-fallback to in-memory if fails
+            init_cache(host=host, port=port, db=db, password=password, fallback=True)
         else:
-            logger.warning("⚠️  Redis not available - caching disabled")
+            # No Redis configured - use in-memory cache directly
+            logger.info("ℹ️  REDIS_URL not configured - using in-memory cache")
+            from utils.cache import InMemoryCache
+            cache = InMemoryCache(maxsize=10000, ttl=300)
+            from utils import cache as cache_module
+            cache_module.cache = cache
     except Exception as e:
-        logger.warning(f"⚠️  Redis initialization error: {e} - caching disabled")
+        logger.warning(f"⚠️  Cache initialization error: {e} - using in-memory fallback")
     
     # Test database connection
     try:
@@ -146,16 +157,21 @@ async def on_startup():
         
         # Bootstrap superadmin with a fresh session
         logger.info("Starting SUPER_ADMIN bootstrap process...")
-        db = next(get_db())
         try:
-            bootstrap_super_admin(db)
-            logger.info("✓ SUPER_ADMIN bootstrap completed")
-        except Exception as bootstrap_error:
-            logger.error(f"❌ Bootstrap error: {bootstrap_error}")
-            import traceback
-            logger.error(traceback.format_exc())
-        finally:
-            db.close()
+            # Create a fresh session outside any transaction context
+            from database.postgres import SessionLocal
+            db = SessionLocal()
+            try:
+                bootstrap_super_admin(db)
+                logger.info("✓ SUPER_ADMIN bootstrap completed")
+            except Exception as bootstrap_error:
+                logger.error(f"❌ Bootstrap error: {bootstrap_error}")
+                import traceback
+                logger.error(traceback.format_exc())
+            finally:
+                db.close()
+        except Exception as session_error:
+            logger.error(f"❌ Failed to create database session: {session_error}")
         
         # Initialize and start scheduler
         logger.info("Initializing Financial Advisor Scheduler...")
@@ -228,15 +244,25 @@ def health_check():
         "timestamp": time.time(),
     }
     
-    # Check Redis
+    # Check cache (Redis or in-memory)
     try:
-        if get_cache().ping():
-            health["redis"] = "connected"
+        from utils.cache import RedisCache, InMemoryCache
+        cache_instance = get_cache()
+        
+        if isinstance(cache_instance, RedisCache):
+            if cache_instance.enabled and cache_instance.ping():
+                health["cache"] = "redis"
+            else:
+                health["cache"] = "redis-disconnected"
+                health["status"] = "degraded"
+        elif isinstance(cache_instance, InMemoryCache):
+            health["cache"] = "in-memory"
+            # In-memory is fine for single-server deployments
         else:
-            health["redis"] = "disconnected"
+            health["cache"] = "none"
             health["status"] = "degraded"
-    except:
-        health["redis"] = "error"
+    except Exception as e:
+        health["cache"] = f"error: {str(e)}"
         health["status"] = "degraded"
     
     # Check Database

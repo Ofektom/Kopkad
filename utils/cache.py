@@ -1,6 +1,6 @@
 """
-Redis Cache Utility Module
-Provides caching functionality using Redis for improved performance
+Cache Utility Module
+Provides caching functionality using Redis (primary) or in-memory cache (fallback)
 """
 
 import redis
@@ -11,8 +11,132 @@ from datetime import timedelta
 from functools import wraps
 import pickle
 import hashlib
+from cachetools import TTLCache
+import threading
 
 logger = logging.getLogger(__name__)
+
+
+class InMemoryCache:
+    """
+    In-memory cache fallback using cachetools (TTL-based LRU cache)
+    Thread-safe and suitable for single-server deployments
+    """
+    
+    def __init__(self, maxsize=10000, ttl=300):
+        """
+        Initialize in-memory cache
+        
+        Args:
+            maxsize: Maximum number of items to cache (default: 10000)
+            ttl: Default time-to-live in seconds (default: 300)
+        """
+        self.cache = TTLCache(maxsize=maxsize, ttl=ttl)
+        self.lock = threading.RLock()
+        self.enabled = True
+        logger.info(f"✓ In-memory cache initialized (maxsize={maxsize}, default_ttl={ttl}s)")
+    
+    def get(self, key: str) -> Optional[Any]:
+        """Get value from cache"""
+        try:
+            with self.lock:
+                return self.cache.get(key)
+        except Exception as e:
+            logger.error(f"In-memory cache GET error for key '{key}': {e}")
+            return None
+    
+    def set(self, key: str, value: Any, ttl: Optional[Union[int, timedelta]] = None) -> bool:
+        """
+        Set value in cache with optional TTL
+        Note: cachetools TTLCache uses global TTL, so custom TTL per key is not supported
+        """
+        try:
+            with self.lock:
+                self.cache[key] = value
+                return True
+        except Exception as e:
+            logger.error(f"In-memory cache SET error for key '{key}': {e}")
+            return False
+    
+    def delete(self, *keys: str) -> int:
+        """Delete one or more keys from cache"""
+        try:
+            with self.lock:
+                deleted = 0
+                for key in keys:
+                    if key in self.cache:
+                        del self.cache[key]
+                        deleted += 1
+                return deleted
+        except Exception as e:
+            logger.error(f"In-memory cache DELETE error: {e}")
+            return 0
+    
+    def exists(self, key: str) -> bool:
+        """Check if key exists in cache"""
+        with self.lock:
+            return key in self.cache
+    
+    def get_many(self, *keys: str) -> dict:
+        """Get multiple values from cache"""
+        result = {}
+        with self.lock:
+            for key in keys:
+                if key in self.cache:
+                    result[key] = self.cache[key]
+        return result
+    
+    def set_many(self, mapping: dict, ttl: Optional[int] = None) -> bool:
+        """Set multiple key-value pairs in cache"""
+        try:
+            with self.lock:
+                for key, value in mapping.items():
+                    self.cache[key] = value
+                return True
+        except Exception as e:
+            logger.error(f"In-memory cache MSET error: {e}")
+            return False
+    
+    def clear_pattern(self, pattern: str) -> int:
+        """Delete all keys matching a pattern (simplified for in-memory)"""
+        try:
+            with self.lock:
+                # Simple pattern matching (starts with)
+                prefix = pattern.rstrip('*')
+                keys_to_delete = [k for k in self.cache.keys() if k.startswith(prefix)]
+                for key in keys_to_delete:
+                    del self.cache[key]
+                return len(keys_to_delete)
+        except Exception as e:
+            logger.error(f"In-memory cache CLEAR_PATTERN error: {e}")
+            return 0
+    
+    def increment(self, key: str, amount: int = 1) -> Optional[int]:
+        """Increment a key's value"""
+        try:
+            with self.lock:
+                current = self.cache.get(key, 0)
+                new_value = int(current) + amount
+                self.cache[key] = new_value
+                return new_value
+        except Exception as e:
+            logger.error(f"In-memory cache INCR error: {e}")
+            return None
+    
+    def get_ttl(self, key: str) -> Optional[int]:
+        """Get remaining TTL (not directly supported by TTLCache)"""
+        # TTLCache doesn't expose per-key TTL
+        return None
+    
+    def ping(self) -> bool:
+        """Check if cache is available"""
+        return self.enabled
+    
+    def flush_db(self):
+        """Clear entire cache"""
+        with self.lock:
+            self.cache.clear()
+        return True
 
 
 class RedisCache:
@@ -48,7 +172,7 @@ class RedisCache:
             self.enabled = True
             logger.info(f"✓ Redis connected successfully at {host}:{port}")
         except (redis.ConnectionError, redis.TimeoutError) as e:
-            logger.warning(f"⚠️  Redis connection failed: {e}. Caching disabled.")
+            logger.warning(f"⚠️  Redis connection failed: {e}. Falling back to in-memory cache.")
             self.enabled = False
             self.client = None
     
@@ -287,18 +411,45 @@ class RedisCache:
 cache = None
 
 
-def init_cache(host='localhost', port=6379, db=0, password=None):
-    """Initialize global cache instance"""
+def init_cache(host='localhost', port=6379, db=0, password=None, fallback=True):
+    """
+    Initialize global cache instance with automatic fallback
+    
+    Args:
+        host: Redis host
+        port: Redis port
+        db: Redis database number
+        password: Redis password
+        fallback: Use in-memory cache if Redis fails (default: True)
+    
+    Returns:
+        Cache instance (Redis or InMemory)
+    """
     global cache
-    cache = RedisCache(host=host, port=port, db=db, password=password)
+    
+    # Try Redis first
+    redis_cache = RedisCache(host=host, port=port, db=db, password=password)
+    
+    if redis_cache.enabled:
+        cache = redis_cache
+        logger.info("✓ Using Redis cache")
+    elif fallback:
+        # Fallback to in-memory cache
+        cache = InMemoryCache(maxsize=10000, ttl=300)
+        logger.info("✓ Using in-memory cache fallback")
+    else:
+        cache = redis_cache  # Return disabled Redis cache
+        logger.warning("⚠️  No cache available")
+    
     return cache
 
 
-def get_cache() -> RedisCache:
+def get_cache() -> Union[RedisCache, InMemoryCache]:
     """Get global cache instance"""
     global cache
     if cache is None:
-        cache = init_cache()
+        # Initialize with fallback by default
+        cache = init_cache(fallback=True)
     return cache
 
 

@@ -13,7 +13,11 @@ logger.info(f"Application connecting to database: {DATABASE_URL}")
 # Create engine with optimized settings
 engine = create_engine(
     DATABASE_URL, 
-    echo=True
+    echo=True,
+    # Prevent set_session errors by disabling automatic connection characteristics
+    connect_args={
+        "options": "-c default_transaction_read_only=off"
+    }
     # Note: Don't set isolation_level here as it causes "set_session cannot be used inside a transaction" errors
 )
 
