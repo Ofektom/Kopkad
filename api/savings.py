@@ -26,6 +26,7 @@ from service.savings import (
     get_savings_metrics,
     end_savings_markings,
     confirm_bank_transfer,
+    get_monthly_summary,
 )
 from database.postgres import get_db
 from utils.auth import get_current_user
@@ -146,3 +147,10 @@ async def confirm_bank_transfer_endpoint(
     db: Session = Depends(get_db),
 ):
     return await confirm_bank_transfer(reference, current_user, db)
+
+@savings_router.get("/monthly-summary", response_model=dict)
+async def get_monthly_summary_endpoint(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return await get_monthly_summary(current_user, db)

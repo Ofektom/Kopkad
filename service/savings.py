@@ -1,5 +1,6 @@
 from fastapi import status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from models.savings import SavingsAccount, SavingsMarking, SavingsType, SavingsStatus, PaymentMethod, MarkingStatus
 from schemas.savings import (
     SavingsCreateDaily,
@@ -1381,4 +1382,54 @@ async def confirm_bank_transfer(reference: str, current_user: dict, db: Session)
         status_code=200,
         message="Bank transfer confirmed successfully",
         data=response_data
+    )
+
+async def get_monthly_summary(current_user: dict, db: Session):
+    """Get monthly summary of savings and expenses for the current month"""
+    from models.expenses import ExpenseCard, Expense
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
+    
+    # Get current month start and end dates
+    now = datetime.now()
+    month_start = datetime(now.year, now.month, 1)
+    if now.month == 12:
+        month_end = datetime(now.year + 1, 1, 1) - timedelta(seconds=1)
+    else:
+        month_end = datetime(now.year, now.month + 1, 1) - timedelta(seconds=1)
+    
+    user_id = current_user["user_id"]
+    
+    # Calculate total savings for current month (amount marked in current month)
+    total_savings_current_month = db.query(
+        func.coalesce(func.sum(SavingsMarking.amount), 0)
+    ).join(
+        SavingsAccount, SavingsMarking.savings_account_id == SavingsAccount.id
+    ).filter(
+        SavingsAccount.customer_id == user_id,
+        SavingsMarking.status == SavingsStatus.PAID,
+        SavingsMarking.marked_date >= month_start.date(),
+        SavingsMarking.marked_date <= month_end.date()
+    ).scalar() or Decimal('0')
+    
+    # Calculate total expenses for current month
+    total_expenses_current_month = db.query(
+        func.coalesce(func.sum(Expense.actual_amount), 0)
+    ).join(
+        ExpenseCard, Expense.card_id == ExpenseCard.id
+    ).filter(
+        ExpenseCard.customer_id == user_id,
+        Expense.created_at >= month_start,
+        Expense.created_at <= month_end
+    ).scalar() or Decimal('0')
+    
+    return success_response(
+        status_code=200,
+        message="Monthly summary retrieved successfully",
+        data={
+            "month": now.strftime("%B %Y"),
+            "total_savings": float(total_savings_current_month),
+            "total_expenses": float(total_expenses_current_month),
+            "net_balance": float(total_savings_current_month - total_expenses_current_month)
+        }
     )
