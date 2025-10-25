@@ -1385,7 +1385,7 @@ async def confirm_bank_transfer(reference: str, current_user: dict, db: Session)
     )
 
 async def get_monthly_summary(current_user: dict, db: Session):
-    """Get monthly summary of savings and expenses for the current month"""
+    """Get monthly summary of savings and expenses for the current month, plus all-time totals"""
     from models.expenses import ExpenseCard, Expense
     from datetime import datetime
     from dateutil.relativedelta import relativedelta
@@ -1423,13 +1423,37 @@ async def get_monthly_summary(current_user: dict, db: Session):
         Expense.created_at <= month_end
     ).scalar() or Decimal('0')
     
+    # Calculate ALL-TIME total savings (all paid markings ever)
+    total_savings_all_time = db.query(
+        func.coalesce(func.sum(SavingsMarking.amount), 0)
+    ).join(
+        SavingsAccount, SavingsMarking.savings_account_id == SavingsAccount.id
+    ).filter(
+        SavingsAccount.customer_id == user_id,
+        SavingsMarking.status == SavingsStatus.PAID
+    ).scalar() or Decimal('0')
+    
+    # Calculate ALL-TIME total expenses (all expenses ever)
+    total_expenses_all_time = db.query(
+        func.coalesce(func.sum(Expense.actual_amount), 0)
+    ).join(
+        ExpenseCard, Expense.card_id == ExpenseCard.id
+    ).filter(
+        ExpenseCard.customer_id == user_id
+    ).scalar() or Decimal('0')
+    
     return success_response(
         status_code=200,
         message="Monthly summary retrieved successfully",
         data={
             "month": now.strftime("%B %Y"),
+            # Current month totals
             "total_savings": float(total_savings_current_month),
             "total_expenses": float(total_expenses_current_month),
-            "net_balance": float(total_savings_current_month - total_expenses_current_month)
+            "net_balance": float(total_savings_current_month - total_expenses_current_month),
+            # All-time totals
+            "total_savings_all_time": float(total_savings_all_time),
+            "total_expenses_all_time": float(total_expenses_all_time),
+            "net_balance_all_time": float(total_savings_all_time - total_expenses_all_time)
         }
     )
