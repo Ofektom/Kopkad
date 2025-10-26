@@ -14,3 +14,11 @@ wheels/
 .qodo
 
 test_env.py
+
+check_enum.py
+test_all_markings.py
+test_monthly_correct.py
+test_monthly_summary.py
+test_monthly_summary_simple.py
+test_savings_totals.py
+test_simple_query.py
