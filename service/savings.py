@@ -1134,49 +1134,114 @@ async def end_savings_markings(tracking_number: str, current_user: dict, db: Ses
         }
     )
 
-async def get_savings_metrics(tracking_number: str, db: Session):
-    savings_account = db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tracking_number).first()
+async def get_savings_metrics(user_id: str, db: Session, tracking_number: str = None,):
+    logger.info(f"Fetching savings metrics for user_id: {user_id}, tracking_number: {tracking_number}")
     
-    if not savings_account:
-        return error_response(status_code=404, message="Savings account not found")
+    if tracking_number:
+        # Metrics for a specific savings account (for SavingsMarkings.jsx)
+        savings_account = db.query(SavingsAccount).filter(
+            SavingsAccount.tracking_number == tracking_number,
+            SavingsAccount.customer_id == user_id
+        ).first()
+        
+        if not savings_account:
+            logger.error(f"Savings account {tracking_number} not found for user {user_id}")
+            return error_response(status_code=404, message="Savings account not found")
 
-    markings = db.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings_account.id).all()
+        markings = db.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings_account.id).all()
 
-    if not markings:
-        return error_response(status_code=404, message="No savings schedule found for this account")
+        if not markings:
+            logger.error(f"No markings found for savings {tracking_number}")
+            return error_response(status_code=404, message="No savings schedule found for this account")
 
-    total_amount = savings_account.target_amount or sum(marking.amount for marking in markings)
-    amount_marked = sum(marking.amount for marking in markings if marking.status == SavingsStatus.PAID)
-    days_remaining = sum(1 for marking in markings if marking.status == SavingsStatus.PENDING)
-    can_extend = savings_account.marking_status != MarkingStatus.COMPLETED and date.today() <= savings_account.end_date
-    total_commission = calculate_total_commission(savings_account)
+        total_amount = savings_account.target_amount or sum(marking.amount for marking in markings)
+        amount_marked = sum(marking.amount for marking in markings if marking.status == SavingsStatus.PAID)
+        days_remaining = sum(1 for marking in markings if marking.status == SavingsStatus.PENDING)
+        can_extend = savings_account.marking_status != MarkingStatus.COMPLETED and date.today() <= savings_account.end_date
+        total_commission = calculate_total_commission(savings_account)
 
-    # Check for existing payment request
-    from models.payments import PaymentRequest, PaymentRequestStatus
-    payment_request = db.query(PaymentRequest).filter(
-        PaymentRequest.savings_account_id == savings_account.id,
-        PaymentRequest.status.in_([
-            PaymentRequestStatus.PENDING,
-            PaymentRequestStatus.APPROVED
-        ])
-    ).first()
-    
-    payment_request_status = payment_request.status.value if payment_request else None
+        # Check for existing payment request
+        from models.payments import PaymentRequest, PaymentRequestStatus
+        payment_request = db.query(PaymentRequest).filter(
+            PaymentRequest.savings_account_id == savings_account.id,
+            PaymentRequest.status.in_([
+                PaymentRequestStatus.PENDING,
+                PaymentRequestStatus.APPROVED
+            ])
+        ).first()
+        
+        payment_request_status = payment_request.status.value if payment_request else None
 
-    response_data = SavingsMetricsResponse(
-        tracking_number=tracking_number,
-        savings_account_id=savings_account.id,
-        total_amount=total_amount,
-        amount_marked=amount_marked,
-        days_remaining=days_remaining,
-        can_extend=can_extend,
-        total_commission=total_commission,
-        marking_status=savings_account.marking_status,
-        payment_request_status=payment_request_status
-    ).model_dump()
+        response_data = SavingsMetricsResponse(
+            tracking_number=tracking_number,
+            savings_account_id=savings_account.id,
+            total_amount=total_amount,
+            amount_marked=amount_marked,
+            days_remaining=days_remaining,
+            can_extend=can_extend,
+            total_commission=total_commission,
+            marking_status=savings_account.marking_status,
+            payment_request_status=payment_request_status
+        ).model_dump()
 
-    logger.info(f"Retrieved metrics for savings {tracking_number}: savings_account_id={savings_account.id}, total={total_amount}, marked={amount_marked}, days_remaining={days_remaining}, can_extend={can_extend}, total_commission={total_commission}, marking_status={savings_account.marking_status}, payment_request_status={payment_request_status}")
-    return success_response(status_code=200, message="Savings metrics retrieved successfully", data=response_data)
+        logger.info(f"Retrieved metrics for savings {tracking_number}: savings_account_id={savings_account.id}, "
+                    f"total={total_amount}, marked={amount_marked}, days_remaining={days_remaining}, "
+                    f"can_extend={can_extend}, total_commission={total_commission}, "
+                    f"marking_status={savings_account.marking_status}, payment_request_status={payment_request_status}")
+        return success_response(status_code=200, message="Savings metrics retrieved successfully", data=response_data)
+    else:
+        # Aggregated metrics for all accounts (for Savings.jsx)
+        today = datetime.now()
+        month_start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_end = month_start + relativedelta(months=1)
+        logger.info(f"Month range: {month_start.date()} to {month_end.date()}")
+
+        # Total savings (all-time): Sum of amount for PAID markings across all accounts
+        total_savings_all_time = db.query(func.coalesce(func.sum(SavingsMarking.amount), 0))\
+            .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)\
+            .filter(
+                SavingsAccount.customer_id == user_id,
+                SavingsMarking.status == SavingsStatus.PAID
+            ).scalar()
+
+        # This month savings: Sum of amount for PAID markings in the current month
+        this_month_savings = db.query(func.coalesce(func.sum(SavingsMarking.amount), 0))\
+            .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)\
+            .filter(
+                SavingsAccount.customer_id == user_id,
+                SavingsMarking.status == SavingsStatus.PAID,
+                SavingsMarking.marked_date >= month_start,
+                SavingsMarking.marked_date < month_end
+            ).scalar()
+
+        # Total savings cards: Count of all savings accounts for the user
+        total_savings_cards = db.query(SavingsAccount)\
+            .filter(SavingsAccount.customer_id == user_id)\
+            .count()
+
+        # Active cards: Count of savings accounts with marking_status != 'completed'
+        active_cards = db.query(SavingsAccount)\
+            .filter(
+                SavingsAccount.customer_id == user_id,
+                SavingsAccount.marking_status != MarkingStatus.COMPLETED
+            ).count()
+
+        logger.info(f"Aggregated metrics for user {user_id}: total_savings_all_time={total_savings_all_time}, "
+                    f"this_month_savings={this_month_savings}, total_savings_cards={total_savings_cards}, "
+                    f"active_cards={active_cards}")
+
+        response_data = {
+            "total_savings_all_time": float(total_savings_all_time or 0),
+            "this_month_savings": float(this_month_savings or 0),
+            "total_savings_cards": total_savings_cards,
+            "active_cards": active_cards
+        }
+
+        return success_response(
+            status_code=200,
+            message="Aggregated savings metrics retrieved successfully",
+            data=response_data
+        )
 
 
 async def verify_savings_payment(reference: str, db: Session):
