@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, Body
+from fastapi import APIRouter, Depends, Query, Body, HTTPException
 from typing import List
 from sqlalchemy.orm import Session
 from schemas.user import SignupRequest, LoginRequest, ChangePasswordRequest, UserResponse
@@ -13,21 +13,23 @@ from service.user import (
     change_password,
     toggle_user_status,
     delete_user,
-    logout,
+    logout,  # Assumes this function blocklists the token
 )
 from database.postgres import get_db
 from utils.auth import get_current_user, oauth2_scheme
+from models.user import User
 from typing import Optional
+import logging
 
-user_router = APIRouter(tags=["auth"], prefix="/auth")
+logger = logging.getLogger(__name__)
 
+user_router = APIRouter(tags=["auth"], prefix="/api/v1/auth")  # Updated prefix to /api/v1/auth
 
 @user_router.post("/signup", response_model=UserResponse)
 async def signup_unauthenticated_endpoint(
     request: SignupRequest, db: Session = Depends(get_db)
 ):
     return await signup_unauthenticated(request, db)
-
 
 @user_router.post("/signup-authenticated", response_model=UserResponse)
 async def signup_authenticated_endpoint(
@@ -37,18 +39,15 @@ async def signup_authenticated_endpoint(
 ):
     return await signup_authenticated(request, db, current_user)
 
-
 @user_router.post("/login", response_model=UserResponse)
 async def login_endpoint(request: LoginRequest, db: Session = Depends(get_db)):
     return await login(request, db)
-
 
 @user_router.get("/oauth/callback/{provider}", response_model=UserResponse)
 async def oauth_callback(
     provider: str, code: str, state: str, db: Session = Depends(get_db)
 ):
     return await handle_oauth_callback(provider, code, state, db)
-
 
 @user_router.post("/refresh", response_model=UserResponse)
 async def refresh_token(refresh_token: str):
@@ -59,8 +58,8 @@ async def change_user_password(
     request: ChangePasswordRequest,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
-    ):
-    """Resets a users password"""
+):
+    """Resets a user's password"""
     return await change_password(request, current_user, db)
 
 @user_router.get("/me", response_model=dict)
@@ -69,7 +68,6 @@ async def get_current_user_info(
     current_user: dict = Depends(get_current_user)
 ):
     """Get the current authenticated user's information."""
-    from models.user import User
     from models.business import Business
     
     user = db.query(User).filter(User.id == current_user["user_id"]).first()
@@ -180,5 +178,38 @@ async def logout_endpoint(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Logout the current user by blocklisting their access token."""
-    return await logout(token, db, current_user)
+    """
+    Logout user by blocklisting their access token and incrementing token_version.
+    This invalidates all existing JWT tokens for the user.
+    """
+    try:
+        user_id = current_user["user_id"]
+        
+        # Get user from database
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            logger.warning(f"Logout attempt for non-existent user ID: {user_id}")
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Increment token_version to invalidate all tokens
+        user.token_version += 1
+        db.commit()
+        
+        # Blocklist the current access token
+        await logout(token, db, current_user)
+        
+        logger.info(f"User {user.username} (ID: {user_id}) logged out successfully. Token version: {user.token_version}")
+        
+        return {
+            "success": True,
+            "message": "Logged out successfully. All active sessions have been terminated.",
+            "data": {
+                "user_id": user_id,
+                "username": user.username
+            }
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error during logout for user {current_user.get('user_id')}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Logout failed: {str(e)}")
