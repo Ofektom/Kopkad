@@ -842,6 +842,8 @@ async def delete_user(user_id: int, current_user: dict, db: Session):
             message=f"Failed to delete user: {str(e)}"
         )
 
+
+
 # service/user.py
 async def logout(token: str, db: Session, current_user: dict):
     """Logout user by incrementing token_version."""
@@ -855,7 +857,10 @@ async def logout(token: str, db: Session, current_user: dict):
         return success_response(
             status_code=200,
             message="Logged out successfully",
-            data={}
+            data={
+                "user_id": user.id,
+                "username": user.username
+            }
         )
     except Exception as e:
         db.rollback()
