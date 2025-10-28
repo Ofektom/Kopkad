@@ -10,7 +10,7 @@ from sqlalchemy import (
     JSON,
 )
 from sqlalchemy.orm import relationship
-from database.postgres import Base
+from database.postgres_optimized import Base
 from models.audit import AuditMixin
 from enum import Enum as PyEnum
 

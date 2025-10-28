@@ -2,7 +2,7 @@ import logging
 from sqlalchemy import select, insert, update, text
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
-from database.postgres import SessionLocal
+from database.postgres_optimized import SessionLocal
 from database import get_db_models
 
 # Configure logging

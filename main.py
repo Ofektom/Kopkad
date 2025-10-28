@@ -157,7 +157,7 @@ async def on_startup():
         logger.info("Starting SUPER_ADMIN bootstrap process...")
         try:
             # Create a fresh session outside any transaction context
-            from database.postgres import SessionLocal
+            from database.postgres_optimized import SessionLocal
             db = SessionLocal()
             try:
                 bootstrap_super_admin(db)

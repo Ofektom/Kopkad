@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 import bcrypt
 import hashlib
 from config.settings import settings
-from database.postgres import get_db
+from database.postgres_optimized import get_db
 from models.user import User
 from utils.cache import get_cache, CacheKeys
 import logging

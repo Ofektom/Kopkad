@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, Table, ForeignKey, DateTime, Boo
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.schema import UniqueConstraint
-from database.postgres import Base
+from database.postgres_optimized import Base
 from models.audit import AuditMixin
 
 user_units = Table(

@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, Enum, ForeignKey
 from sqlalchemy.orm import relationship
-from database.postgres import Base
+from database.postgres_optimized import Base
 from models.audit import AuditMixin
 
 

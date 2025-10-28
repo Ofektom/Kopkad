@@ -8,7 +8,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 from config.settings import settings
-from database.postgres import Base
+from database.postgres_optimized import Base
 from models.user import User
 from models.user_business import user_business
 from models.business import Business, Unit, PendingBusinessRequest

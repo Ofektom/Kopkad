@@ -29,7 +29,7 @@ from service.business import (
     get_business_unit_summary,
     get_user_units,
 )
-from database.postgres import get_db
+from database.postgres_optimized import get_db
 from utils.auth import get_current_user
 from typing import Optional, List
 from datetime import date

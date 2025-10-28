@@ -23,7 +23,7 @@ from service.financial_advisor import (
     generate_personalized_advice, suggest_category_optimizations,
     recommend_savings_opportunities
 )
-from database.postgres import get_db
+from database.postgres_optimized import get_db
 from utils.auth import get_current_user
 from utils.response import success_response, error_response
 import logging

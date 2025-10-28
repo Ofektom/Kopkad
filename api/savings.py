@@ -28,7 +28,7 @@ from service.savings import (
     confirm_bank_transfer,
     get_monthly_summary,
 )
-from database.postgres import get_db
+from database.postgres_optimized import get_db
 from utils.auth import get_current_user
 from typing import List
 

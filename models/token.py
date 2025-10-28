@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime
 from datetime import datetime, timezone
-from database.postgres import Base
+from database.postgres_optimized import Base
 
 class TokenBlocklist(Base):
     __tablename__ = "token_blocklist"

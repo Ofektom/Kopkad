@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, Enum, Table, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import select
-from database.postgres import Base
+from database.postgres_optimized import Base
 from models.audit import AuditMixin
 from models.user_business import user_business
 

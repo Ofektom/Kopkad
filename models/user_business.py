@@ -1,5 +1,5 @@
 from sqlalchemy import Table, Column, Integer, ForeignKey
-from database.postgres import Base
+from database.postgres_optimized import Base
 
 user_business = Table(
     "user_business",

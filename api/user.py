@@ -15,7 +15,7 @@ from service.user import (
     delete_user,
     logout,
 )
-from database.postgres import get_db
+from database.postgres_optimized import get_db
 from utils.auth import get_current_user, oauth2_scheme
 from typing import Optional
 

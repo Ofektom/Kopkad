@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, Enum, DateTime
 from sqlalchemy.orm import relationship
-from database.postgres import Base
+from database.postgres_optimized import Base
 from models.audit import AuditMixin
 from enum import Enum as PyEnum
 from datetime import datetime, timezone

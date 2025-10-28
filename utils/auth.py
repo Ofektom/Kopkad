@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 import bcrypt
 from config.settings import settings
-from database.postgres import get_db
+from database.postgres_optimized import get_db
 from models.user import User
 import logging
 

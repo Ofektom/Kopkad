@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Request, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import insert
-from database.postgres import get_db
+from database.postgres_optimized import get_db
 import hmac
 import hashlib
 from config.settings import settings

@@ -37,14 +37,9 @@ engine = create_engine(
         'keepalives_idle': 30,  # Seconds before starting keepalives
         'keepalives_interval': 10,  # Seconds between keepalive probes
         'keepalives_count': 5,  # Number of keepalives before closing
-    },
-    
-    # Execution options for better query performance
-    execution_options={
-        'isolation_level': 'READ COMMITTED',  # Faster than SERIALIZABLE
-        'postgresql_readonly': False,
-        'postgresql_deferrable': False,
     }
+    
+    # Note: execution_options removed to prevent "set_session cannot be used inside a transaction" errors
 )
 
 # Configure session maker with optimized settings

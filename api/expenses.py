@@ -40,7 +40,7 @@ from service.expenses import (
     complete_planned_item,
     get_planner_progress,
 )
-from database.postgres import get_db
+from database.postgres_optimized import get_db
 from utils.auth import get_current_user
 from typing import Optional
 from datetime import date

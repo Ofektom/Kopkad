@@ -1,7 +1,7 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
-from database.postgres import get_db
+from database.postgres_optimized import get_db
 from service.proactive_advisor import (
     check_overspending_alerts,
     check_goal_progress,

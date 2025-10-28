@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from schemas.settings import SettingsUpdate, SettingsResponse
-from database.postgres import get_db
+from database.postgres_optimized import get_db
 from utils.auth import get_current_user
 from models.settings import Settings
 

@@ -33,7 +33,7 @@ from service.payments import (
     get_customer_payments,
     get_payment_accounts,
 )
-from database.postgres import get_db
+from database.postgres_optimized import get_db
 from utils.auth import get_current_user
 from typing import Optional
 
