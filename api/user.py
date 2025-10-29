@@ -14,6 +14,7 @@ from service.user import (
     toggle_user_status,
     delete_user,
     logout,
+    switch_business,
 )
 from database.postgres_optimized import get_db
 from utils.auth import get_current_user, oauth2_scheme
@@ -53,6 +54,15 @@ async def oauth_callback(
 @user_router.post("/refresh", response_model=UserResponse)
 async def refresh_token(refresh_token: str):
     return await get_refresh_token(refresh_token)
+
+@user_router.post("/switch-business", response_model=UserResponse)
+async def switch_business_endpoint(
+    business_id: int = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Switch user's active business context and get new token"""
+    return await switch_business(business_id, current_user, db)
 
 @user_router.post("/change_password", response_model=UserResponse)
 async def change_user_password(

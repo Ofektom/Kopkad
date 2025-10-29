@@ -417,8 +417,19 @@ async def login(request: LoginRequest, db: Session):
         for business in businesses
     ] if businesses else []
 
+    # Set default active business (user's saved preference or first business)
+    active_business_id = None
+    if businesses:
+        active_business_id = user.active_business_id if user.active_business_id else businesses[0].id
+        # Update user's active business if not set
+        if not user.active_business_id:
+            user.active_business_id = active_business_id
+            db.commit()
+
     access_token = create_access_token(
-        data={"sub": user.username, "role": user.role, "user_id": user.id}, db=db
+        data={"sub": user.username, "role": user.role, "user_id": user.id}, 
+        db=db,
+        active_business_id=active_business_id
     )
     user_response = UserResponse(
         user_id=user.id,
@@ -428,6 +439,7 @@ async def login(request: LoginRequest, db: Session):
         role=user.role,
         is_active=user.is_active,
         businesses=business_responses,
+        active_business_id=active_business_id,
         created_at=user.created_at,
         access_token=access_token,
         next_action="choose_action",
@@ -869,3 +881,71 @@ async def logout(token: str, db: Session, current_user: dict):
             status_code=500,
             message=f"Failed to logout: {str(e)}"
         )
+
+
+async def switch_business(business_id: int, current_user: dict, db: Session):
+    """Switch user's active business and return new token."""
+    try:
+        user = db.query(User).filter(User.id == current_user["user_id"]).first()
+        if not user:
+            return error_response(status_code=404, message="User not found")
+        
+        # Verify business belongs to user
+        user_business_ids = [b.id for b in user.businesses]
+        if business_id not in user_business_ids:
+            return error_response(
+                status_code=403,
+                message="You do not have access to this business"
+            )
+        
+        # Update user's active business
+        user.active_business_id = business_id
+        db.commit()
+        
+        logger.info(f"User {user.id} switched to business {business_id}")
+        
+        # Fetch businesses for response
+        businesses = (
+            db.query(Business)
+            .options(joinedload(Business.units))
+            .join(user_business, Business.id == user_business.c.business_id)
+            .filter(user_business.c.user_id == user.id)
+            .all()
+        )
+        
+        business_responses = [
+            BusinessResponse.model_validate(business, from_attributes=True)
+            for business in businesses
+        ]
+        
+        # Create new token with updated active_business_id
+        access_token = create_access_token(
+            data={"sub": user.username, "role": user.role, "user_id": user.id},
+            db=db,
+            active_business_id=business_id
+        )
+        
+        user_response = UserResponse(
+            user_id=user.id,
+            full_name=user.full_name,
+            phone_number=user.phone_number,
+            email=user.email,
+            role=user.role,
+            is_active=user.is_active,
+            businesses=business_responses,
+            active_business_id=business_id,
+            created_at=user.created_at,
+            access_token=access_token,
+            next_action="choose_action",
+            address=None
+        )
+        
+        return success_response(
+            status_code=200,
+            message="Business switched successfully",
+            data=user_response.model_dump()
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Switch business error: {str(e)}")
+        return error_response(status_code=500, message=f"Failed to switch business: {str(e)}")

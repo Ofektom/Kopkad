@@ -72,9 +72,11 @@ class User(AuditMixin, Base):
     )
     is_active = Column(Boolean, default=True, nullable=True)
     token_version = Column(Integer, nullable=False, default=1)
+    active_business_id = Column(Integer, ForeignKey("businesses.id"), nullable=True)
     businesses = relationship(
         "Business", secondary=user_business, back_populates="users"
     )
+    active_business = relationship("Business", foreign_keys=[active_business_id])
     settings = relationship(
         "Settings",
         uselist=False,

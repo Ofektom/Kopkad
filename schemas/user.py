@@ -21,6 +21,7 @@ class UserResponse(BaseModel):
     role: str
     is_active: bool
     businesses: List[BusinessResponse] = []
+    active_business_id: Optional[int] = None
     created_at: datetime
     access_token: Optional[str] = None
     next_action: Optional[str] = None

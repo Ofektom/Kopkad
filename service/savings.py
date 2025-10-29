@@ -596,45 +596,89 @@ async def get_all_savings(
     current_user: dict, 
     db: Session
 ):
+    """
+    Get all savings accounts with flexible business filtering.
+    
+    Business selection logic:
+    1. If business_id provided → use it (with validation)
+    2. Else use active_business_id from current_user
+    3. Super admin with no business_id → show all businesses
+    """
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not current_user_obj:
         return error_response(status_code=404, message="User not found")
     
     query = db.query(SavingsAccount)
+    target_business_id = None
 
     if current_user["role"] == "customer":
         if customer_id and customer_id != current_user["user_id"]:
             return error_response(status_code=403, message="Customers can only view their own savings")
         query = query.filter(SavingsAccount.customer_id == current_user["user_id"])
+        
+        # Customers: use explicit business_id or active_business_id or all their businesses
+        if business_id:
+            user_business_ids = [b.id for b in current_user_obj.businesses]
+            if business_id not in user_business_ids:
+                return error_response(status_code=403, message="You don't have access to this business")
+            target_business_id = business_id
+            query = query.filter(SavingsAccount.business_id == target_business_id)
+        elif current_user.get("active_business_id"):
+            target_business_id = current_user["active_business_id"]
+            query = query.filter(SavingsAccount.business_id == target_business_id)
+        # else: show savings from all their businesses
+        
     elif current_user["role"] in ["agent", "sub_agent"]:
-        business_ids = [b.id for b in current_user_obj.businesses]
-        if not business_ids:
+        user_business_ids = [b.id for b in current_user_obj.businesses]
+        if not user_business_ids:
             return error_response(status_code=400, message="No business associated with user")
-        if business_id and business_id not in business_ids:
-            return error_response(status_code=403, message="Access restricted to your business")
-        query = query.filter(SavingsAccount.business_id.in_(business_ids))
+        
+        # Determine target business
+        if business_id:
+            if business_id not in user_business_ids:
+                return error_response(status_code=403, message="You don't have access to this business")
+            target_business_id = business_id
+        elif current_user.get("active_business_id"):
+            target_business_id = current_user["active_business_id"]
+        else:
+            return error_response(status_code=400, message="Please specify a business_id or set an active business")
+        
+        query = query.filter(SavingsAccount.business_id == target_business_id)
+        
         if unit_id:
-            unit_exists = db.query(exists().where(Unit.id == unit_id).where(Unit.business_id.in_(business_ids))).scalar()
+            unit_exists = db.query(exists().where(Unit.id == unit_id).where(Unit.business_id == target_business_id)).scalar()
             if not unit_exists:
-                return error_response(status_code=400, message=f"Unit {unit_id} not found in your businesses")
+                return error_response(status_code=400, message=f"Unit {unit_id} not found in business {target_business_id}")
             query = query.filter(SavingsAccount.unit_id == unit_id)
+            
     elif current_user["role"] == "admin":
-        if not business_id:
-            return error_response(status_code=400, message="Business ID is required for admin role")
-        unit_exists = db.query(exists().where(Unit.business_id == business_id)).scalar()
-        if not unit_exists:
-            return error_response(status_code=400, message=f"Business {business_id} not found")
-        query = query.filter(SavingsAccount.business_id == business_id)
+        target_business_id = business_id or current_user.get("active_business_id")
+        if not target_business_id:
+            return error_response(status_code=400, message="Please specify a business_id parameter")
+        
+        query = query.filter(SavingsAccount.business_id == target_business_id)
+        
         if unit_id:
-            unit_exists = db.query(exists().where(Unit.id == unit_id).where(Unit.business_id == business_id)).scalar()
+            unit_exists = db.query(exists().where(Unit.id == unit_id).where(Unit.business_id == target_business_id)).scalar()
             if not unit_exists:
-                return error_response(status_code=400, message=f"Unit {unit_id} not found in business {business_id}")
+                return error_response(status_code=400, message=f"Unit {unit_id} not found in business {target_business_id}")
             query = query.filter(SavingsAccount.unit_id == unit_id)
-    elif current_user["role"] != "super_admin":
+            
+    elif current_user["role"] == "super_admin":
+        # Super admin can query specific business or all businesses
+        if business_id:
+            business_exists = db.query(exists().where(Business.id == business_id)).scalar()
+            if not business_exists:
+                return error_response(status_code=404, message=f"Business {business_id} not found")
+            query = query.filter(SavingsAccount.business_id == business_id)
+            target_business_id = business_id
+        elif current_user.get("active_business_id"):
+            query = query.filter(SavingsAccount.business_id == current_user["active_business_id"])
+            target_business_id = current_user["active_business_id"]
+        # else: no filter - super admin sees all businesses
+        
+    else:
         return error_response(status_code=401, message="Unauthorized role")
-
-    if business_id:
-        query = query.filter(SavingsAccount.business_id == business_id)
 
     if customer_id and current_user["role"] != "customer":
         customer = db.query(User).filter(User.id == customer_id, User.role == "customer").first()

@@ -23,8 +23,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         plain_password.encode("utf-8"), hashed_password.encode("utf-8")
     )
 
-def create_access_token(data: dict, db: Session) -> str:
-    """Create a JWT access token with token_version."""
+def create_access_token(data: dict, db: Session, active_business_id: int = None) -> str:
+    """Create a JWT access token with token_version and active_business_id."""
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.ACCESS_TOKEN_EXPIRES_IN
@@ -33,14 +33,15 @@ def create_access_token(data: dict, db: Session) -> str:
     to_encode.update({
         "exp": expire,
         "user_id": data.get("user_id", 1),
-        "version": user.token_version if user else 1
+        "version": user.token_version if user else 1,
+        "active_business_id": active_business_id
     })
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
 ):
-    """Retrieve the current user from a JWT token, checking token_version."""
+    """Retrieve the current user from a JWT token, checking token_version and active_business_id."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -54,6 +55,7 @@ async def get_current_user(
         role: str = payload.get("role")
         user_id: int = payload.get("user_id")
         version: int = payload.get("version")
+        active_business_id: int = payload.get("active_business_id")
         if username is None or role is None or user_id is None or version is None:
             raise credentials_exception
     except JWTError:
@@ -64,11 +66,20 @@ async def get_current_user(
         raise credentials_exception
 
     business_ids = [b.id for b in user.businesses]
+    
+    # Validate that active_business_id belongs to user (if provided)
+    if active_business_id and active_business_id not in business_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Active business does not belong to user"
+        )
+    
     return {
         "user_id": user.id,
         "username": username,
         "role": role,
         "business_ids": business_ids,
+        "active_business_id": active_business_id,
     }
 
 def refresh_access_token(token: str):
