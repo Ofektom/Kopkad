@@ -104,10 +104,11 @@ async def get_savings_markings(
 @savings_router.get("/metrics", response_model=dict)
 async def get_savings_metrics_endpoint(
     tracking_number: str = Query(None, description="Optional tracking number for specific savings account metrics"),
+    business_id: int = Query(None, description="Optional business ID filter"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return await get_savings_metrics(current_user["user_id"], db, tracking_number)
+    return await get_savings_metrics(current_user["user_id"], db, tracking_number, business_id)
 
 @savings_router.post("/mark/{tracking_number}", response_model=dict)
 async def mark_savings(
@@ -148,3 +149,12 @@ async def confirm_bank_transfer_endpoint(
     db: Session = Depends(get_db),
 ):
     return await confirm_bank_transfer(reference, current_user, db)
+
+@savings_router.get("/monthly-summary", response_model=dict)
+async def get_monthly_summary_endpoint(
+    business_id: int = Query(None, description="Optional business ID filter"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get monthly summary of savings and expenses for the current month, plus all-time totals"""
+    return await get_monthly_summary(current_user, db)

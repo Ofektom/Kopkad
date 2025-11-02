@@ -29,6 +29,7 @@ class ExpenseCard(AuditMixin, Base):
     __tablename__ = "expense_cards"
     id = Column(Integer, primary_key=True)
     customer_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=False)
+    business_id = Column(Integer, ForeignKey("businesses.id"), nullable=False)
     name = Column(String(100), nullable=False)
     income_type = Column(Enum(IncomeType, name="income_type"), nullable=False)
     income_amount = Column(Numeric(10, 2), nullable=False, default=0.00)

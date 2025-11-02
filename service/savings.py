@@ -1178,8 +1178,8 @@ async def end_savings_markings(tracking_number: str, current_user: dict, db: Ses
         }
     )
 
-async def get_savings_metrics(user_id: str, db: Session, tracking_number: str = None,):
-    logger.info(f"Fetching savings metrics for user_id: {user_id}, tracking_number: {tracking_number}")
+async def get_savings_metrics(user_id: str, db: Session, tracking_number: str = None, business_id: int = None):
+    logger.info(f"Fetching savings metrics for user_id: {user_id}, tracking_number: {tracking_number}, business_id: {business_id}")
     
     if tracking_number:
         # Metrics for a specific savings account (for SavingsMarkings.jsx)
@@ -1234,47 +1234,74 @@ async def get_savings_metrics(user_id: str, db: Session, tracking_number: str = 
                     f"marking_status={savings_account.marking_status}, payment_request_status={payment_request_status}")
         return success_response(status_code=200, message="Savings metrics retrieved successfully", data=response_data)
     else:
-        # Aggregated metrics for all accounts (for Savings.jsx)
+        # Aggregated metrics for all accounts (for Savings.jsx and Dashboard)
+        from models.user import User
+        
+        # Get user to determine active_business_id if not provided
+        user = db.query(User).filter(User.id == user_id).first()
+        target_business_id = business_id or (user.active_business_id if user else None)
+        
         today = datetime.now()
         month_start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         month_end = month_start + relativedelta(months=1)
-        logger.info(f"Month range: {month_start.date()} to {month_end.date()}")
+        logger.info(f"Month range: {month_start.date()} to {month_end.date()}, business_id: {target_business_id}")
 
         # Total savings (all-time): Sum of amount for PAID markings across all accounts
-        total_savings_all_time = db.query(func.coalesce(func.sum(SavingsMarking.amount), 0))\
+        total_savings_query = db.query(func.coalesce(func.sum(SavingsMarking.amount), 0))\
             .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)\
             .filter(
                 SavingsAccount.customer_id == user_id,
                 SavingsMarking.status == SavingsStatus.PAID
-            ).scalar()
+            )
+        
+        if target_business_id:
+            total_savings_query = total_savings_query.filter(SavingsAccount.business_id == target_business_id)
+        
+        total_savings_all_time = total_savings_query.scalar()
 
         # This month savings: Sum of amount for PAID markings in the current month
-        this_month_savings = db.query(func.coalesce(func.sum(SavingsMarking.amount), 0))\
+        this_month_query = db.query(func.coalesce(func.sum(SavingsMarking.amount), 0))\
             .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)\
             .filter(
                 SavingsAccount.customer_id == user_id,
                 SavingsMarking.status == SavingsStatus.PAID,
                 SavingsMarking.marked_date >= month_start,
                 SavingsMarking.marked_date < month_end
-            ).scalar()
+            )
+        
+        if target_business_id:
+            this_month_query = this_month_query.filter(SavingsAccount.business_id == target_business_id)
+        
+        this_month_savings = this_month_query.scalar()
 
         # Total savings cards: Count of all savings accounts for the user
-        total_savings_cards = db.query(SavingsAccount)\
-            .filter(SavingsAccount.customer_id == user_id)\
-            .count()
+        total_cards_query = db.query(SavingsAccount)\
+            .filter(SavingsAccount.customer_id == user_id)
+        
+        if target_business_id:
+            total_cards_query = total_cards_query.filter(SavingsAccount.business_id == target_business_id)
+        
+        total_savings_cards = total_cards_query.count()
 
         # Active cards: Count of savings accounts with marking_status != 'completed'
-        active_cards = db.query(SavingsAccount)\
+        active_cards_query = db.query(SavingsAccount)\
             .filter(
                 SavingsAccount.customer_id == user_id,
                 SavingsAccount.marking_status != MarkingStatus.COMPLETED
-            ).count()
+            )
+        
+        if target_business_id:
+            active_cards_query = active_cards_query.filter(SavingsAccount.business_id == target_business_id)
+        
+        active_cards = active_cards_query.count()
 
-        logger.info(f"Aggregated metrics for user {user_id}: total_savings_all_time={total_savings_all_time}, "
+        logger.info(f"Aggregated metrics for user {user_id}, business {target_business_id}: "
+                    f"total_savings_all_time={total_savings_all_time}, "
                     f"this_month_savings={this_month_savings}, total_savings_cards={total_savings_cards}, "
                     f"active_cards={active_cards}")
 
         response_data = {
+            "business_id": target_business_id,
             "total_savings_all_time": float(total_savings_all_time or 0),
             "this_month_savings": float(this_month_savings or 0),
             "total_savings_cards": total_savings_cards,

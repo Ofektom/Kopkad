@@ -39,6 +39,7 @@ from service.expenses import (
     activate_planner_card,
     complete_planned_item,
     get_planner_progress,
+    get_expense_metrics,
 )
 from database.postgres_optimized import get_db
 from utils.auth import get_current_user
@@ -108,6 +109,15 @@ async def delete_expense_card_endpoint(
     db: Session = Depends(get_db),
 ):
     return await delete_expense_card(card_id, current_user, db)
+
+@expenses_router.get("/metrics", response_model=dict)
+async def get_expense_metrics_endpoint(
+    business_id: int = Query(None, description="Optional business ID filter"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get aggregated expense metrics for dashboard and Expenses page"""
+    return await get_expense_metrics(current_user, db, business_id)
 
 @expenses_router.get("/stats", response_model=ExpenseStatsResponse)
 async def get_expense_stats_endpoint(

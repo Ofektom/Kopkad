@@ -948,6 +948,80 @@ async def complete_planned_item(expense_id: int, actual_amount: Decimal | None, 
     
     return ExpenseResponse.from_orm(expense)
 
+async def get_expense_metrics(current_user: dict, db: Session, business_id: int = None):
+    """Get aggregated expense metrics for dashboard and Expenses page"""
+    from models.user import User
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
+    
+    user_id = current_user["user_id"]
+    
+    # Get user to determine active_business_id if not provided
+    user = db.query(User).filter(User.id == user_id).first()
+    target_business_id = business_id or (user.active_business_id if user else None)
+    
+    today = datetime.now()
+    month_start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_end = month_start + relativedelta(months=1)
+    
+    # Base query for expense cards with business filter
+    cards_query = db.query(ExpenseCard).filter(ExpenseCard.customer_id == user_id)
+    if target_business_id:
+        cards_query = cards_query.filter(ExpenseCard.business_id == target_business_id)
+    
+    cards = cards_query.all()
+    
+    # Total income from all cards
+    total_income = sum(card.income_amount for card in cards) if cards else Decimal(0)
+    
+    # Total expenses (all-time)
+    expenses_all_time_query = db.query(func.coalesce(func.sum(Expense.actual_amount), 0))\
+        .join(ExpenseCard, Expense.card_id == ExpenseCard.id)\
+        .filter(ExpenseCard.customer_id == user_id)
+    
+    if target_business_id:
+        expenses_all_time_query = expenses_all_time_query.filter(ExpenseCard.business_id == target_business_id)
+    
+    total_expenses_all_time = expenses_all_time_query.scalar() or Decimal(0)
+    
+    # This month expenses
+    expenses_this_month_query = db.query(func.coalesce(func.sum(Expense.actual_amount), 0))\
+        .join(ExpenseCard, Expense.card_id == ExpenseCard.id)\
+        .filter(
+            ExpenseCard.customer_id == user_id,
+            Expense.created_at >= month_start,
+            Expense.created_at < month_end
+        )
+    
+    if target_business_id:
+        expenses_this_month_query = expenses_this_month_query.filter(ExpenseCard.business_id == target_business_id)
+    
+    this_month_expenses = expenses_this_month_query.scalar() or Decimal(0)
+    
+    # Total expense cards
+    total_expense_cards = len(cards)
+    
+    # Active cards
+    active_cards = sum(1 for card in cards if card.status == CardStatus.ACTIVE)
+    
+    logger.info(f"Aggregated expense metrics for user {user_id}, business {target_business_id}: "
+                f"total_expenses_all_time={total_expenses_all_time}, "
+                f"this_month_expenses={this_month_expenses}, total_expense_cards={total_expense_cards}, "
+                f"active_cards={active_cards}")
+    
+    return success_response(
+        status_code=200,
+        message="Expense metrics retrieved successfully",
+        data={
+            "business_id": target_business_id,
+            "total_expenses_all_time": float(total_expenses_all_time),
+            "this_month_expenses": float(this_month_expenses),
+            "total_expense_cards": total_expense_cards,
+            "active_cards": active_cards,
+            "total_income": float(total_income)
+        }
+    )
+
 async def get_planner_progress(card_id: int, current_user: dict, db: Session):
     """
     Get progress tracking for a planner card - planned vs actual
