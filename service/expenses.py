@@ -34,6 +34,11 @@ async def create_expense_card(request: ExpenseCardCreate, current_user: dict, db
     if not current_user_obj:
         return error_response(status_code=404, message="User not found")
 
+    # Determine business_id - use request or user's active_business_id
+    target_business_id = request.business_id or current_user_obj.active_business_id
+    if not target_business_id:
+        return error_response(status_code=400, message="No business context available. Please ensure you belong to a business.")
+
     income_amount = Decimal(0)
     balance = Decimal(0)
 
@@ -82,6 +87,7 @@ async def create_expense_card(request: ExpenseCardCreate, current_user: dict, db
 
     expense_card = ExpenseCard(
         customer_id=current_user["user_id"],
+        business_id=target_business_id,
         name=request.name,
         income_type=request.income_type,
         income_amount=income_amount,
@@ -776,6 +782,15 @@ async def create_planner_card(name: str, capital: Decimal, planned_expenses: lis
     from schemas.expenses import PlannerCardResponse, ExpenseCardResponse
     from models.expenses import CardStatus, IncomeType
     
+    # Get user's active_business_id
+    user = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not user:
+        return error_response(status_code=404, message="User not found")
+    
+    business_id = user.active_business_id
+    if not business_id:
+        return error_response(status_code=400, message="No business context available. Please ensure you belong to a business.")
+    
     # Calculate totals
     total_planned = sum(exp['amount'] for exp in planned_expenses)
     remaining_balance = capital - total_planned
@@ -790,6 +805,7 @@ async def create_planner_card(name: str, capital: Decimal, planned_expenses: lis
     # Create expense card as DRAFT/PLANNER
     expense_card = ExpenseCard(
         customer_id=current_user["user_id"],
+        business_id=business_id,
         name=name,
         income_type=IncomeType.PLANNER,
         income_amount=capital,

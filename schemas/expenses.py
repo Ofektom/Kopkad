@@ -7,6 +7,7 @@ from models.expenses import IncomeType, ExpenseCategory, CardStatus
 class ExpenseCardCreate(BaseModel):
     name: str
     income_type: IncomeType
+    business_id: Optional[int] = None  # Optional - backend will use active_business_id if not provided
     savings_id: Optional[int] = None
     initial_income: Optional[Decimal] = None
     income_details: Optional[str] = None
@@ -26,6 +27,7 @@ class ExpenseCardCreate(BaseModel):
 class ExpenseCardResponse(BaseModel):
     id: int
     customer_id: int
+    business_id: int
     name: str
     income_type: IncomeType
     income_amount: Decimal
