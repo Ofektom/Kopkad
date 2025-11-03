@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from models.expenses import ExpenseCard, Expense, IncomeType, ExpenseCategory
+from models.expenses import ExpenseCard, Expense, IncomeType, ExpenseCategory, CardStatus
 from models.savings import SavingsAccount, SavingsMarking, SavingsStatus, MarkingStatus
 from schemas.expenses import (
     ExpenseCardCreate,
