@@ -1550,9 +1550,9 @@ async def get_monthly_summary(current_user: dict, db: Session):
     
     # Calculate total expenses for current month
     total_expenses_current_month = db.query(
-        func.coalesce(func.sum(Expense.actual_amount), 0)
+        func.coalesce(func.sum(Expense.amount), 0)
     ).join(
-        ExpenseCard, Expense.card_id == ExpenseCard.id
+        ExpenseCard, Expense.expense_card_id == ExpenseCard.id
     ).filter(
         ExpenseCard.customer_id == user_id,
         Expense.created_at >= month_start,
@@ -1571,9 +1571,9 @@ async def get_monthly_summary(current_user: dict, db: Session):
     
     # Calculate ALL-TIME total expenses (all expenses ever)
     total_expenses_all_time = db.query(
-        func.coalesce(func.sum(Expense.actual_amount), 0)
+        func.coalesce(func.sum(Expense.amount), 0)
     ).join(
-        ExpenseCard, Expense.card_id == ExpenseCard.id
+        ExpenseCard, Expense.expense_card_id == ExpenseCard.id
     ).filter(
         ExpenseCard.customer_id == user_id
     ).scalar() or Decimal('0')

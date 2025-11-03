@@ -991,8 +991,8 @@ async def get_expense_metrics(current_user: dict, db: Session, business_id: int 
     total_income = sum(card.income_amount for card in cards) if cards else Decimal(0)
     
     # Total expenses (all-time)
-    expenses_all_time_query = db.query(func.coalesce(func.sum(Expense.actual_amount), 0))\
-        .join(ExpenseCard, Expense.card_id == ExpenseCard.id)\
+    expenses_all_time_query = db.query(func.coalesce(func.sum(Expense.amount), 0))\
+        .join(ExpenseCard, Expense.expense_card_id == ExpenseCard.id)\
         .filter(ExpenseCard.customer_id == user_id)
     
     if target_business_id:
@@ -1001,8 +1001,8 @@ async def get_expense_metrics(current_user: dict, db: Session, business_id: int 
     total_expenses_all_time = expenses_all_time_query.scalar() or Decimal(0)
     
     # This month expenses
-    expenses_this_month_query = db.query(func.coalesce(func.sum(Expense.actual_amount), 0))\
-        .join(ExpenseCard, Expense.card_id == ExpenseCard.id)\
+    expenses_this_month_query = db.query(func.coalesce(func.sum(Expense.amount), 0))\
+        .join(ExpenseCard, Expense.expense_card_id == ExpenseCard.id)\
         .filter(
             ExpenseCard.customer_id == user_id,
             Expense.created_at >= month_start,

@@ -1,0 +1,226 @@
+{
+  "test_scenarios": {
+    "1_salary_card": {
+      "description": "Create expense card with salary income",
+      "endpoint": "POST /api/v1/expenses/card",
+      "payload": {
+        "name": "November Salary Card",
+        "income_type": "SALARY",
+        "initial_income": 150000.00
+      },
+      "expected_status": 200
+    },
+    "2_business_card": {
+      "description": "Create expense card with business income",
+      "endpoint": "POST /api/v1/expenses/card",
+      "payload": {
+        "name": "Business Revenue - November",
+        "income_type": "BUSINESS",
+        "initial_income": 500000.00
+      },
+      "expected_status": 200
+    },
+    "3_borrowed_card": {
+      "description": "Create expense card with borrowed funds",
+      "endpoint": "POST /api/v1/expenses/card",
+      "payload": {
+        "name": "Loan for Business Expansion",
+        "income_type": "BORROWED",
+        "initial_income": 200000.00
+      },
+      "expected_status": 200
+    },
+    "4_other_income_card": {
+      "description": "Create expense card with other income type (requires income_details)",
+      "endpoint": "POST /api/v1/expenses/card",
+      "payload": {
+        "name": "Freelance Project Income",
+        "income_type": "OTHER",
+        "initial_income": 75000.00,
+        "income_details": "Web development project for Client XYZ"
+      },
+      "expected_status": 200
+    },
+    "5_savings_card": {
+      "description": "Create expense card from completed savings (requires savings_id)",
+      "endpoint": "POST /api/v1/expenses/card",
+      "payload": {
+        "name": "Expense Card from Savings Payout",
+        "income_type": "SAVINGS",
+        "savings_id": "<GET_FROM_ELIGIBLE_SAVINGS_ENDPOINT>"
+      },
+      "expected_status": 200,
+      "notes": "First call GET /api/v1/expenses/eligible-savings to get a valid savings_id"
+    },
+    "6_planner_card": {
+      "description": "Create planner card with budget and planned expenses",
+      "endpoint": "POST /api/v1/expenses/planner/create",
+      "payload": {
+        "name": "December Budget Plan",
+        "capital": 250000.00,
+        "planned_expenses": [
+          {
+            "category": "RENT",
+            "amount": 80000.00,
+            "purpose": "Monthly apartment rent"
+          },
+          {
+            "category": "FOOD",
+            "amount": 50000.00,
+            "purpose": "Groceries and meal prep"
+          },
+          {
+            "category": "TRANSPORT",
+            "amount": 30000.00,
+            "purpose": "Fuel and transportation"
+          },
+          {
+            "category": "UTILITIES",
+            "amount": 25000.00,
+            "purpose": "Electricity, water, internet"
+          },
+          {
+            "category": "ENTERTAINMENT",
+            "amount": 20000.00,
+            "purpose": "Movies, outings, recreation"
+          },
+          {
+            "category": "MISC",
+            "amount": 15000.00,
+            "purpose": "Emergency fund and miscellaneous"
+          }
+        ]
+      },
+      "expected_status": 200,
+      "notes": "Returns AI analysis of budget sufficiency"
+    },
+    "7_record_expense": {
+      "description": "Record an expense on an existing card",
+      "endpoint": "POST /api/v1/expenses/card/{card_id}/expense",
+      "payload": {
+        "category": "FOOD",
+        "description": "Lunch at restaurant",
+        "amount": 5500.00,
+        "date": "2025-11-03"
+      },
+      "expected_status": 200,
+      "notes": "Replace {card_id} with actual card ID from previous tests"
+    }
+  },
+  "valid_enums": {
+    "income_types": [
+      "SALARY",
+      "SAVINGS",
+      "BORROWED",
+      "BUSINESS",
+      "OTHER",
+      "PLANNER"
+    ],
+    "expense_categories": [
+      "FOOD",
+      "TRANSPORT",
+      "ENTERTAINMENT",
+      "UTILITIES",
+      "RENT",
+      "MISC"
+    ],
+    "card_statuses": [
+      "DRAFT",
+      "ACTIVE",
+      "ARCHIVED"
+    ]
+  },
+  "validation_rules": {
+    "ExpenseCardCreate": {
+      "name": "Required string",
+      "income_type": "Required enum (IncomeType)",
+      "business_id": "Optional integer (defaults to user's active business)",
+      "savings_id": "Optional integer (required if income_type is SAVINGS)",
+      "initial_income": "Optional decimal (required for non-SAVINGS types)",
+      "income_details": "Optional string (required if income_type is OTHER)"
+    },
+    "PlannedExpense": {
+      "category": "Required enum (ExpenseCategory)",
+      "amount": "Required decimal",
+      "purpose": "Required string (NOT 'description')"
+    },
+    "ExpenseCreate": {
+      "category": "Required enum (ExpenseCategory)",
+      "description": "Optional string",
+      "amount": "Required decimal",
+      "date": "Required date (YYYY-MM-DD format)"
+    }
+  },
+  "sample_curl_commands": {
+    "create_salary_card": "curl -X POST 'https://kopkad.onrender.com/api/v1/expenses/card' -H 'Authorization: Bearer YOUR_TOKEN' -H 'Content-Type: application/json' -d '{\"name\":\"November Salary\",\"income_type\":\"SALARY\",\"initial_income\":150000}'",
+    "get_eligible_savings": "curl -X GET 'https://kopkad.onrender.com/api/v1/expenses/eligible-savings' -H 'Authorization: Bearer YOUR_TOKEN'",
+    "create_planner": "curl -X POST 'https://kopkad.onrender.com/api/v1/expenses/planner/create' -H 'Authorization: Bearer YOUR_TOKEN' -H 'Content-Type: application/json' -d @planner_payload.json",
+    "get_all_cards": "curl -X GET 'https://kopkad.onrender.com/api/v1/expenses/cards?limit=20&offset=0' -H 'Authorization: Bearer YOUR_TOKEN'",
+    "get_metrics": "curl -X GET 'https://kopkad.onrender.com/api/v1/expenses/metrics' -H 'Authorization: Bearer YOUR_TOKEN'"
+  },
+  "common_errors": {
+    "401": {
+      "message": "Unauthorized",
+      "solution": "Ensure you're passing a valid Bearer token in Authorization header"
+    },
+    "422": {
+      "message": "Validation Error",
+      "solutions": [
+        "Check that income_details is provided when income_type is OTHER",
+        "Ensure savings_id is provided when income_type is SAVINGS",
+        "Verify all required fields are present",
+        "Check enum values match exactly (case-sensitive)"
+      ]
+    },
+    "500": {
+      "message": "Internal Server Error",
+      "solutions": [
+        "Check if business_id exists in database",
+        "Verify savings_id is valid and belongs to the user",
+        "Review backend logs for specific error details"
+      ]
+    }
+  },
+  "test_data_variations": {
+    "minimal_salary_card": {
+      "name": "Minimal Salary",
+      "income_type": "SALARY",
+      "initial_income": 50000
+    },
+    "large_business_income": {
+      "name": "Q4 Business Revenue",
+      "income_type": "BUSINESS",
+      "initial_income": 5000000
+    },
+    "small_borrowed_amount": {
+      "name": "Personal Loan",
+      "income_type": "BORROWED",
+      "initial_income": 25000
+    },
+    "freelance_income": {
+      "name": "Consulting Fee",
+      "income_type": "OTHER",
+      "initial_income": 120000,
+      "income_details": "3-month consulting engagement"
+    },
+    "tight_budget_planner": {
+      "name": "Tight Budget Month",
+      "capital": 100000,
+      "planned_expenses": [
+        {"category": "RENT", "amount": 60000, "purpose": "Rent"},
+        {"category": "FOOD", "amount": 30000, "purpose": "Food"},
+        {"category": "TRANSPORT", "amount": 15000, "purpose": "Transport"}
+      ]
+    },
+    "over_budget_planner": {
+      "name": "Ambitious Spending Plan",
+      "capital": 100000,
+      "planned_expenses": [
+        {"category": "RENT", "amount": 70000, "purpose": "Rent"},
+        {"category": "FOOD", "amount": 40000, "purpose": "Food"},
+        {"category": "ENTERTAINMENT", "amount": 30000, "purpose": "Fun"}
+      ]
+    }
+  }
+}
+
