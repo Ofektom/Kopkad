@@ -40,6 +40,7 @@ class ExpenseCardResponse(BaseModel):
     updated_at: Optional[datetime]
 
     class Config:
+        from_attributes = True
         arbitrary_types_allowed = True
 
 class ExpenseCreate(BaseModel):
@@ -66,6 +67,7 @@ class ExpenseResponse(BaseModel):
     updated_at: Optional[datetime]
 
     class Config:
+        from_attributes = True
         arbitrary_types_allowed = True
 
 class TopUpRequest(BaseModel):
@@ -83,6 +85,7 @@ class ExpenseStatsResponse(BaseModel):
     savings_payout: Decimal
 
     class Config:
+        from_attributes = True
         arbitrary_types_allowed = True
 
 class FinancialAdviceResponse(BaseModel):
@@ -98,6 +101,7 @@ class FinancialAdviceResponse(BaseModel):
     advice: str
 
     class Config:
+        from_attributes = True
         arbitrary_types_allowed = True
 
 class FinancialAnalyticsResponse(BaseModel):
@@ -117,6 +121,7 @@ class FinancialAnalyticsResponse(BaseModel):
     top_expense_percentage: float
 
     class Config:
+        from_attributes = True
         arbitrary_types_allowed = True
 
 # New schemas for expense planner
@@ -159,6 +164,7 @@ class EligibleSavingsResponse(BaseModel):
     already_linked: bool
 
     class Config:
+        from_attributes = True
         arbitrary_types_allowed = True
 
 class ExpenseUpdate(BaseModel):
@@ -192,6 +198,7 @@ class PlannerCardResponse(BaseModel):
     recommendations: List[str]
 
     class Config:
+        from_attributes = True
         arbitrary_types_allowed = True
 
 class ActivatePlannerRequest(BaseModel):
@@ -223,4 +230,5 @@ class PlannerProgressResponse(BaseModel):
     items: List[Dict]  # List of planned items with status
 
     class Config:
+        from_attributes = True
         arbitrary_types_allowed = True
