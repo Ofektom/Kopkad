@@ -28,6 +28,7 @@ from service.savings import (
     confirm_bank_transfer,
     get_monthly_summary,
 )
+from service.get_unpaid_savings import get_unpaid_completed_savings
 from database.postgres_optimized import get_db
 from utils.auth import get_current_user
 from typing import List
