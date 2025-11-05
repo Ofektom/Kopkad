@@ -22,3 +22,4 @@ test_monthly_summary.py
 test_monthly_summary_simple.py
 test_savings_totals.py
 test_simple_query.py
+.env.render

@@ -3,13 +3,14 @@ User controller - following Showroom360 pattern.
 Controllers contain business logic with dependency injection.
 """
 from typing import Optional
-from fastapi import Depends, Query
+from fastapi import Depends, Query, Body
 from sqlalchemy.orm import Session
 import logging
 
 logger = logging.getLogger(__name__)
 
 from schemas.user import SignupRequest, LoginRequest, ChangePasswordRequest
+from typing import List
 from service.user import (
     signup_unauthenticated,
     signup_authenticated,
@@ -93,27 +94,53 @@ async def logout_controller(
 # ============================================================================
 
 async def get_users_controller(
-    role: Optional[str] = Query(None),
-    business_id: Optional[int] = Query(None),
-    is_active: Optional[bool] = Query(None),
-    page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=1, le=100),
+    limit: int = Query(8, ge=1, le=100, description="Maximum number of users to return"),
+    offset: int = Query(0, ge=0, description="Number of users to skip"),
+    role: Optional[str] = Query(None, description="Filter by user role (e.g., 'customer', 'agent')"),
+    business_name: Optional[str] = Query(None, description="Filter by partial business name"),
+    unique_code: Optional[str] = Query(None, description="Filter by exact business unique code"),
+    is_active: Optional[bool] = Query(None, description="Filter by active/inactive status"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
     """Get all users with optional filters"""
-    return await get_all_users(role, business_id, is_active, page, limit, current_user, db)
+    return await get_all_users(
+        db=db,
+        current_user=current_user,
+        limit=limit,
+        offset=offset,
+        role=role,
+        business_name=business_name,
+        unique_code=unique_code,
+        is_active=is_active
+    )
 
 
 async def get_business_users_controller(
     business_id: int,
-    page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=1, le=100),
+    limit: int = Query(8, ge=5, le=100, description="Maximum number of users to return"),
+    offset: int = Query(0, ge=0, description="Number of users to skip"),
+    role: Optional[str] = Query(None, description="Filter by user role (e.g., 'customer', 'sub_agent')"),
+    savings_type: Optional[str] = Query(None, description="Filter by savings type (e.g., 'daily', 'target')"),
+    savings_status: Optional[str] = Query(None, description="Filter by savings status (e.g., 'pending', 'paid')"),
+    payment_method: Optional[str] = Query(None, description="Filter by payment method (e.g., 'card', 'bank_transfer')"),
+    is_active: Optional[bool] = Query(None, description="Filter by active/inactive status"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
     """Get users in a specific business"""
-    return await get_business_users(business_id, page, limit, current_user, db)
+    return await get_business_users(
+        db=db,
+        current_user=current_user,
+        business_id=business_id,
+        limit=limit,
+        offset=offset,
+        role=role,
+        savings_type=savings_type,
+        savings_status=savings_status,
+        payment_method=payment_method,
+        is_active=is_active
+    )
 
 
 async def change_password_controller(
@@ -127,7 +154,7 @@ async def change_password_controller(
 
 async def toggle_user_status_controller(
     user_id: int,
-    is_active: bool,
+    is_active: bool = Body(...),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -145,7 +172,7 @@ async def delete_user_controller(
 
 
 async def switch_business_controller(
-    business_id: int,
+    business_id: int = Body(..., embed=True),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -158,19 +185,63 @@ async def switch_business_controller(
 # ============================================================================
 
 async def assign_admin_controller(
-    business_id: int,
-    person_user_id: int,
-    user_context: UserContext = Depends(require_super_admin),
+    business_id: int = Query(..., description="Business ID"),
+    person_user_id: int = Query(..., description="User ID of person to assign as admin"),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Assign admin to business (super_admin only)"""
-    return await assign_admin_to_business(business_id, person_user_id, user_context.user.__dict__, db)
+    return await assign_admin_to_business(business_id, person_user_id, current_user, db)
 
 
 async def get_admin_credentials_controller(
-    user_context: UserContext = Depends(require_super_admin),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Get all admin credentials (super_admin only)"""
-    return await get_business_admin_credentials(user_context.user.__dict__, db)
+    return await get_business_admin_credentials(current_user, db)
+
+
+async def get_current_user_info_controller(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get the current authenticated user's information."""
+    from models.user import User
+    from models.business import Business
+    
+    user = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not user:
+        return {
+            "success": False,
+            "message": "User not found"
+        }
+    
+    # Get user's businesses
+    businesses = [
+        {
+            "id": b.id,
+            "name": b.name,
+            "unique_code": b.unique_code,
+            "is_default": b.is_default
+        }
+        for b in user.businesses
+    ]
+    
+    return {
+        "success": True,
+        "message": "User information retrieved successfully",
+        "data": {
+            "user_id": user.id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "phone_number": user.phone_number,
+            "username": user.username,
+            "role": user.role.value if hasattr(user.role, 'value') else user.role,
+            "is_active": user.is_active,
+            "location": getattr(user, 'location', None),
+            "businesses": businesses,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+        }
+    }
 

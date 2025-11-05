@@ -3,6 +3,7 @@ User router - following Showroom360 pattern.
 Routers only register routes using add_api_route().
 """
 from fastapi import APIRouter
+from typing import List
 from schemas.user import UserResponse
 from api.controller.user import (
     signup_controller,
@@ -19,6 +20,7 @@ from api.controller.user import (
     switch_business_controller,
     assign_admin_controller,
     get_admin_credentials_controller,
+    get_current_user_info_controller,
 )
 
 user_router = APIRouter(prefix="/auth", tags=["Authentication & User Management"])
@@ -64,7 +66,7 @@ user_router.add_api_route(
     "/refresh",
     endpoint=refresh_token_controller,
     methods=["POST"],
-    response_model=dict,
+    response_model=UserResponse,
     summary="Refresh access token",
 )
 
@@ -76,6 +78,14 @@ user_router.add_api_route(
     summary="Logout current user",
 )
 
+user_router.add_api_route(
+    "/me",
+    endpoint=get_current_user_info_controller,
+    methods=["GET"],
+    response_model=dict,
+    summary="Get current authenticated user's information",
+)
+
 
 # ============================================================================
 # USER MANAGEMENT ROUTES
@@ -85,23 +95,23 @@ user_router.add_api_route(
     "/users",
     endpoint=get_users_controller,
     methods=["GET"],
-    response_model=dict,
+    response_model=List[UserResponse],
     summary="Get all users with optional filters",
 )
 
 user_router.add_api_route(
-    "/users/business/{business_id}",
+    "/business/{business_id}/users",
     endpoint=get_business_users_controller,
     methods=["GET"],
-    response_model=dict,
+    response_model=List[UserResponse],
     summary="Get users in a specific business",
 )
 
 user_router.add_api_route(
-    "/users/change-password",
+    "/change_password",
     endpoint=change_password_controller,
     methods=["POST"],
-    response_model=dict,
+    response_model=UserResponse,
     summary="Change user password",
 )
 
@@ -122,10 +132,10 @@ user_router.add_api_route(
 )
 
 user_router.add_api_route(
-    "/users/switch-business/{business_id}",
+    "/switch-business",
     endpoint=switch_business_controller,
     methods=["POST"],
-    response_model=dict,
+    response_model=UserResponse,
     summary="Switch user's active business",
 )
 
