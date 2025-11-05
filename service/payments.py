@@ -398,7 +398,7 @@ async def create_payment_request(request: PaymentRequestCreate, current_user: di
         logger.error(f"User not found: {current_user['user_id']}")
         return error_response(status_code=404, message="User not found")
 
-    if current_user["role"] not in ["customer", "admin", "super_admin"]:
+    if current_user["role"] not in ["customer", "admin"]:
         logger.error(f"Unauthorized role: {current_user['role']} for user {current_user['user_id']}")
         return error_response(status_code=403, message="Unauthorized role")
 
@@ -611,14 +611,9 @@ async def get_payment_requests(
     )
 
 async def approve_payment_request(request_id: int, current_user: dict, db: Session):
-    """Approve a payment request (manual transfer assumed)."""
-    current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
-    if not current_user_obj:
-        return error_response(status_code=404, message="User not found")
-
-    if current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin"]:
-        return error_response(status_code=403, message="Only agents, sub-agents, admins, or super-admins can approve payment requests")
-
+    """Approve a payment request with business-scoped validation."""
+    from utils.permissions import can_approve_payment
+    
     payment_request = db.query(PaymentRequest).filter(PaymentRequest.id == request_id).first()
     if not payment_request:
         return error_response(status_code=404, message="Payment request not found")
@@ -627,10 +622,14 @@ async def approve_payment_request(request_id: int, current_user: dict, db: Sessi
         return error_response(status_code=400, message=f"Payment request is in {payment_request.status} status")
 
     savings_account = payment_request.savings_account
-    if current_user["role"] in ["agent", "sub_agent"]:
-        business_ids = [b.id for b in current_user_obj.businesses]
-        if savings_account.business_id not in business_ids:
-            return error_response(status_code=403, message="Not authorized for this business")
+    savings_business_id = savings_account.business_id
+    
+    # NEW: Business-scoped permission check
+    if not can_approve_payment(current_user, savings_business_id, db):
+        return error_response(
+            status_code=403, 
+            message="You do not have permission to approve payments for this business"
+        )
 
     try:
         payment_request.status = PaymentRequestStatus.APPROVED
@@ -651,21 +650,25 @@ async def approve_payment_request(request_id: int, current_user: dict, db: Sessi
         return error_response(status_code=500, message=f"Failed to approve payment request: {str(e)}")
 
 async def reject_payment_request(request_id: int, reject_data: PaymentRequestReject, current_user: dict, db: Session):
-    """Reject a payment request with reason."""
-    current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
-    if not current_user_obj:
-        return error_response(status_code=404, message="User not found")
-
-    # Only admins and super_admins can reject payment requests
-    if current_user["role"] not in ["admin", "super_admin"]:
-        return error_response(status_code=403, message="Only admins or super-admins can reject payment requests")
-
+    """Reject a payment request with business-scoped validation."""
+    from utils.permissions import can_reject_payment
+    
     payment_request = db.query(PaymentRequest).filter(PaymentRequest.id == request_id).first()
     if not payment_request:
         return error_response(status_code=404, message="Payment request not found")
 
     if payment_request.status != PaymentRequestStatus.PENDING:
         return error_response(status_code=400, message=f"Payment request is in {payment_request.status} status")
+
+    savings_account = payment_request.savings_account
+    savings_business_id = savings_account.business_id
+    
+    # NEW: Business-scoped permission check
+    if not can_reject_payment(current_user, savings_business_id, db):
+        return error_response(
+            status_code=403,
+            message="You do not have permission to reject payments for this business"
+        )
 
     if not reject_data.rejection_reason or len(reject_data.rejection_reason.strip()) == 0:
         return error_response(status_code=400, message="Rejection reason is required")

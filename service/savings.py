@@ -565,7 +565,7 @@ async def delete_savings(savings_id: int, current_user: dict, db: Session):
 
     if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
         return error_response(status_code=403, message="Not your savings account")
-    elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
+    elif current_user["role"] not in ["agent", "sub_agent", "admin", "customer"]:
         return error_response(status_code=401, message="Unauthorized role")
 
     has_paid_markings = db.query(SavingsMarking).filter(
@@ -790,7 +790,7 @@ async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequ
     if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
         logger.warning(f"User {current_user['user_id']} attempted to mark savings {tracking_number} not owned")
         return error_response(status_code=403, message=f"Not your savings {tracking_number}")
-    elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
+    elif current_user["role"] not in ["agent", "sub_agent", "admin", "customer"]:
         logger.warning(f"Unauthorized role {current_user['role']} attempted to mark savings {tracking_number}")
         return error_response(status_code=401, message="Unauthorized role")
 
@@ -958,7 +958,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
         if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
             logger.warning(f"User {current_user['user_id']} attempted to mark savings {tracking_number} not owned")
             return error_response(status_code=403, message=f"Not your savings {tracking_number}")
-        elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
+        elif current_user["role"] not in ["agent", "sub_agent", "admin", "customer"]:
             logger.warning(f"Unauthorized role {current_user['role']} attempted to mark savings {tracking_number}")
             return error_response(status_code=401, message="Unauthorized role")
 
@@ -1154,7 +1154,7 @@ async def end_savings_markings(tracking_number: str, current_user: dict, db: Ses
 
     if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
         return error_response(status_code=403, message=f"Not your savings {tracking_number}")
-    elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
+    elif current_user["role"] not in ["agent", "sub_agent", "admin", "customer"]:
         return error_response(status_code=401, message="Unauthorized role")
 
     markings = db.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings.id).all()
@@ -1450,7 +1450,7 @@ async def confirm_bank_transfer(reference: str, current_user: dict, db: Session)
     savings = db.query(SavingsAccount).filter(SavingsAccount.id == markings[0].savings_account_id).first()
     if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
         return error_response(status_code=403, message="Not your savings account")
-    elif current_user["role"] not in ["agent", "sub_agent", "admin", "super_admin", "customer"]:
+    elif current_user["role"] not in ["agent", "sub_agent", "admin", "customer"]:
         return error_response(status_code=401, message="Unauthorized role")
 
     savings_accounts = {m.savings_account_id: m.savings_account for m in markings}

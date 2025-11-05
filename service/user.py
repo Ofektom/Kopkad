@@ -3,8 +3,10 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, func
 from sqlalchemy.sql import insert
 from models.user import User, Role, Permission, user_permissions
-from models.business import Business, Unit
+from models.business import Business, Unit, AdminCredentials, BusinessPermission
 from models.user_business import user_business
+from utils.password_utils import decrypt_password
+from utils.permissions import grant_admin_permissions, revoke_admin_permissions
 from models.settings import Settings, NotificationMethod
 from schemas.user import SignupRequest, UserResponse, LoginRequest, ChangePasswordRequest
 from schemas.business import BusinessResponse
@@ -949,3 +951,170 @@ async def switch_business(business_id: int, current_user: dict, db: Session):
         db.rollback()
         logger.error(f"Switch business error: {str(e)}")
         return error_response(status_code=500, message=f"Failed to switch business: {str(e)}")
+
+async def assign_admin_to_business(
+    business_id: int, 
+    person_user_id: int, 
+    current_user: dict, 
+    db: Session
+):
+    """
+    Super admin assigns a real person to manage a business as admin.
+    Transfers admin role and permissions from auto-created account to the assigned person.
+    
+    Args:
+        business_id: Business ID
+        person_user_id: User ID of person to assign as admin
+        current_user: Current user dict (must be super_admin)
+        db: Database session
+    """
+    
+    # Only super_admin can assign
+    if current_user["role"] != "super_admin":
+        return error_response(status_code=403, message="Only super admin can assign admins")
+    
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business:
+        return error_response(status_code=404, message="Business not found")
+    
+    person = db.query(User).filter(User.id == person_user_id).first()
+    if not person:
+        return error_response(status_code=404, message="Person not found")
+    
+    # Get the auto-created admin
+    auto_admin = db.query(User).filter(User.id == business.admin_id).first()
+    
+    # Check if already assigned
+    creds = db.query(AdminCredentials).filter(
+        AdminCredentials.business_id == business_id
+    ).first()
+    
+    if creds and creds.is_assigned:
+        return error_response(
+            status_code=400, 
+            message=f"This business already has an active admin assigned: {auto_admin.full_name if auto_admin else 'Unknown'}"
+        )
+    
+    try:
+        # Store old role for response
+        old_role = person.role
+        
+        # Transfer admin role to the assigned person
+        person.role = Role.ADMIN
+        person.is_active = True
+        
+        # Update business admin_id to point to new person
+        business.admin_id = person.id
+        
+        # Transfer business permissions from auto-admin to person
+        if auto_admin:
+            # Revoke old admin's permissions
+            revoke_admin_permissions(auto_admin.id, business_id, db)
+            
+            # Deactivate and archive auto-created admin
+            auto_admin.is_active = False
+            auto_admin.full_name = f"[ARCHIVED] {auto_admin.full_name}"
+        
+        # Grant permissions to new admin
+        grant_admin_permissions(person.id, business_id, current_user["user_id"], db)
+        
+        # Link person to business
+        existing_link = db.query(user_business).filter(
+            user_business.c.user_id == person.id,
+            user_business.c.business_id == business_id
+        ).first()
+        
+        if not existing_link:
+            db.execute(
+                insert(user_business).values(user_id=person.id, business_id=business_id)
+            )
+        
+        # Update credentials record
+        if creds:
+            creds.admin_user_id = person.id
+            creds.is_assigned = True
+        
+        db.commit()
+        
+        logger.info(f"Assigned {person.full_name} (ID: {person.id}) as admin for business {business.id}")
+        
+        return success_response(
+            status_code=200,
+            message=f"{person.full_name} successfully assigned as admin for {business.name}",
+            data={
+                "business_id": business_id,
+                "business_name": business.name,
+                "admin_id": person.id,
+                "admin_name": person.full_name,
+                "previous_role": old_role,
+                "new_role": "admin"
+            }
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to assign admin: {str(e)}")
+        return error_response(status_code=500, message=f"Failed to assign admin: {str(e)}")
+
+
+async def get_business_admin_credentials(current_user: dict, db: Session):
+    """
+    Get all business admin credentials (super_admin only).
+    Shows temporary passwords for unassigned admin accounts.
+    
+    Args:
+        current_user: Current user dict (must be super_admin)
+        db: Database session
+        
+    Returns:
+        Success response with list of admin credentials
+    """
+    
+    if current_user["role"] != "super_admin":
+        return error_response(status_code=403, message="Only super admin can view credentials")
+    
+    businesses = db.query(Business).all()
+    credentials_list = []
+    
+    for business in businesses:
+        admin = db.query(User).filter(User.id == business.admin_id).first()
+        creds = db.query(AdminCredentials).filter(
+            AdminCredentials.business_id == business.id
+        ).first()
+        
+        if admin and creds:
+            # Only decrypt password if not assigned yet
+            temp_password = None
+            temp_pin = None
+            if not creds.is_assigned:
+                try:
+                    decrypted_pwd = decrypt_password(creds.temp_password)
+                    temp_password = decrypted_pwd
+                    temp_pin = decrypted_pwd[:5]
+                except Exception as e:
+                    logger.error(f"Failed to decrypt password for business {business.id}: {str(e)}")
+                    temp_password = "[DECRYPTION ERROR]"
+                    temp_pin = "[ERROR]"
+            
+            credentials_list.append({
+                "business_id": business.id,
+                "business_name": business.name,
+                "unique_code": business.unique_code,
+                "admin_id": admin.id,
+                "admin_name": admin.full_name,
+                "admin_username": admin.username,
+                "admin_email": admin.email,
+                "is_assigned": creds.is_assigned,
+                "temp_password": temp_password if not creds.is_assigned else None,
+                "temp_pin": temp_pin if not creds.is_assigned else None,
+                "password_changed": creds.is_password_changed,
+                "expires_at": creds.expires_at.isoformat() if creds.expires_at else None,
+                "created_at": creds.created_at.isoformat() if creds.created_at else None,
+            })
+    
+    logger.info(f"Retrieved {len(credentials_list)} admin credentials for super admin {current_user['user_id']}")
+    
+    return success_response(
+        status_code=200,
+        message="Admin credentials retrieved successfully",
+        data={"credentials": credentials_list, "total": len(credentials_list)}
+    )

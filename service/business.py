@@ -1,10 +1,13 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import insert
 from sqlalchemy import select
-from models.business import Business, PendingBusinessRequest, Unit, user_units
+from models.business import Business, PendingBusinessRequest, Unit, user_units, AdminCredentials, BusinessPermission
 from models.user_business import user_business
 from models.user import User, Role, Permission
 from utils.response import success_response, error_response
+from utils.password_utils import generate_admin_credentials, encrypt_password
+from utils.permissions import grant_admin_permissions
+from utils.auth import hash_password
 from schemas.business import (
     BusinessCreate, 
     BusinessResponse, 
@@ -39,12 +42,12 @@ async def create_business(request: BusinessCreate, current_user: dict, db: Sessi
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not current_user_obj:
         return error_response(status_code=404, message="User not found")
-    if current_user["role"] not in [Role.AGENT, Role.SUPER_ADMIN]:
-        return error_response(status_code=403, message="Only AGENT or SUPER_ADMIN can create businesses")
-    if current_user["role"] != Role.SUPER_ADMIN and not has_permission(current_user_obj, Permission.CREATE_BUSINESS, db):
+    if current_user["role"] != Role.AGENT:
+        return error_response(status_code=403, message="Only AGENT can create businesses")
+    if not has_permission(current_user_obj, Permission.CREATE_BUSINESS, db):
         return error_response(status_code=403, message="No permission to create business")
 
-    if current_user["role"] != Role.SUPER_ADMIN and db.query(Business).filter(Business.agent_id == current_user["user_id"]).first():
+    if db.query(Business).filter(Business.agent_id == current_user["user_id"]).first():
         return error_response(status_code=403, message="User can only own one business")
 
     characters = string.digits + string.ascii_letters
@@ -59,6 +62,7 @@ async def create_business(request: BusinessCreate, current_user: dict, db: Sessi
         )
 
     try:
+        # 1. Create business
         business = Business(
             name=request.name,
             agent_id=current_user["user_id"],
@@ -69,9 +73,44 @@ async def create_business(request: BusinessCreate, current_user: dict, db: Sessi
             created_at=datetime.now(timezone.utc),
         )
         db.add(business)
-        db.commit()
-        db.refresh(business)
-
+        db.flush()  # Get business.id before creating admin
+        
+        # 2. AUTO-CREATE ADMIN USER for this business
+        admin_creds = generate_admin_credentials(request.name, unique_code)
+        
+        admin_user = User(
+            full_name=admin_creds['full_name'],
+            phone_number=admin_creds['phone'],
+            email=admin_creds['email'],
+            username=admin_creds['phone'],
+            pin=hash_password(admin_creds['pin']),
+            role=Role.ADMIN,
+            is_active=False,  # Inactive until super_admin assigns someone
+            created_by=current_user["user_id"],
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(admin_user)
+        db.flush()  # Get admin_user.id
+        
+        # 3. Link admin to business
+        business.admin_id = admin_user.id
+        
+        # 4. Store encrypted admin credentials (super admin can see these)
+        admin_credentials_record = AdminCredentials(
+            business_id=business.id,
+            admin_user_id=admin_user.id,
+            temp_password=encrypt_password(admin_creds['password']),
+            is_password_changed=False,
+            is_assigned=False,
+            created_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(timezone.utc) + timedelta(days=30),
+        )
+        db.add(admin_credentials_record)
+        
+        # 5. Grant business-scoped permissions to admin
+        grant_admin_permissions(admin_user.id, business.id, current_user["user_id"], db)
+        
+        # 6. Create default unit (existing logic)
         if request.address:
             unit = Unit(
                 name=f"{request.name} Default Unit",
@@ -81,12 +120,14 @@ async def create_business(request: BusinessCreate, current_user: dict, db: Sessi
                 created_at=datetime.now(timezone.utc),
             )
             db.add(unit)
-            db.commit()
-
+        
+        # 7. Link agent to business (existing logic)
         db.execute(
             insert(user_business).values(user_id=current_user["user_id"], business_id=business.id)
         )
+        
         db.commit()
+        db.refresh(business)
 
         user = db.query(User).filter(User.id == current_user["user_id"]).first()
         notification_method = user.settings.notification_method if user.settings else "both"
@@ -102,10 +143,24 @@ async def create_business(request: BusinessCreate, current_user: dict, db: Sessi
             delivery_status = "pending"
 
         business_response = BusinessResponse.model_validate(business)
+        
+        # Return with admin credentials for super_admin to view
         return success_response(
             status_code=201,
-            message=f"Business created. Unique code: {unique_code}",
-            data=business_response.model_dump(),
+            message=f"Business and admin account created successfully. Unique code: {unique_code}",
+            data={
+                "business": business_response.model_dump(),
+                "admin_credentials": {
+                    "admin_id": admin_user.id,
+                    "username": admin_creds['phone'],
+                    "email": admin_creds['email'],
+                    "temporary_password": admin_creds['password'],  # Show once
+                    "temporary_pin": admin_creds['pin'],
+                    "expires_in_days": 30,
+                    "status": "unassigned",
+                    "note": "Admin account is inactive. Super admin must assign a person to activate it."
+                }
+            },
         )
     except Exception as e:
         db.rollback()
@@ -293,8 +348,8 @@ async def get_user_businesses(
     page: int = 1,
     size: int = 8
 ):
-    """Retrieve paginated and filtered list of businesses associated with the user or all businesses for SUPER_ADMIN."""
-    if current_user["role"] == Role.SUPER_ADMIN:
+    """Retrieve paginated and filtered list of businesses associated with the user or all businesses for ADMIN."""
+    if current_user["role"] == Role.ADMIN:
         query = db.query(Business)
     else:
         business_ids = [
@@ -433,13 +488,13 @@ async def delete_business(business_id: int, current_user: dict, db: Session):
         )
 
 async def create_unit(business_id: int, request: UnitCreate, current_user: dict, db: Session):
-    """Create a new unit within a business for AGENT or SUPER_ADMIN."""
-    if current_user["role"] not in [Role.AGENT, Role.SUPER_ADMIN]:
-        return error_response(status_code=403, message="Only AGENT or SUPER_ADMIN can create units")
+    """Create a new unit within a business for AGENT or ADMIN."""
+    if current_user["role"] not in [Role.AGENT, Role.ADMIN]:
+        return error_response(status_code=403, message="Only AGENT or ADMIN can create units")
 
     business = db.query(Business).filter(
         Business.id == business_id,
-        Business.agent_id == current_user["user_id"] if current_user["role"] != Role.SUPER_ADMIN else True
+        Business.agent_id == current_user["user_id"] if current_user["role"] == Role.AGENT else True
     ).first()
     if not business:
         return error_response(status_code=404, message="Business not found or you do not have access")
@@ -724,10 +779,10 @@ async def delete_unit(unit_id: int, current_user: dict, db: Session):
         return error_response(status_code=500, message=f"Failed to delete unit: {str(e)}")
 
 async def get_business_summary(current_user: dict, db: Session):
-    """Retrieve the total number of businesses in the system, accessible by SUPER_ADMIN only."""
+    """Retrieve the total number of businesses in the system, accessible by ADMIN only."""
  
-    if current_user["role"] != Role.SUPER_ADMIN:
-        return error_response(status_code=403, message="Only SUPER_ADMIN can access total business count")
+    if current_user["role"] != Role.ADMIN:
+        return error_response(status_code=403, message="Only ADMIN can access total business count")
 
     total_businesses = db.query(Business).count()
     

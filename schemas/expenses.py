@@ -162,6 +162,7 @@ class EligibleSavingsResponse(BaseModel):
     start_date: date
     completion_date: Optional[date]
     already_linked: bool
+    payment_request_status: Optional[str]  # pending, approved, rejected, cancelled, or None
 
     class Config:
         from_attributes = True

@@ -13,12 +13,28 @@ class Role:
     CUSTOMER = "customer"
 
 class Permission:
+    # Super Admin Permissions (User Management Only)
+    MANAGE_USERS = "manage_users"
     CREATE_ADMIN = "create_admin"
+    DEACTIVATE_USERS = "deactivate_users"
+    DELETE_USERS = "delete_users"
+    VIEW_ADMIN_CREDENTIALS = "view_admin_credentials"
+    ASSIGN_ADMIN = "assign_admin"
+    
+    # Admin Permissions (Business-scoped via BusinessPermission table)
+    APPROVE_PAYMENTS = "approve_payments"
+    REJECT_PAYMENTS = "reject_payments"
+    MANAGE_BUSINESS = "manage_business"
+    VIEW_BUSINESS_ANALYTICS = "view_business_analytics"
+    
+    # Agent Permissions
     CREATE_AGENT = "create_agent"
     CREATE_SUB_AGENT = "create_sub_agent"
     CREATE_BUSINESS = "create_business"
     ASSIGN_BUSINESS = "assign_business"
     CREATE_CUSTOMER = "create_customer"
+    
+    # Operational Permissions
     CREATE_SAVINGS = "create_savings"
     REINITIATE_SAVINGS = "reinitiate_savings"
     UPDATE_SAVINGS = "update_savings"

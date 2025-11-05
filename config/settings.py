@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     PAYSTACK_SECRET_KEY: str
     ENV: str
     REDIS_URL: str | None = None  # Optional Redis cache URL
+    ENCRYPTION_KEY: str | None = None  # For encrypting admin credentials (set in production)
     
     # Financial Advisor ML Parameters
     ANOMALY_DETECTION_CONTAMINATION: float = 0.1

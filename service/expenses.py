@@ -621,6 +621,14 @@ async def get_eligible_savings(current_user: dict, db: Session):
             ExpenseCard.customer_id == current_user["user_id"]
         ).first() is not None
         
+        # Check payment request status
+        from models.payments import PaymentRequest
+        payment_request = db.query(PaymentRequest).filter(
+            PaymentRequest.savings_account_id == savings.id
+        ).order_by(PaymentRequest.created_at.desc()).first()
+        
+        payment_request_status = payment_request.status.value if payment_request else None
+        
         results.append(EligibleSavingsResponse(
             id=savings.id,
             tracking_number=savings.tracking_number,
@@ -630,7 +638,8 @@ async def get_eligible_savings(current_user: dict, db: Session):
             net_payout=net_payout,
             start_date=savings.start_date,
             completion_date=latest_date,
-            already_linked=already_linked
+            already_linked=already_linked,
+            payment_request_status=payment_request_status
         ))
     
     logger.info(f"Found {len(results)} eligible savings for user {current_user['user_id']}")

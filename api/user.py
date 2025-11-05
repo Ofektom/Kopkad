@@ -15,6 +15,8 @@ from service.user import (
     delete_user,
     logout,
     switch_business,
+    assign_admin_to_business,
+    get_business_admin_credentials,
 )
 from database.postgres_optimized import get_db
 from utils.auth import get_current_user, oauth2_scheme
@@ -193,3 +195,22 @@ async def logout_endpoint(
 ):
     """Logout the current user by blocklisting their access token."""
     return await logout(token, db, current_user)
+
+@user_router.post("/assign-admin", response_model=dict)
+async def assign_admin_endpoint(
+    business_id: int = Query(..., description="Business ID"),
+    person_user_id: int = Query(..., description="User ID of person to assign as admin"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Super admin assigns a person to be admin of a business."""
+    return await assign_admin_to_business(business_id, person_user_id, current_user, db)
+
+
+@user_router.get("/admin-credentials", response_model=dict)
+async def get_admin_credentials_endpoint(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get all business admin credentials (super_admin only)."""
+    return await get_business_admin_credentials(current_user, db)
