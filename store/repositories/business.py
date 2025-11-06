@@ -30,6 +30,26 @@ class BusinessRepository(BaseRepository[Business]):
             .first()
         )
     
+    def get_with_units(self, business_id: int) -> Optional[Business]:
+        """Get business with units loaded"""
+        return (
+            self.db.query(Business)
+            .options(joinedload(Business.units))
+            .filter(Business.id == business_id)
+            .first()
+        )
+    
+    def get_user_businesses_with_units(self, user_id: int) -> List[Business]:
+        """Get all businesses for a user with units loaded"""
+        from models.user_business import user_business
+        return (
+            self.db.query(Business)
+            .options(joinedload(Business.units))
+            .join(user_business, Business.id == user_business.c.business_id)
+            .filter(user_business.c.user_id == user_id)
+            .all()
+        )
+    
     def get_admin_credentials(self, business_id: int) -> Optional[AdminCredentials]:
         """Get admin credentials for business"""
         return (
@@ -41,6 +61,33 @@ class BusinessRepository(BaseRepository[Business]):
     def get_all_admin_credentials(self) -> List[AdminCredentials]:
         """Get all admin credentials"""
         return self.db.query(AdminCredentials).all()
+    
+    def unique_code_exists(self, unique_code: str) -> bool:
+        """Check if unique code already exists"""
+        return self.exists(unique_code=unique_code)
+
+    def list_all(self) -> List[Business]:
+        """Return all businesses."""
+        return self.db.query(Business).all()
+
+    def set_admin(self, business_id: int, admin_user_id: int) -> Optional[Business]:
+        """Update the admin assigned to a business."""
+        business = self.get_by_id(business_id)
+        if not business:
+            return None
+        business.admin_id = admin_user_id
+        self.db.flush()
+        return business
+
+    def update_admin_credentials(self, business_id: int, admin_user_id: int, is_assigned: bool = True) -> Optional[AdminCredentials]:
+        """Update admin credentials metadata for a business."""
+        creds = self.get_admin_credentials(business_id)
+        if not creds:
+            return None
+        creds.admin_user_id = admin_user_id
+        creds.is_assigned = is_assigned
+        self.db.flush()
+        return creds
 
 
 class UnitRepository(BaseRepository[Unit]):
