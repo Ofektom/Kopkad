@@ -1,3 +1,4 @@
+
 """
 User-Business association repository.
 Handles operations on the user_business association table.
@@ -19,14 +20,15 @@ class UserBusinessRepository:
     
     def is_user_in_business(self, user_id: int, business_id: int) -> bool:
         """Check if user is already linked to a business"""
-        query = (
-            self.db.query(user_business)
-            .filter(
+        result = self.db.execute(
+            select(user_business.c.user_id)
+            .where(
                 user_business.c.user_id == user_id,
                 user_business.c.business_id == business_id,
             )
-        )
-        return self.db.execute(query.exists()).scalar()
+            .limit(1)
+        ).first()
+        return result is not None
     
     def link_user_to_business(self, user_id: int, business_id: int):
         """Create association between user and business"""
