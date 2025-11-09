@@ -60,10 +60,11 @@ async def create_expense_card_endpoint(
 async def get_expense_cards_endpoint(
     limit: int = Query(10, ge=1),
     offset: int = Query(0, ge=0),
+    search: Optional[str] = Query(None, description="Search cards by name or notes"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return await get_expense_cards(limit, offset, current_user, db)
+    return await get_expense_cards(limit, offset, current_user, db, search)
 
 @expenses_router.post("/card/{card_id}/expense", response_model=ExpenseResponse)
 async def record_expense_endpoint(
@@ -88,10 +89,11 @@ async def get_expenses_by_card_endpoint(
     card_id: int,
     limit: int = Query(10, ge=1),
     offset: int = Query(0, ge=0),
+    search: Optional[str] = Query(None, description="Search expenses by description or card name"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return await get_expenses_by_card(card_id, limit, offset, current_user, db)
+    return await get_expenses_by_card(card_id, limit, offset, current_user, db, search)
 
 @expenses_router.put("/card/{card_id}", response_model=ExpenseCardResponse)
 async def update_expense_card_endpoint(

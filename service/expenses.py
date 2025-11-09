@@ -104,8 +104,21 @@ async def create_expense_card(request: ExpenseCardCreate, current_user: dict, db
     logger.info(f"Created expense card {expense_card.id} for user {current_user['user_id']}")
     return ExpenseCardResponse.from_orm(expense_card)
 
-async def get_expense_cards(limit: int, offset: int, current_user: dict, db: Session):
+async def get_expense_cards(
+    limit: int,
+    offset: int,
+    current_user: dict,
+    db: Session,
+    search: str | None = None,
+):
     query = db.query(ExpenseCard).filter(ExpenseCard.customer_id == current_user["user_id"])
+
+    if search:
+        search_pattern = f"%{search.lower()}%"
+        query = query.filter(
+            func.lower(ExpenseCard.name).like(search_pattern)
+            | func.lower(func.coalesce(ExpenseCard.income_details, "")).like(search_pattern)
+        )
     total_count = query.count()
     cards = query.order_by(ExpenseCard.created_at.desc()).offset(offset).limit(limit).all()
     response_data = [ExpenseCardResponse.from_orm(card) for card in cards]
@@ -166,7 +179,14 @@ async def top_up_expense_card(card_id: int, request: TopUpRequest, current_user:
     logger.info(f"Topped up expense card {card_id} by {request.amount} for user {current_user['user_id']}")
     return ExpenseCardResponse.from_orm(card)
 
-async def get_expenses_by_card(card_id: int, limit: int, offset: int, current_user: dict, db: Session):
+async def get_expenses_by_card(
+    card_id: int,
+    limit: int,
+    offset: int,
+    current_user: dict,
+    db: Session,
+    search: str | None = None,
+):
     card = db.query(ExpenseCard).filter(ExpenseCard.id == card_id).first()
     if not card:
         return error_response(status_code=404, message="Expense card not found")
@@ -174,6 +194,16 @@ async def get_expenses_by_card(card_id: int, limit: int, offset: int, current_us
         return error_response(status_code=403, message="Not your expense card")
 
     query = db.query(Expense).filter(Expense.expense_card_id == card_id)
+
+    if search:
+        search_pattern = f"%{search.lower()}%"
+        query = (
+            query.join(ExpenseCard, Expense.expense_card_id == ExpenseCard.id)
+            .filter(
+                func.lower(func.coalesce(Expense.description, "")).like(search_pattern)
+                | func.lower(ExpenseCard.name).like(search_pattern)
+            )
+        )
     total_count = query.count()
     expenses = query.order_by(Expense.date.desc()).offset(offset).limit(limit).all()
     response_data = [ExpenseResponse.from_orm(exp) for exp in expenses]
