@@ -18,6 +18,8 @@ from middleware.caching import CachingMiddleware
 # Import routers
 # NEW: Import from api.router (Showroom360 pattern)
 from api.router.user import user_router as user_router_new
+# Analytics router
+from api.router.analytics import analytics_router
 # OLD: Keep for backwards compatibility during migration
 from api.user import user_router as user_router_old
 from api.business import business_router
@@ -97,6 +99,8 @@ app.add_middleware(AuditMiddleware)
 # Routers
 # NEW: Use new Showroom360-style router
 app.include_router(user_router_new, prefix="/api/v1")
+# Analytics endpoints
+app.include_router(analytics_router, prefix="/api/v1")
 # OLD: Commented out - keeping for reference during migration
 # app.include_router(user_router_old, prefix="/api/v1")
 app.include_router(business_router, prefix="/api/v1")

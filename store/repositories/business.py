@@ -1,10 +1,12 @@
 """
 Business repository for business-related database operations.
 """
-from typing import Optional, List
+from typing import Optional, List, Dict
+from decimal import Decimal
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_
+from sqlalchemy import or_, func, case
 from models.business import Business, Unit, AdminCredentials, BusinessPermission
+from models.user_business import user_business
 from store.repositories.base import BaseRepository
 
 
@@ -105,6 +107,100 @@ class BusinessRepository(BaseRepository[Business]):
         self.db.flush()
         return creds
 
+    def get_business_performance_metrics(self) -> List[Dict[str, object]]:
+        """Aggregate savings, user, and unit metrics for every business."""
+        from models.savings import SavingsAccount, SavingsMarking
+
+        total_volume = func.coalesce(func.sum(SavingsMarking.amount), 0)
+        paid_volume = func.coalesce(
+            func.sum(
+                case(
+                    (SavingsMarking.status == "paid", SavingsMarking.amount),
+                    else_=0,
+                )
+            ),
+            0,
+        )
+        pending_volume = func.coalesce(
+            func.sum(
+                case(
+                    (SavingsMarking.status == "pending", SavingsMarking.amount),
+                    else_=0,
+                )
+            ),
+            0,
+        )
+
+        results = (
+            self.db.query(
+                Business.id.label("business_id"),
+                Business.name.label("name"),
+                Business.unique_code.label("unique_code"),
+                func.count(func.distinct(user_business.c.user_id)).label("total_users"),
+                func.count(func.distinct(Unit.id)).label("total_units"),
+                func.count(func.distinct(SavingsAccount.id)).label(
+                    "total_savings_accounts"
+                ),
+                total_volume.label("total_volume"),
+                paid_volume.label("paid_volume"),
+                pending_volume.label("pending_volume"),
+            )
+            .outerjoin(user_business, user_business.c.business_id == Business.id)
+            .outerjoin(Unit, Unit.business_id == Business.id)
+            .outerjoin(SavingsAccount, SavingsAccount.business_id == Business.id)
+            .outerjoin(
+                SavingsMarking, SavingsMarking.savings_account_id == SavingsAccount.id
+            )
+            .group_by(Business.id)
+            .order_by(Business.created_at.desc())
+            .all()
+        )
+
+        metrics: List[Dict[str, object]] = []
+        for row in results:
+            metrics.append(
+                {
+                    "business_id": row.business_id,
+                    "name": row.name,
+                    "unique_code": row.unique_code,
+                    "total_users": int(row.total_users or 0),
+                    "total_units": int(row.total_units or 0),
+                    "total_savings_accounts": int(row.total_savings_accounts or 0),
+                    "total_volume": Decimal(row.total_volume or 0),
+                    "paid_volume": Decimal(row.paid_volume or 0),
+                    "pending_volume": Decimal(row.pending_volume or 0),
+                }
+            )
+        return metrics
+
+    def get_units_by_business(self) -> List[Dict[str, object]]:
+        """Return unit counts grouped by business."""
+        results = (
+            self.db.query(
+                Business.id.label("business_id"),
+                Business.name.label("name"),
+                Business.unique_code.label("unique_code"),
+                func.count(Unit.id).label("unit_count"),
+            )
+            .outerjoin(Unit, Unit.business_id == Business.id)
+            .group_by(Business.id)
+            .order_by(Business.created_at.desc())
+            .all()
+        )
+        return [
+            {
+                "business_id": row.business_id,
+                "name": row.name,
+                "unique_code": row.unique_code,
+                "unit_count": int(row.unit_count or 0),
+            }
+            for row in results
+        ]
+
+    def count_total_units(self) -> int:
+        """Return total number of units across all businesses."""
+        return self.db.query(func.count(Unit.id)).scalar() or 0
+
 
 class UnitRepository(BaseRepository[Unit]):
     """Repository for Unit model"""
@@ -115,6 +211,42 @@ class UnitRepository(BaseRepository[Unit]):
     def get_by_business_id(self, business_id: int) -> List[Unit]:
         """Get all units for a business"""
         return self.find_by(business_id=business_id)
+
+    def count_all_units(self) -> int:
+        """Return total number of units in the system."""
+        return self.db.query(func.count(Unit.id)).scalar() or 0
+
+    def count_units_by_business(self) -> Dict[int, int]:
+        """Return mapping of business_id to the number of units."""
+        rows = (
+            self.db.query(Unit.business_id, func.count(Unit.id))
+            .group_by(Unit.business_id)
+            .all()
+        )
+        return {business_id: count for business_id, count in rows if business_id is not None}
+
+    def get_units_per_business(self) -> List[Dict[str, object]]:
+        """Return unit counts with business metadata."""
+        rows = (
+            self.db.query(
+                Business.id.label("business_id"),
+                Business.name.label("name"),
+                Business.unique_code.label("unique_code"),
+                func.count(Unit.id).label("unit_count"),
+            )
+            .join(Business, Unit.business_id == Business.id)
+            .group_by(Business.id)
+            .all()
+        )
+        return [
+            {
+                "business_id": row.business_id,
+                "name": row.name,
+                "unique_code": row.unique_code,
+                "unit_count": int(row.unit_count or 0),
+            }
+            for row in rows
+        ]
 
 
 class BusinessPermissionRepository(BaseRepository[BusinessPermission]):

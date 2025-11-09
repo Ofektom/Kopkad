@@ -1,7 +1,7 @@
 """
 User repository for user-related database operations.
 """
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict
 from datetime import datetime, timezone
 
 from sqlalchemy import select, func, exists, and_
@@ -342,4 +342,102 @@ class UserRepository(BaseRepository[User]):
         """Remove all permissions linked to a user."""
         self.db.execute(user_permissions.delete().where(user_permissions.c.user_id == user_id))
         self.db.flush()
+
+    # -------------------------------------------------------------------------
+    # Analytics helpers
+    # -------------------------------------------------------------------------
+
+    def count_all_users(self) -> int:
+        """Count all users in the system."""
+        return self.db.query(func.count(User.id)).scalar() or 0
+
+    def count_active_users(self) -> int:
+        """Count all active users."""
+        return self.db.query(func.count(User.id)).filter(User.is_active.is_(True)).scalar() or 0
+
+    def count_inactive_users(self) -> int:
+        """Count all inactive users."""
+        return self.db.query(func.count(User.id)).filter(User.is_active.is_(False)).scalar() or 0
+
+    def count_users_by_role(self) -> Dict[str, int]:
+        """Return a breakdown of users by role."""
+        results = (
+            self.db.query(User.role, func.count(User.id))
+            .group_by(User.role)
+            .all()
+        )
+        return {role: count for role, count in results if role is not None}
+
+    def get_recent_users(self, limit: int = 5) -> List[User]:
+        """Fetch the most recently created users."""
+        return (
+            self.db.query(User)
+            .order_by(User.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+
+    def get_business_user_counts(self) -> Dict[int, int]:
+        """Return mapping of business_id to number of linked users."""
+        rows = (
+            self.db.query(
+                user_business.c.business_id,
+                func.count(user_business.c.user_id),
+            )
+            .group_by(user_business.c.business_id)
+            .all()
+        )
+        return {
+            business_id: count
+            for business_id, count in rows
+            if business_id is not None
+        }
+
+    def get_monthly_user_growth(self, months: int = 6) -> List[Dict[str, int]]:
+        """Return the number of users created per month for the last N months."""
+        if months <= 0:
+            return []
+
+        month_alias = func.date_trunc("month", User.created_at)
+        rows = (
+            self.db.query(
+                month_alias.label("month"),
+                func.count(User.id).label("count"),
+            )
+            .filter(User.created_at.isnot(None))
+            .group_by("month")
+            .order_by(month_alias.desc())
+            .limit(months)
+            .all()
+        )
+
+        results: List[Dict[str, int]] = []
+        for month, count in reversed(rows):
+            label = month.strftime("%b %Y") if month else "Unknown"
+            results.append({"label": label, "value": int(count or 0)})
+        return results
+
+    def get_monthly_signups(self, months: int = 6) -> List[Dict[str, int]]:
+        """Return signup counts for the most recent `months` months (chronological)."""
+        if months <= 0:
+            return []
+
+        month_alias = func.date_trunc("month", User.created_at)
+        results = (
+            self.db.query(
+                month_alias.label("month"),
+                func.count(User.id).label("count"),
+            )
+            .filter(User.created_at.isnot(None))
+            .group_by("month")
+            .order_by(month_alias.desc())
+            .limit(months)
+            .all()
+        )
+
+        formatted: List[Dict[str, int]] = []
+        for month, count in reversed(results):
+            label = month.strftime("%b %Y") if month else "Unknown"
+            formatted.append({"label": label, "value": int(count or 0)})
+        return formatted
 
