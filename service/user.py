@@ -26,7 +26,13 @@ from store.enums import (
 )
 
 # Schemas
-from schemas.user import SignupRequest, UserResponse, LoginRequest, ChangePasswordRequest
+from schemas.user import (
+    SignupRequest,
+    UserResponse,
+    LoginRequest,
+    ChangePasswordRequest,
+    AdminUpdateRequest,
+)
 from schemas.business import BusinessResponse
 
 # Utilities
@@ -39,6 +45,24 @@ from config.settings import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _normalize_phone_number(raw_phone: str) -> Optional[str]:
+    """Normalize phone number to 11-digit format starting with 0; return None if invalid."""
+    if not raw_phone:
+        return None
+
+    cleaned = raw_phone.strip().replace(" ", "").replace("-", "")
+    digits = cleaned.replace("+", "")
+
+    if digits.startswith("234") and len(digits) == 13:
+        return "0" + digits[3:]
+    if len(digits) == 11 and digits.startswith("0"):
+        return digits
+    if len(digits) == 10 and not digits.startswith("0"):
+        return "0" + digits
+
+    return None
 
 async def signup_unauthenticated(
     request: SignupRequest,
@@ -398,21 +422,26 @@ async def login(
     if not user.is_active:
         return error_response(status_code=403, message="Account is inactive")
 
-    businesses = business_repo.get_user_businesses_with_units(user.id)
+    user_role_value = getattr(user.role, "value", user.role)
 
-    business_responses = [
-        BusinessResponse.model_validate(business, from_attributes=True)
-        for business in businesses
-    ] if businesses else []
-
-    # Set default active business (user's saved preference or first business)
+    business_responses = []
     active_business_id = None
-    if businesses:
-        active_business_id = user.active_business_id if user.active_business_id else businesses[0].id
-        # Update user's active business if not set
-        if not user.active_business_id:
-            user_repo.update_active_business(user.id, active_business_id)
-            db.commit()
+
+    if user_role_value != Role.SUPER_ADMIN.value:
+        businesses = business_repo.get_user_businesses_with_units(user.id)
+        if businesses:
+            business_responses = [
+                BusinessResponse.model_validate(business, from_attributes=True)
+                for business in businesses
+            ]
+
+            active_business_id = (
+                user.active_business_id if user.active_business_id else businesses[0].id
+            )
+            # Update user's active business if not set
+            if not user.active_business_id:
+                user_repo.update_active_business(user.id, active_business_id)
+                db.commit()
 
     access_token = create_access_token(
         data={"sub": user.username, "role": user.role, "user_id": user.id}, 
@@ -1040,6 +1069,94 @@ async def assign_admin_to_business(
         return error_response(status_code=500, message=f"Failed to assign admin: {str(e)}")
 
 
+async def update_admin_details(
+    user_id: int,
+    request: AdminUpdateRequest,
+    current_user: dict,
+    db: Session,
+    user_repo: UserRepository,
+):
+    """Update profile details for an admin (super_admin only)."""
+    if current_user.get("role") != "super_admin":
+        return error_response(status_code=403, message="Only super admin can update admin details")
+
+    admin = user_repo.get_by_id(user_id)
+    if not admin or admin.role not in {Role.ADMIN.value, Role.ADMIN}:
+        return error_response(status_code=404, message="Admin not found")
+
+    updated = False
+
+    if request.full_name is not None:
+        admin.full_name = request.full_name.strip()
+        updated = True
+
+    if request.email is not None:
+        email_lower = request.email.lower()
+        if user_repo.email_in_use(email_lower, exclude_user_id=user_id):
+            return error_response(status_code=409, message="Email already in use by another user")
+        admin.email = email_lower
+        updated = True
+
+    if request.phone_number is not None:
+        normalized_phone = _normalize_phone_number(request.phone_number)
+        if not normalized_phone:
+            return error_response(status_code=400, message="Invalid phone number format. Use Nigerian phone numbers.")
+        if user_repo.phone_in_use(normalized_phone, exclude_user_id=user_id):
+            return error_response(status_code=409, message="Phone number already in use by another user")
+        if user_repo.username_in_use(normalized_phone, exclude_user_id=user_id):
+            return error_response(status_code=409, message="Username already in use by another user")
+        admin.phone_number = normalized_phone
+        admin.username = normalized_phone
+        updated = True
+
+    if not updated:
+        return success_response(
+            status_code=200,
+            message="No changes applied",
+            data={
+                "user_id": admin.id,
+                "full_name": admin.full_name,
+                "email": admin.email,
+                "phone_number": admin.phone_number,
+            },
+        )
+
+    admin.updated_at = datetime.now(timezone.utc)
+    admin.updated_by = current_user.get("user_id")
+
+    try:
+        db.commit()
+        admin_with_businesses = user_repo.get_with_businesses(admin.id)
+        businesses = []
+        if admin_with_businesses and admin_with_businesses.businesses:
+            businesses = [
+                {
+                    "id": business.id,
+                    "name": business.name,
+                    "unique_code": business.unique_code,
+                }
+                for business in admin_with_businesses.businesses
+            ]
+
+        logger.info("Admin %s updated by super admin %s", admin.id, current_user["user_id"])
+
+        return success_response(
+            status_code=200,
+            message="Admin details updated successfully",
+            data={
+                "user_id": admin.id,
+                "full_name": admin.full_name,
+                "email": admin.email,
+                "phone_number": admin.phone_number,
+                "businesses": businesses,
+            },
+        )
+    except Exception as exc:
+        db.rollback()
+        logger.error(f"Failed to update admin {user_id}: {str(exc)}")
+        return error_response(status_code=500, message=f"Failed to update admin: {str(exc)}")
+
+
 async def get_business_admin_credentials(
     current_user: dict,
     db: Session,
@@ -1120,16 +1237,20 @@ async def get_current_user_info_service(
     if not user:
         return error_response(status_code=404, message="User not found")
 
-    businesses = business_repo.get_user_businesses_with_units(user.id)
-    business_payload = [
-        {
-            "id": business.id,
-            "name": business.name,
-            "unique_code": business.unique_code,
-            "is_default": getattr(business, "is_default", False),
-        }
-        for business in businesses
-    ]
+    user_role_value = getattr(user.role, "value", user.role)
+
+    business_payload = []
+    if user_role_value != Role.SUPER_ADMIN.value:
+        businesses = business_repo.get_user_businesses_with_units(user.id)
+        business_payload = [
+            {
+                "id": business.id,
+                "name": business.name,
+                "unique_code": business.unique_code,
+                "is_default": getattr(business, "is_default", False),
+            }
+            for business in businesses
+        ]
 
     return success_response(
         status_code=200,

@@ -4,7 +4,7 @@ User repository for user-related database operations.
 from typing import Optional, List, Tuple
 from datetime import datetime, timezone
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, exists, and_
 from sqlalchemy.orm import Session, joinedload
 
 from models.user import User, user_permissions
@@ -187,6 +187,31 @@ class UserRepository(BaseRepository[User]):
                 insert(user_business).values(user_id=user_id, business_id=business_id)
             )
             self.db.flush()
+
+    # -------------------------------------------------------------------------
+    # Uniqueness helpers
+    # -------------------------------------------------------------------------
+
+    def phone_in_use(self, phone_number: str, exclude_user_id: Optional[int] = None) -> bool:
+        """Check if a phone number is already used by another user."""
+        conditions = [User.phone_number == phone_number]
+        if exclude_user_id is not None:
+            conditions.append(User.id != exclude_user_id)
+        return self.db.query(exists().where(and_(*conditions))).scalar()
+
+    def email_in_use(self, email: str, exclude_user_id: Optional[int] = None) -> bool:
+        """Check if an email is already used by another user."""
+        conditions = [User.email == email]
+        if exclude_user_id is not None:
+            conditions.append(User.id != exclude_user_id)
+        return self.db.query(exists().where(and_(*conditions))).scalar()
+
+    def username_in_use(self, username: str, exclude_user_id: Optional[int] = None) -> bool:
+        """Check if a username is already used by another user."""
+        conditions = [User.username == username]
+        if exclude_user_id is not None:
+            conditions.append(User.id != exclude_user_id)
+        return self.db.query(exists().where(and_(*conditions))).scalar()
 
     # -------------------------------------------------------------------------
     # Extended query helpers

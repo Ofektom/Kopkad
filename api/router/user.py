@@ -21,6 +21,7 @@ from api.controller.user import (
     assign_admin_controller,
     get_admin_credentials_controller,
     get_current_user_info_controller,
+    update_admin_details_controller,
 )
 
 user_router = APIRouter(prefix="/auth", tags=["Authentication & User Management"])
@@ -158,5 +159,13 @@ user_router.add_api_route(
     methods=["GET"],
     response_model=dict,
     summary="Get all admin credentials (super_admin only)",
+)
+
+user_router.add_api_route(
+    "/admin/{user_id}",
+    endpoint=update_admin_details_controller,
+    methods=["PATCH"],
+    response_model=dict,
+    summary="Update admin details (super_admin only)",
 )
 

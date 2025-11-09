@@ -28,8 +28,10 @@ from service.business import (
     get_all_unit_summary,
     get_business_unit_summary,
     get_user_units,
+    get_unassigned_admin_businesses,
 )
 from database.postgres_optimized import get_db
+from store.repositories.business import BusinessRepository
 from utils.auth import get_current_user
 from typing import Optional, List
 from datetime import date
@@ -73,6 +75,15 @@ async def get_user_businesses_endpoint(
     return await get_user_businesses(
         current_user, db, address, start_date, end_date, page, size
     )
+
+
+@business_router.get("/unassigned-admins", response_model=dict)
+async def get_unassigned_admin_businesses_endpoint(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    business_repo = BusinessRepository(db)
+    return await get_unassigned_admin_businesses(current_user, business_repo)
 
 @business_router.get("/{business_id}", response_model=BusinessResponse)
 async def get_single_business_endpoint(

@@ -3,6 +3,7 @@ Business repository for business-related database operations.
 """
 from typing import Optional, List
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
 from models.business import Business, Unit, AdminCredentials, BusinessPermission
 from store.repositories.base import BaseRepository
 
@@ -69,6 +70,21 @@ class BusinessRepository(BaseRepository[Business]):
     def list_all(self) -> List[Business]:
         """Return all businesses."""
         return self.db.query(Business).all()
+
+    def get_unassigned_businesses(self) -> List[Business]:
+        """Return businesses that do not currently have an assigned admin (is_assigned=False)."""
+        return (
+            self.db.query(Business)
+            .outerjoin(AdminCredentials, AdminCredentials.business_id == Business.id)
+            .filter(
+                or_(
+                    AdminCredentials.id.is_(None),
+                    AdminCredentials.is_assigned.is_(False),
+                )
+            )
+            .order_by(Business.created_at.desc())
+            .all()
+        )
 
     def set_admin(self, business_id: int, admin_user_id: int) -> Optional[Business]:
         """Update the admin assigned to a business."""

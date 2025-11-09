@@ -348,7 +348,22 @@ async def get_user_businesses(
     page: int = 1,
     size: int = 8
 ):
-    """Retrieve paginated and filtered list of businesses associated with the user or all businesses for ADMIN."""
+    """Retrieve paginated and filtered list of businesses associated with the user or all businesses for ADMIN/SUPER_ADMIN."""
+    # SUPER_ADMIN should not see businesses in their user profile (they're universal)
+    # But they can access all businesses through other endpoints
+    if current_user["role"] == Role.SUPER_ADMIN:
+        return success_response(
+            status_code=200,
+            message="Super admin is universal and not associated with specific businesses",
+            data={
+                "businesses": [],
+                "total_items": 0,
+                "total_pages": 0,
+                "current_page": page,
+                "size": size
+            }
+        )
+    
     if current_user["role"] == Role.ADMIN:
         query = db.query(Business)
     else:
@@ -841,4 +856,28 @@ async def get_business_unit_summary(business_id: str, current_user: dict, db: Se
         status_code=200,
         message="Business unit count retrieved successfully",
         data={"total_units": total_units}
+    )
+
+
+async def get_unassigned_admin_businesses(
+    current_user: dict,
+    business_repo: "BusinessRepository",
+):
+    """Return businesses that do not currently have an assigned admin (super_admin only)."""
+    if current_user.get("role") != Role.SUPER_ADMIN:
+        return error_response(
+            status_code=403,
+            message="Only super_admin can view unassigned businesses",
+        )
+
+    businesses = business_repo.get_unassigned_businesses()
+    business_list = [
+        BusinessResponse.model_validate(business, from_attributes=True).model_dump()
+        for business in businesses
+    ]
+
+    return success_response(
+        status_code=200,
+        message="Unassigned businesses retrieved successfully",
+        data={"businesses": business_list, "total": len(business_list)},
     )

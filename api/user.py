@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, Body
 from typing import List
 from sqlalchemy.orm import Session
-from schemas.user import SignupRequest, LoginRequest, ChangePasswordRequest, UserResponse
+from schemas.user import SignupRequest, LoginRequest, ChangePasswordRequest, UserResponse, AdminUpdateRequest
 from service.user import (
     signup_unauthenticated,
     signup_authenticated,
@@ -17,10 +17,12 @@ from service.user import (
     switch_business,
     assign_admin_to_business,
     get_business_admin_credentials,
+    update_admin_details,
 )
 from database.postgres_optimized import get_db
 from utils.auth import get_current_user, oauth2_scheme
 from typing import Optional
+from store.repositories import UserRepository
 
 user_router = APIRouter(tags=["auth"], prefix="/auth")
 
@@ -81,7 +83,7 @@ async def get_current_user_info(
     current_user: dict = Depends(get_current_user)
 ):
     """Get the current authenticated user's information."""
-    from models.user import User
+    from models.user import User, Role
     from models.business import Business
     
     user = db.query(User).filter(User.id == current_user["user_id"]).first()
@@ -91,16 +93,20 @@ async def get_current_user_info(
             "message": "User not found"
         }
     
-    # Get user's businesses
-    businesses = [
-        {
-            "id": b.id,
-            "name": b.name,
-            "unique_code": b.unique_code,
-            "is_default": b.is_default
-        }
-        for b in user.businesses
-    ]
+    user_role_value = getattr(user.role, "value", user.role)
+    
+    # Super admin should not have businesses - they are universal
+    businesses = []
+    if user_role_value != Role.SUPER_ADMIN.value:
+        businesses = [
+            {
+                "id": b.id,
+                "name": b.name,
+                "unique_code": b.unique_code,
+                "is_default": b.is_default
+            }
+            for b in user.businesses
+        ]
     
     return {
         "success": True,
@@ -111,7 +117,7 @@ async def get_current_user_info(
             "email": user.email,
             "phone_number": user.phone_number,
             "username": user.username,
-            "role": user.role.value if hasattr(user.role, 'value') else user.role,
+            "role": user_role_value,
             "is_active": user.is_active,
             "location": getattr(user, 'location', None),
             "businesses": businesses,
@@ -214,3 +220,15 @@ async def get_admin_credentials_endpoint(
 ):
     """Get all business admin credentials (super_admin only)."""
     return await get_business_admin_credentials(current_user, db)
+
+
+@user_router.patch("/admin/{user_id}", response_model=dict)
+async def update_admin_endpoint(
+    user_id: int,
+    request: AdminUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Update admin profile details (super_admin only)."""
+    user_repo = UserRepository(db)
+    return await update_admin_details(user_id, request, current_user, db, user_repo)

@@ -38,39 +38,8 @@ def bootstrap_super_admin(db: Session):
     super_admin.created_by = super_admin.id
     db.commit()
 
-    # Create default business (Central)
-    central_business = (
-        db.query(Business).filter(Business.unique_code == "CEN123").first()
-    )
-    if not central_business:
-        central_business = Business(
-            name="Central",
-            agent_id=super_admin.id,
-            unique_code="CEN123",
-            is_default=True,
-            created_by=super_admin.id,
-            created_at=datetime.now(timezone.utc),
-        )
-        db.add(central_business)
-        db.commit()
-        db.refresh(central_business)
-
-    # Link SUPER_ADMIN to Central business
-    existing_link = (
-        db.query(user_business)
-        .filter(
-            user_business.c.user_id == super_admin.id,
-            user_business.c.business_id == central_business.id,
-        )
-        .first()
-    )
-    if not existing_link:
-        db.execute(
-            insert(user_business).values(
-                user_id=super_admin.id, business_id=central_business.id
-            )
-        )
-        db.commit()
+    # Note: SUPER_ADMIN should NOT be linked to any business
+    # They are universal and can manage all businesses
 
     # Create settings for SUPER_ADMIN
     settings = db.query(Settings).filter(Settings.user_id == super_admin.id).first()
@@ -106,5 +75,5 @@ def bootstrap_super_admin(db: Session):
         db.commit()
 
     print(
-        f"SUPER_ADMIN seeded with ID {super_admin.id} and linked to business 'CEN123'."
+        f"SUPER_ADMIN seeded with ID {super_admin.id}. Super admin is universal and not linked to any business."
     )

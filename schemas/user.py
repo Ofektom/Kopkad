@@ -44,3 +44,10 @@ class Response(BaseModel):
     success: bool
     message: str
     data: Optional[Dict] = None
+
+
+class AdminUpdateRequest(BaseModel):
+    """Payload for updating admin profile details."""
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
