@@ -87,12 +87,13 @@ async def savings_list_route(
     business_id: int = Query(None, description="Filter by business ID (required for admin role)"),
     unit_id: int = Query(None, description="Filter by unit ID"),
     savings_type: str = Query(None, description="Filter by savings type (DAILY or TARGET)"),
+    search: str = Query(None, description="Search by tracking number, customer name, phone, or email"),
     limit: int = Query(10, ge=1, description="Number of records to return"),
     offset: int = Query(0, ge=0, description="Number of records to skip"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db), 
 ):
-    return await get_all_savings(customer_id, business_id, unit_id, savings_type, limit, offset, current_user, db)
+    return await get_all_savings(customer_id, business_id, unit_id, savings_type, search, limit, offset, current_user, db)
 
 @savings_router.get("/markings/{tracking_number}", response_model=dict)
 async def get_savings_markings(

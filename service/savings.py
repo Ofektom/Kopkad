@@ -1,6 +1,6 @@
 from fastapi import status
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from models.savings import SavingsAccount, SavingsMarking, SavingsType, SavingsStatus, PaymentMethod, MarkingStatus
 from schemas.savings import (
     SavingsCreateDaily,
@@ -591,6 +591,7 @@ async def get_all_savings(
     business_id: int | None,
     unit_id: int | None,
     savings_type: str | None,
+    search: str | None,
     limit: int, 
     offset: int, 
     current_user: dict, 
@@ -696,6 +697,18 @@ async def get_all_savings(
         if savings_type.lower() not in savings_type_map and savings_type not in [SavingsType.DAILY, SavingsType.TARGET]:
             return error_response(status_code=400, message="Invalid savings type. Use DAILY, TARGET, single, or target")
         query = query.filter(SavingsAccount.savings_type == savings_type_map.get(savings_type.lower(), savings_type))
+    
+    if search:
+        search_pattern = f"%{search.lower()}%"
+        query = query.join(User, User.id == SavingsAccount.customer_id, isouter=True)
+        query = query.filter(
+            or_(
+                func.lower(SavingsAccount.tracking_number).like(search_pattern),
+                func.lower(User.full_name).like(search_pattern),
+                func.lower(User.phone_number).like(search_pattern),
+                func.lower(User.email).like(search_pattern),
+            )
+        )
     
     if limit < 1 or offset < 0:
         return error_response(status_code=400, message="Limit must be positive and offset non-negative")
