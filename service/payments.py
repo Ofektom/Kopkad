@@ -47,8 +47,9 @@ async def create_account_details(payment_account_id: int, request: AccountDetail
     if current_user["role"] == "customer" and payment_account.customer_id != current_user["user_id"]:
         return error_response(status_code=403, message="Not your payment account")
 
-    if current_user["role"] not in ["customer", "agent", "sub_agent", "admin", "super_admin"]:
-        return error_response(status_code=403, message="Unauthorized role")
+    # Only customers and agents can perform this action
+    if current_user["role"] not in ["customer", "agent"]:
+        return error_response(status_code=403, message="Unauthorized role. Only customers and agents can perform this action")
 
     try:
         account_details = AccountDetails(
@@ -92,8 +93,9 @@ async def update_account_details(account_details_id: int, request: AccountDetail
     if current_user["role"] == "customer" and payment_account.customer_id != current_user["user_id"]:
         return error_response(status_code=403, message="Not your payment account")
 
-    if current_user["role"] not in ["customer", "agent", "sub_agent", "admin", "super_admin"]:
-        return error_response(status_code=403, message="Unauthorized role")
+    # Only customers and agents can perform this action
+    if current_user["role"] not in ["customer", "agent"]:
+        return error_response(status_code=403, message="Unauthorized role. Only customers and agents can perform this action")
 
     try:
         # Update only provided fields
@@ -146,11 +148,14 @@ async def delete_payment_account(payment_account_id: int, current_user: dict, db
     if not payment_account:
         return error_response(status_code=404, message="Payment account not found")
 
-    if current_user["role"] == "customer" and payment_account.customer_id != current_user["user_id"]:
-        return error_response(status_code=403, message="Not your payment account")
+    # Only customers and agents can delete payment accounts
+    # Customers: their own payment accounts only
+    # Agents: their own payment accounts only (for commission payments)
+    if current_user["role"] not in ["customer", "agent"]:
+        return error_response(status_code=403, message="Unauthorized role. Only customers and agents can delete payment accounts")
 
-    if current_user["role"] not in ["customer", "admin", "super_admin"]:
-        return error_response(status_code=403, message="Unauthorized role")
+    if payment_account.customer_id != current_user["user_id"]:
+        return error_response(status_code=403, message="You can only delete your own payment account")
 
     # Check for active payment requests
     if db.query(PaymentRequest).filter(PaymentRequest.payment_account_id == payment_account_id).first():
@@ -183,8 +188,11 @@ async def create_payment_account(request: PaymentAccountCreate, current_user: di
     if not current_user_obj:
         return error_response(status_code=404, message="User not found")
 
-    if current_user["role"] not in ["customer", "admin", "super_admin"]:
-        return error_response(status_code=403, message="Only customers, admins, or super-admins can create payment accounts")
+    # Only customers and agents can create payment accounts
+    # Agents create payment accounts for themselves (for commission payments)
+    # Customers create payment accounts for themselves (for savings payouts)
+    if current_user["role"] not in ["customer", "agent"]:
+        return error_response(status_code=403, message="Only customers and agents can create payment accounts")
 
     if current_user["role"] == "customer" and current_user["user_id"] != current_user_obj.id:
         return error_response(status_code=403, message="Customers can only create their own payment accounts")
@@ -266,11 +274,14 @@ async def update_payment_account(payment_account_id: int, request: PaymentAccoun
     if not payment_account:
         return error_response(status_code=404, message="Payment account not found")
 
-    if current_user["role"] == "customer" and payment_account.customer_id != current_user["user_id"]:
-        return error_response(status_code=403, message="Not your payment account")
+    # Only customers and agents can update payment accounts
+    # Customers: their own payment accounts only
+    # Agents: their own payment accounts only (for commission payments)
+    if current_user["role"] not in ["customer", "agent"]:
+        return error_response(status_code=403, message="Unauthorized role. Only customers and agents can update payment accounts")
 
-    if current_user["role"] not in ["customer", "admin", "super_admin"]:
-        return error_response(status_code=403, message="Unauthorized role")
+    if payment_account.customer_id != current_user["user_id"]:
+        return error_response(status_code=403, message="You can only update your own payment account")
 
     try:
         if request.account_details:
@@ -356,11 +367,14 @@ async def delete_account_details(account_details_id: int, current_user: dict, db
     if not payment_account:
         return error_response(status_code=404, message="Payment account not found")
 
-    if current_user["role"] == "customer" and payment_account.customer_id != current_user["user_id"]:
-        return error_response(status_code=403, message="Not your payment account")
+    # Only customers and agents can delete account details
+    # Customers: their own account details only
+    # Agents: their own account details only (for commission payments)
+    if current_user["role"] not in ["customer", "agent"]:
+        return error_response(status_code=403, message="Unauthorized role. Only customers and agents can delete account details")
 
-    if current_user["role"] not in ["customer", "agent", "sub_agent", "admin", "super_admin"]:
-        return error_response(status_code=403, message="Unauthorized role")
+    if payment_account.customer_id != current_user["user_id"]:
+        return error_response(status_code=403, message="You can only delete your own account details")
 
     if db.query(PaymentRequest).filter(PaymentRequest.account_details_id == account_details_id).first():
         return error_response(status_code=400, message="Cannot delete account details used in a payment request")
@@ -911,28 +925,27 @@ async def get_payment_accounts(
     if not current_user_obj:
         return error_response(status_code=404, message="User not found")
 
-    if current_user["role"] not in ["customer", "agent", "sub_agent", "admin", "super_admin"]:
-        return error_response(status_code=403, message="Unauthorized role")
+    # Only customers and agents can view payment accounts
+    # Customers: their own payment accounts only
+    # Agents: payment accounts for commission payments (their own)
+    # Admins, super_admins, and sub_agents: NOT allowed
+    if current_user["role"] not in ["customer", "agent"]:
+        return error_response(status_code=403, message="Unauthorized role. Only customers and agents can view payment accounts")
 
     query = db.query(PaymentAccount).join(User, User.id == PaymentAccount.customer_id)
 
+    # Both customers and agents can only view their own payment accounts
     if current_user["role"] == "customer":
         if customer_id and customer_id != current_user["user_id"]:
             return error_response(status_code=403, message="Customers can only view their own payment accounts")
         query = query.filter(PaymentAccount.customer_id == current_user["user_id"])
-    elif current_user["role"] in ["agent", "sub_agent"]:
-        business_ids = [b.id for b in current_user_obj.businesses]
-        if not business_ids:
-            return error_response(status_code=400, message="No business associated with user")
-        query = query.join(PaymentRequest).join(SavingsAccount).filter(SavingsAccount.business_id.in_(business_ids))
-    elif current_user["role"] not in ["admin", "super_admin"]:
-        return error_response(status_code=403, message="Unauthorized role")
-
-    if customer_id:
-        customer = db.query(User).filter(User.id == customer_id, User.role == "customer").first()
-        if not customer:
-            return error_response(status_code=400, message=f"User {customer_id} is not a customer")
-        query = query.filter(PaymentAccount.customer_id == customer_id)
+    elif current_user["role"] == "agent":
+        # Agents can only view their own payment accounts (for commission payments)
+        if customer_id and customer_id != current_user["user_id"]:
+            return error_response(status_code=403, message="Agents can only view their own payment accounts")
+        query = query.filter(PaymentAccount.customer_id == current_user["user_id"])
+    
+    # Note: customer_id parameter is ignored for customers and agents as they can only see their own accounts
 
     total_count = query.count()
     payment_accounts = query.order_by(PaymentAccount.created_at.desc()).offset(offset).limit(limit).all()
