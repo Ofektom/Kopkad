@@ -1,7 +1,6 @@
-from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 
 class DashboardTotals(BaseModel):
@@ -41,19 +40,6 @@ class BusinessPerformanceMetrics(BaseModel):
     total_volume: float
     paid_volume: float
     pending_volume: float
-
-
-class RecentUserSummary(BaseModel):
-    user_id: int
-    full_name: Optional[str] = None
-    email: Optional[EmailStr] = None
-    phone_number: Optional[str] = None
-    role: str
-    is_active: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class UnitCount(BaseModel):
@@ -108,6 +94,5 @@ class DashboardAnalyticsResponse(BaseModel):
     unit_summary: UnitSummary
     payment_summary: PaymentSummary
     charts: DashboardCharts
-    recent_users: List[RecentUserSummary]
 
 

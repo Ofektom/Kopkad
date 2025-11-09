@@ -10,7 +10,6 @@ from schemas.analytics import (
     SavingsOverview,
     SavingsVolumeBreakdown,
     BusinessPerformanceMetrics,
-    RecentUserSummary,
     UnitSummary,
     UnitCount,
     PaymentSummary,
@@ -69,6 +68,7 @@ async def get_super_admin_dashboard(
         savings_metrics = savings_repo.get_system_savings_metrics()
     except Exception as exc:
         logger.warning("Failed to retrieve savings metrics: %s", exc)
+        db.rollback()
         savings_metrics = {
             "total_accounts": 0,
             "accounts_by_type": {},
@@ -80,30 +80,35 @@ async def get_super_admin_dashboard(
         business_metrics = business_repo.get_business_performance_metrics()
     except Exception as exc:
         logger.warning("Failed to retrieve business performance metrics: %s", exc)
+        db.rollback()
         business_metrics = []
 
     try:
         user_counts_by_business = user_repo.get_business_user_counts()
     except Exception as exc:
         logger.warning("Failed to retrieve user counts by business: %s", exc)
+        db.rollback()
         user_counts_by_business = {}
 
     try:
         unit_counts_by_business = unit_repo.count_units_by_business()
     except Exception as exc:
         logger.warning("Failed to retrieve unit counts by business: %s", exc)
+        db.rollback()
         unit_counts_by_business = {}
 
     try:
         units_per_business = unit_repo.get_units_per_business()
     except Exception as exc:
         logger.warning("Failed to retrieve units per business: %s", exc)
+        db.rollback()
         units_per_business = []
 
     try:
         role_counts = user_repo.count_users_by_role()
     except Exception as exc:
         logger.warning("Failed to retrieve role counts: %s", exc)
+        db.rollback()
         role_counts = {}
 
     role_breakdown = {role.value: role_counts.get(role.value, 0) for role in Role}
@@ -112,66 +117,77 @@ async def get_super_admin_dashboard(
         successful_payment_stats = payments_repo.get_successful_payment_stats()
     except Exception as exc:
         logger.warning("Failed to retrieve successful payment stats: %s", exc)
+        db.rollback()
         successful_payment_stats = {"count": 0, "amount": 0.0}
 
     try:
         payment_status_metrics = payments_repo.get_status_summary()
     except Exception as exc:
         logger.warning("Failed to retrieve payment status summary: %s", exc)
+        db.rollback()
         payment_status_metrics = []
 
     try:
         monthly_payment_volume = payments_repo.get_monthly_payment_volume(months=6)
     except Exception as exc:
         logger.warning("Failed to retrieve monthly payment volume: %s", exc)
+        db.rollback()
         monthly_payment_volume = []
 
     try:
         total_payment_requests = payments_repo.count_total_requests()
     except Exception as exc:
         logger.warning("Failed to count payment requests: %s", exc)
+        db.rollback()
         total_payment_requests = 0
 
     try:
         transfer_metrics = savings_repo.get_successful_transfer_metrics()
     except Exception as exc:
         logger.warning("Failed to retrieve transfer metrics: %s", exc)
+        db.rollback()
         transfer_metrics = {"count": 0, "amount": 0.0}
 
     try:
         monthly_transfer_volume = savings_repo.get_monthly_transfer_volume(months=6)
     except Exception as exc:
         logger.warning("Failed to retrieve monthly transfer volume: %s", exc)
+        db.rollback()
         monthly_transfer_volume = []
 
     try:
         total_users = user_repo.count_all_users()
     except Exception as exc:
         logger.warning("Failed to count users: %s", exc)
+        db.rollback()
         total_users = 0
 
     try:
         active_users = user_repo.count_active_users()
     except Exception as exc:
         logger.warning("Failed to count active users: %s", exc)
+        db.rollback()
         active_users = 0
 
     try:
         inactive_users = user_repo.count_inactive_users()
     except Exception as exc:
         logger.warning("Failed to count inactive users: %s", exc)
+        db.rollback()
         inactive_users = 0
 
     try:
         total_businesses = business_repo.count()
     except Exception as exc:
         logger.warning("Failed to count businesses: %s", exc)
+        db.rollback()
         total_businesses = 0
 
     try:
         total_units = unit_repo.count_all_units()
     except Exception as exc:
         logger.warning("Failed to count units: %s", exc)
+        db.rollback()
         total_units = 0
 
     totals = DashboardTotals(
@@ -273,6 +289,7 @@ async def get_super_admin_dashboard(
         user_growth_points = user_repo.get_monthly_user_growth(months=6)
     except Exception as exc:
         logger.warning("Failed to retrieve monthly user growth: %s", exc)
+        db.rollback()
         user_growth_points = []
 
     charts = DashboardCharts(
@@ -317,11 +334,6 @@ async def get_super_admin_dashboard(
         ],
     )
 
-    recent_users = [
-        RecentUserSummary.model_validate(user)
-        for user in user_repo.get_recent_users(limit=5)
-    ]
-
     response_payload = DashboardAnalyticsResponse(
         totals=totals,
         role_breakdown=role_breakdown,
@@ -330,7 +342,6 @@ async def get_super_admin_dashboard(
         unit_summary=unit_summary,
         payment_summary=payment_summary,
         charts=charts,
-        recent_users=recent_users,
     )
 
     return success_response(
