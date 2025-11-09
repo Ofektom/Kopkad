@@ -69,7 +69,7 @@ class BusinessRepository(BaseRepository[Business]):
                     # Customers and sub-agents: via user_business table
                     Business.id.in_(
                         self.db.query(user_business.c.business_id)
-                        .filter(user_business.c.user_id == user_id)
+            .filter(user_business.c.user_id == user_id)
                     ),
                     # Admins: via business.admin_id
                     Business.admin_id == user_id,

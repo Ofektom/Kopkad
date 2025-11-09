@@ -459,9 +459,9 @@ async def login(
                 )
             else:
                 # For customers and sub-agents, use stored active_business_id or first business
-                active_business_id = (
-                    user.active_business_id if user.active_business_id else businesses[0].id
-                )
+            active_business_id = (
+                user.active_business_id if user.active_business_id else businesses[0].id
+            )
             
             # Update user's active business if not set
             if not user.active_business_id:
@@ -647,14 +647,14 @@ async def get_all_users(
                 is_active=is_active,
             )
         else:
-            users, total = user_repo.get_users_with_filters(
-                limit=limit,
-                offset=offset,
-                role=normalized_role,
-                business_name=business_name,
-                unique_code=unique_code,
-                is_active=is_active,
-            )
+        users, total = user_repo.get_users_with_filters(
+            limit=limit,
+            offset=offset,
+            role=normalized_role,
+            business_name=business_name,
+            unique_code=unique_code,
+            is_active=is_active,
+        )
 
         user_responses: List[UserResponse] = []
         for user in users:
