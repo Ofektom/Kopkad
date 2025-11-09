@@ -537,10 +537,19 @@ async def get_payment_requests(
             PaymentAccount.customer_id == current_user["user_id"],
             PaymentRequest.status.in_([PaymentRequestStatus.PENDING, PaymentRequestStatus.APPROVED])
         )
-    elif current_user["role"] not in ["admin", "super_admin"]:
+    elif current_user["role"] == "admin":
+        # Admins can only see payment requests from their assigned business
+        from models.business import Business
+        admin_business = db.query(Business).filter(Business.admin_id == current_user["user_id"]).first()
+        if not admin_business:
+            return error_response(status_code=403, message="Admin is not assigned to any business")
+        # Force filter by admin's business - ignore any business_id parameter
+        query = query.filter(SavingsAccount.business_id == admin_business.id)
+    elif current_user["role"] != "super_admin":
         return error_response(status_code=403, message="Unauthorized role")
 
-    if business_id:
+    if business_id and current_user["role"] == "super_admin":
+        # Only super_admin can filter by business_id
         query = query.filter(SavingsAccount.business_id == business_id)
 
     if customer_id:

@@ -24,6 +24,10 @@ class BusinessRepository(BaseRepository[Business]):
         """Get business by agent ID"""
         return self.find_one_by(agent_id=agent_id)
     
+    def get_by_admin_id(self, admin_id: int) -> Optional[Business]:
+        """Get business by admin ID"""
+        return self.find_one_by(admin_id=admin_id)
+    
     def get_with_admin(self, business_id: int) -> Optional[Business]:
         """Get business with admin user loaded"""
         return (
@@ -43,15 +47,40 @@ class BusinessRepository(BaseRepository[Business]):
         )
     
     def get_user_businesses_with_units(self, user_id: int) -> List[Business]:
-        """Get all businesses for a user with units loaded"""
+        """
+        Get all businesses for a user with units loaded.
+        
+        Handles different relationship types:
+        - Customers: via user_business table (many-to-many)
+        - Sub-agents: via user_business table (one-to-one, but table allows many)
+        - Admins: via business.admin_id (one-to-one)
+        - Agents: via business.agent_id (one-to-one)
+        - Super Admins: no businesses (returns empty list)
+        """
         from models.user_business import user_business
-        return (
+        from sqlalchemy import or_
+        
+        # Query businesses from all possible relationships
+        businesses = (
             self.db.query(Business)
             .options(joinedload(Business.units))
-            .join(user_business, Business.id == user_business.c.business_id)
-            .filter(user_business.c.user_id == user_id)
+            .filter(
+                or_(
+                    # Customers and sub-agents: via user_business table
+                    Business.id.in_(
+                        self.db.query(user_business.c.business_id)
+                        .filter(user_business.c.user_id == user_id)
+                    ),
+                    # Admins: via business.admin_id
+                    Business.admin_id == user_id,
+                    # Agents: via business.agent_id
+                    Business.agent_id == user_id,
+                )
+            )
             .all()
         )
+        
+        return businesses
     
     def get_admin_credentials(self, business_id: int) -> Optional[AdminCredentials]:
         """Get admin credentials for business"""

@@ -1,5 +1,5 @@
 from fastapi import status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.sql import insert
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -8,6 +8,7 @@ import logging
 
 # Models (only for type hints and relationships)
 from models.user import User, user_permissions
+from models.business import Business
 
 # Repositories (for data access)
 from store.repositories import (
@@ -428,16 +429,40 @@ async def login(
     active_business_id = None
 
     if user_role_value != Role.SUPER_ADMIN.value:
+        # get_user_businesses_with_units now handles all relationship types:
+        # - Customers: via user_business table (many-to-many)
+        # - Sub-agents: via user_business table (one-to-one)
+        # - Admins: via business.admin_id (one-to-one)
+        # - Agents: via business.agent_id (one-to-one)
         businesses = business_repo.get_user_businesses_with_units(user.id)
+        
         if businesses:
             business_responses = [
                 BusinessResponse.model_validate(business, from_attributes=True)
                 for business in businesses
             ]
 
-            active_business_id = (
-                user.active_business_id if user.active_business_id else businesses[0].id
-            )
+            # Determine active business based on role
+            if user_role_value == Role.ADMIN.value:
+                # For admins, prioritize their assigned business (via admin_id)
+                admin_business = business_repo.get_by_admin_id(user.id)
+                active_business_id = (
+                    admin_business.id if admin_business 
+                    else (user.active_business_id if user.active_business_id else businesses[0].id)
+                )
+            elif user_role_value == Role.AGENT.value:
+                # For agents, prioritize their owned business (via agent_id)
+                agent_business = business_repo.get_by_agent_id(user.id)
+                active_business_id = (
+                    agent_business.id if agent_business
+                    else (user.active_business_id if user.active_business_id else businesses[0].id)
+                )
+            else:
+                # For customers and sub-agents, use stored active_business_id or first business
+                active_business_id = (
+                    user.active_business_id if user.active_business_id else businesses[0].id
+                )
+            
             # Update user's active business if not set
             if not user.active_business_id:
                 user_repo.update_active_business(user.id, active_business_id)
@@ -596,20 +621,40 @@ async def get_all_users(
         return error_response(status_code=403, message="Only SUPER_ADMIN or ADMIN can retrieve all users")
 
     try:
+        # For admins, restrict to their assigned business
+        admin_business_id = None
+        if current_user.get("role") == "admin":
+            admin_business = business_repo.get_by_admin_id(current_user["user_id"])
+            if not admin_business:
+                return error_response(status_code=403, message="Admin is not assigned to any business")
+            admin_business_id = admin_business.id
+            # Force filter by admin's business unique_code
+            unique_code = admin_business.unique_code
+
         normalized_role = None
         if role:
             normalized_role = role.lower()
             if normalized_role not in {r.value for r in Role}:
                 return error_response(status_code=400, message="Invalid role specified")
 
-        users, total = user_repo.get_users_with_filters(
-            limit=limit,
-            offset=offset,
-            role=normalized_role,
-            business_name=business_name,
-            unique_code=unique_code,
-            is_active=is_active,
-        )
+        # For admins, use business-specific user query
+        if admin_business_id:
+            users, total = user_repo.get_business_users_with_filters(
+                business_id=admin_business_id,
+                limit=limit,
+                offset=offset,
+                role=normalized_role,
+                is_active=is_active,
+            )
+        else:
+            users, total = user_repo.get_users_with_filters(
+                limit=limit,
+                offset=offset,
+                role=normalized_role,
+                business_name=business_name,
+                unique_code=unique_code,
+                is_active=is_active,
+            )
 
         user_responses: List[UserResponse] = []
         for user in users:
