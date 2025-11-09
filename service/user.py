@@ -615,6 +615,7 @@ async def get_all_users(
     business_name: Optional[str] = None,
     unique_code: Optional[str] = None,
     is_active: Optional[bool] = None,
+    search: Optional[str] = None,
 ):
     """Retrieve all users with pagination and filtering by role, business name, unique code, and active status."""
     if current_user.get("role") not in {"super_admin", "admin"}:
@@ -645,6 +646,7 @@ async def get_all_users(
                 offset=offset,
                 role=normalized_role,
                 is_active=is_active,
+                search=search,
             )
         else:
             users, total = user_repo.get_users_with_filters(
@@ -654,6 +656,7 @@ async def get_all_users(
                 business_name=business_name,
                 unique_code=unique_code,
                 is_active=is_active,
+                search=search,
             )
 
         user_responses: List[UserResponse] = []

@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timezone
 from fastapi import status
 from sqlalchemy.orm import Session
-from sqlalchemy.sql import func
+from sqlalchemy import func, or_
 from models.payments import AccountDetails, PaymentAccount, Commission, PaymentRequest, PaymentRequestStatus
 from models.savings import SavingsAccount, SavingsMarking, MarkingStatus, SavingsStatus
 from models.user import User
@@ -527,6 +527,7 @@ async def get_payment_requests(
     status: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    search: Optional[str] = None,
     limit: int = 20,
     offset: int = 0,
     current_user: dict = None,
@@ -578,6 +579,18 @@ async def get_payment_requests(
             query = query.filter(PaymentRequest.status == payment_request_status)
         except ValueError:
             return error_response(status_code=400, message=f"Invalid status: {status}")
+
+    if search:
+        search_pattern = f"%{search.lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(PaymentRequest.reference).like(search_pattern),
+                func.lower(SavingsAccount.tracking_number).like(search_pattern),
+                func.lower(User.full_name).like(search_pattern),
+                func.lower(User.phone_number).like(search_pattern),
+                func.lower(User.email).like(search_pattern),
+            )
+        )
 
     # Date filtering
     if start_date:
@@ -752,6 +765,7 @@ async def cancel_payment_request(request_id: int, current_user: dict, db: Sessio
 async def get_agent_commissions(
     business_id: Optional[int],
     savings_account_id: Optional[int],
+    search: Optional[str],
     limit: int,
     offset: int,
     current_user: dict,
@@ -783,6 +797,16 @@ async def get_agent_commissions(
         if not savings:
             return error_response(status_code=404, message="Savings account not found")
         query = query.filter(Commission.savings_account_id == savings_account_id)
+
+    if search:
+        search_pattern = f"%{search.lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(User.full_name).like(search_pattern),
+                func.lower(User.phone_number).like(search_pattern),
+                func.lower(SavingsAccount.tracking_number).like(search_pattern),
+            )
+        )
 
     total_count = query.count()
     commissions = query.order_by(Commission.commission_date.desc()).offset(offset).limit(limit).all()
@@ -820,6 +844,7 @@ async def get_agent_commissions(
 async def get_customer_payments(
     customer_id: Optional[int],
     savings_account_id: Optional[int],
+    search: Optional[str],
     limit: int,
     offset: int,
     current_user: dict,
@@ -857,6 +882,16 @@ async def get_customer_payments(
         if not savings:
             return error_response(status_code=404, message="Savings account not found")
         query = query.filter(PaymentRequest.savings_account_id == savings_account_id)
+
+    if search:
+        search_pattern = f"%{search.lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(User.full_name).like(search_pattern),
+                func.lower(User.phone_number).like(search_pattern),
+                func.lower(SavingsAccount.tracking_number).like(search_pattern),
+            )
+        )
 
     total_count = query.count()
     payment_requests = query.order_by(PaymentRequest.request_date.desc()).offset(offset).limit(limit).all()

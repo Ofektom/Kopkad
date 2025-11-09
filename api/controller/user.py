@@ -146,6 +146,7 @@ async def get_users_controller(
     business_name: Optional[str] = Query(None, description="Filter by partial business name"),
     unique_code: Optional[str] = Query(None, description="Filter by exact business unique code"),
     is_active: Optional[bool] = Query(None, description="Filter by active/inactive status"),
+    search: Optional[str] = Query(None, description="Search by user name, contact, or username"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
     user_repo: UserRepository = Depends(get_repository(UserRepository)),
@@ -162,7 +163,8 @@ async def get_users_controller(
         role=role,
         business_name=business_name,
         unique_code=unique_code,
-        is_active=is_active
+        is_active=is_active,
+        search=search,
     )
 
 

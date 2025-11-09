@@ -191,13 +191,14 @@ async def get_payment_requests_endpoint(
     status: Optional[str] = Query(None, description="Filter by status (pending, approved, rejected)"),
     start_date: Optional[str] = Query(None, description="Filter by start date (ISO format)"),
     end_date: Optional[str] = Query(None, description="Filter by end date (ISO format)"),
+    search: Optional[str] = Query(None, description="Search by reference, tracking number, or customer details"),
     limit: int = Query(10, ge=1, le=100),
     offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Retrieve payment requests for admins and customers. Blocked for agents/sub-agents."""
-    return await get_payment_requests(business_id, customer_id, status, start_date, end_date, limit, offset, current_user, db)
+    return await get_payment_requests(business_id, customer_id, status, start_date, end_date, search, limit, offset, current_user, db)
 
 @payment_router.post("/request/{request_id}/approve", response_model=dict)
 async def approve_payment_request_endpoint(
@@ -231,22 +232,24 @@ async def cancel_payment_request_endpoint(
 async def get_commissions_endpoint(
     business_id: Optional[int] = Query(None, description="Filter by business ID"),
     savings_account_id: Optional[int] = Query(None, description="Filter by savings account ID"),
+    search: Optional[str] = Query(None, description="Search by customer details or tracking number"),
     limit: int = Query(10, ge=1, le=100),
     offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Retrieve commissions for agents with customer and savings details."""
-    return await get_agent_commissions(business_id, savings_account_id, limit, offset, current_user, db)
+    return await get_agent_commissions(business_id, savings_account_id, search, limit, offset, current_user, db)
 
 @payment_router.get("/customer-payments", response_model=dict)
 async def get_customer_payments_endpoint(
     customer_id: Optional[int] = Query(None, description="Filter by customer ID"),
     savings_account_id: Optional[int] = Query(None, description="Filter by savings account ID"),
+    search: Optional[str] = Query(None, description="Search by customer details or tracking number"),
     limit: int = Query(10, ge=1, le=100),
     offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Retrieve customer payments for completed savings, including total amount, commission, and payout."""
-    return await get_customer_payments(customer_id, savings_account_id, limit, offset, current_user, db)
+    return await get_customer_payments(customer_id, savings_account_id, search, limit, offset, current_user, db)

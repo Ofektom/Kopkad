@@ -226,6 +226,7 @@ class UserRepository(BaseRepository[User]):
         business_name: Optional[str] = None,
         unique_code: Optional[str] = None,
         is_active: Optional[bool] = None,
+        search: Optional[str] = None,
     ) -> Tuple[List[User], int]:
         """
         Retrieve users with optional filters.
@@ -234,6 +235,7 @@ class UserRepository(BaseRepository[User]):
             Tuple[List[User], int]: (users, total_count)
         """
         query = select(User)
+        joined_business = False
 
         if role:
             query = query.filter(User.role == role)
@@ -246,10 +248,30 @@ class UserRepository(BaseRepository[User]):
                 query.join(user_business, User.id == user_business.c.user_id, isouter=True)
                 .join(Business, Business.id == user_business.c.business_id, isouter=True)
             )
+            joined_business = True
             if business_name:
                 query = query.filter(Business.name.ilike(f"%{business_name}%"))
             if unique_code:
                 query = query.filter(Business.unique_code == unique_code)
+
+        if search:
+            if not joined_business:
+                query = (
+                    query.join(user_business, User.id == user_business.c.user_id, isouter=True)
+                    .join(Business, Business.id == user_business.c.business_id, isouter=True)
+                )
+                joined_business = True
+            search_pattern = f"%{search.lower()}%"
+            query = query.filter(
+                or_(
+                    func.lower(User.full_name).like(search_pattern),
+                    func.lower(User.email).like(search_pattern),
+                    func.lower(User.phone_number).like(search_pattern),
+                    func.lower(User.username).like(search_pattern),
+                    func.lower(Business.name).like(search_pattern),
+                    func.lower(Business.unique_code).like(search_pattern),
+                )
+            )
 
         # Avoid duplicates when joins are applied
         query = query.distinct()
@@ -275,6 +297,7 @@ class UserRepository(BaseRepository[User]):
         savings_type: Optional[str] = None,
         savings_status: Optional[str] = None,
         payment_method: Optional[str] = None,
+        search: Optional[str] = None,
     ) -> Tuple[List[User], int]:
         """
         Retrieve users linked to a specific business with optional filters.
@@ -284,6 +307,7 @@ class UserRepository(BaseRepository[User]):
             .join(user_business, User.id == user_business.c.user_id)
             .filter(user_business.c.business_id == business_id)
         )
+        joined_savings = False
 
         if role:
             query = query.filter(User.role == role)
@@ -291,17 +315,18 @@ class UserRepository(BaseRepository[User]):
         if is_active is not None:
             query = query.filter(User.is_active == is_active)
 
-        if savings_type or savings_status or payment_method:
+        if savings_type or savings_status or payment_method or search:
             query = query.join(
                 SavingsAccount,
                 SavingsAccount.customer_id == User.id,
                 isouter=True,
             )
+            joined_savings = True
 
         if savings_type:
             query = query.filter(SavingsAccount.savings_type == savings_type)
 
-        if savings_status or payment_method:
+        if savings_status or payment_method or search:
             query = query.join(
                 SavingsMarking,
                 SavingsMarking.savings_account_id == SavingsAccount.id,
@@ -313,6 +338,18 @@ class UserRepository(BaseRepository[User]):
 
         if payment_method:
             query = query.filter(SavingsMarking.payment_method == payment_method)
+
+        if search:
+            search_pattern = f"%{search.lower()}%"
+            query = query.filter(
+                or_(
+                    func.lower(User.full_name).like(search_pattern),
+                    func.lower(User.email).like(search_pattern),
+                    func.lower(User.phone_number).like(search_pattern),
+                    func.lower(User.username).like(search_pattern),
+                    func.lower(SavingsAccount.tracking_number).like(search_pattern) if joined_savings else False,
+                )
+            )
 
         query = query.distinct()
 

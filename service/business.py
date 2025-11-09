@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import insert
-from sqlalchemy import select
+from sqlalchemy import select, or_, func
 from models.business import Business, PendingBusinessRequest, Unit, user_units, AdminCredentials, BusinessPermission
 from models.user_business import user_business
 from models.user import User, Role, Permission
@@ -343,6 +343,7 @@ async def get_user_businesses(
     current_user: dict,
     db: Session,
     address: Optional[str] = None,
+    search: Optional[str] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     page: int = 1,
@@ -387,6 +388,16 @@ async def get_user_businesses(
 
     if address:
         query = query.filter(Business.address.ilike(f"%{address}%"))
+    
+    if search:
+        search_pattern = f"%{search.lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(Business.name).like(search_pattern),
+                func.lower(Business.unique_code).like(search_pattern),
+                func.lower(Business.address).like(search_pattern),
+            )
+        )
 
     if start_date:
         query = query.filter(Business.created_at >= start_date)
@@ -582,7 +593,7 @@ async def get_single_unit(business_id: int, unit_id: int, current_user: dict, db
         data=UnitResponse.model_validate(unit).model_dump()
     )
 
-async def get_all_units(current_user: dict, db: Session, page: int = 1, size: int = 8):
+async def get_all_units(current_user: dict, db: Session, page: int = 1, size: int = 8, search: Optional[str] = None):
     """Retrieve all paginated units in the system for SUPER_ADMIN only."""
     logger.info(f"Fetching all units for user_id: {current_user['user_id']}, page: {page}, size: {size}")
     if current_user["role"] != Role.SUPER_ADMIN:
@@ -590,6 +601,14 @@ async def get_all_units(current_user: dict, db: Session, page: int = 1, size: in
         return error_response(status_code=403, message="Only SUPER_ADMIN can access all units")
 
     query = db.query(Unit)
+    if search:
+        search_pattern = f"%{search.lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(Unit.name).like(search_pattern),
+                func.lower(Unit.location).like(search_pattern),
+            )
+        )
     total_items = query.count()
     offset = (page - 1) * size
     units = query.order_by(Unit.created_at.desc()).offset(offset).limit(size).all()
@@ -621,7 +640,7 @@ async def get_all_units(current_user: dict, db: Session, page: int = 1, size: in
         }
     )
 
-async def get_business_units(business_id: int, current_user: dict, db: Session, page: int = 1, size: int = 8):
+async def get_business_units(business_id: int, current_user: dict, db: Session, page: int = 1, size: int = 8, search: Optional[str] = None):
     """Retrieve paginated units for a business based on user role."""
     logger.info(f"Fetching units for business_id: {business_id}, user_id: {current_user['user_id']}, role: {current_user['role']}, page: {page}, size: {size}")
     business = db.query(Business).filter(Business.id == business_id).first()
@@ -654,6 +673,15 @@ async def get_business_units(business_id: int, current_user: dict, db: Session, 
     else:
         logger.error(f"Invalid role {current_user['role']} for user {current_user['user_id']}")
         return error_response(status_code=403, message="Invalid user role")
+
+    if search:
+        search_pattern = f"%{search.lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(Unit.name).like(search_pattern),
+                func.lower(Unit.location).like(search_pattern),
+            )
+        )
 
     total_items = query.count()
     offset = (page - 1) * size
@@ -691,6 +719,7 @@ async def get_user_units(
     db: Session,
     name: Optional[str] = None,
     location: Optional[str] = None,
+    search: Optional[str] = None,
     page: int = 1,
     size: int = 8
 ):
@@ -705,6 +734,14 @@ async def get_user_units(
         query = query.filter(Unit.name.ilike(f"%{name}%"))
     if location:
         query = query.filter(Unit.location.ilike(f"%{location}%"))
+    if search:
+        search_pattern = f"%{search.lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(Unit.name).like(search_pattern),
+                func.lower(Unit.location).like(search_pattern),
+            )
+        )
 
     # Pagination
     total_items = query.count()

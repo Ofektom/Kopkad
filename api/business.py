@@ -65,6 +65,7 @@ async def reject_invitation(token: str = Query(...), db: Session = Depends(get_d
 @business_router.get("/list", response_model=List[BusinessResponse])
 async def get_user_businesses_endpoint(
     address: Optional[str] = Query(None, description="Filter by business address"),
+    search: Optional[str] = Query(None, description="Search by business name, code, or address"),
     start_date: Optional[date] = Query(None, description="Filter by creation date start"),
     end_date: Optional[date] = Query(None, description="Filter by creation date end"),
     page: int = Query(1, ge=1, description="Page number"),
@@ -73,7 +74,7 @@ async def get_user_businesses_endpoint(
     db: Session = Depends(get_db)
 ):
     return await get_user_businesses(
-        current_user, db, address, start_date, end_date, page, size
+        current_user, db, address, search, start_date, end_date, page, size
     )
 
 
@@ -132,31 +133,34 @@ async def get_single_unit_endpoint(
 async def get_all_units_endpoint(
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(8, ge=1, le=100, description="Items per page"),
+    search: Optional[str] = Query(None, description="Search units by name or location"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return await get_all_units(current_user, db, page, size)
+    return await get_all_units(current_user, db, page, size, search)
 
 @business_router.get("/{business_id}/units", response_model=List[UnitResponse])
 async def get_business_units_endpoint(
     business_id: int,
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(8, ge=1, le=100, description="Items per page"),
+    search: Optional[str] = Query(None, description="Search units by name or location"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return await get_business_units(business_id, current_user, db, page, size)
+    return await get_business_units(business_id, current_user, db, page, size, search)
 
 @business_router.get("/user/units/list/", response_model=List[UnitResponse])  # New endpoint
 async def get_user_units_endpoint(
     name: Optional[str] = Query(None, description="Filter by unit name"),
     location: Optional[str] = Query(None, description="Filter by unit location"),
+    search: Optional[str] = Query(None, description="Search units by name or location"),
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(8, ge=1, le=100, description="Items per page"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return await get_user_units(current_user, db, name, location, page, size)
+    return await get_user_units(current_user, db, name, location, search, page, size)
 
 @business_router.put("/{unit_id}/units", response_model=UnitResponse)
 async def update_unit_endpoint(
