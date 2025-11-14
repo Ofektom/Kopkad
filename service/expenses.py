@@ -21,6 +21,12 @@ import pandas as pd
 from statsmodels.tsa.arima.model import ARIMA
 from sklearn.linear_model import LinearRegression
 import numpy as np
+from store.repositories import (
+    ExpenseCardRepository,
+    ExpenseRepository,
+    UserRepository,
+    SavingsRepository,
+)
 
 logging.basicConfig(
     filename="expenses.log",
@@ -29,15 +35,34 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-async def create_expense_card(request: ExpenseCardCreate, current_user: dict, db: Session):
-    current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
+
+def _resolve_repo(repo, repo_cls, db: Session):
+    return repo if repo is not None else repo_cls(db)
+
+async def create_expense_card(
+    request: ExpenseCardCreate,
+    current_user: dict,
+    db: Session,
+    *,
+    user_repo: UserRepository | None = None,
+    savings_repo: SavingsRepository | None = None,
+    expense_card_repo: ExpenseCardRepository | None = None,
+):
+    user_repo = _resolve_repo(user_repo, UserRepository, db)
+    savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
+    expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+    session = expense_card_repo.db
+
+    current_user_obj = user_repo.get_by_id(current_user["user_id"])
     if not current_user_obj:
         return error_response(status_code=404, message="User not found")
 
-    # Determine business_id - use request or user's active_business_id
     target_business_id = request.business_id or current_user_obj.active_business_id
     if not target_business_id:
-        return error_response(status_code=400, message="No business context available. Please ensure you belong to a business.")
+        return error_response(
+            status_code=400,
+            message="No business context available. Please ensure you belong to a business.",
+        )
 
     income_amount = Decimal(0)
     balance = Decimal(0)
@@ -46,19 +71,27 @@ async def create_expense_card(request: ExpenseCardCreate, current_user: dict, db
         if not request.savings_id:
             return error_response(status_code=400, message="savings_id required for SAVINGS type")
         if request.income_details:
-            return error_response(status_code=400, message="income_details should only be provided for OTHER income type")
-        savings = db.query(SavingsAccount).filter(SavingsAccount.id == request.savings_id).first()
+            return error_response(
+                status_code=400,
+                message="income_details should only be provided for OTHER income type",
+            )
+        savings = savings_repo.get_by_id(request.savings_id)
         if not savings:
             return error_response(status_code=404, message="Savings account not found")
         if savings.customer_id != current_user["user_id"]:
             return error_response(status_code=403, message="Not your savings account")
         if savings.marking_status != MarkingStatus.COMPLETED:
             return error_response(status_code=400, message="Savings account must be marked as COMPLETED")
-        
-        paid_markings = db.query(SavingsMarking).filter(
-            SavingsMarking.savings_account_id == savings.id,
-            SavingsMarking.status == SavingsStatus.PAID
-        ).order_by(SavingsMarking.marked_date).all()
+
+        paid_markings = (
+            session.query(SavingsMarking)
+            .filter(
+                SavingsMarking.savings_account_id == savings.id,
+                SavingsMarking.status == SavingsStatus.PAID,
+            )
+            .order_by(SavingsMarking.marked_date)
+            .all()
+        )
         if not paid_markings:
             return error_response(status_code=400, message="No paid savings markings found")
         total_amount = sum(marking.amount for marking in paid_markings)
@@ -68,40 +101,63 @@ async def create_expense_card(request: ExpenseCardCreate, current_user: dict, db
         if savings.commission_days == 0:
             total_commission = Decimal(0)
         else:
-            total_commission = savings.commission_amount * Decimal(total_savings_days / savings.commission_days)
+            total_commission = savings.commission_amount * Decimal(
+                total_savings_days / savings.commission_days
+            )
             total_commission = total_commission.quantize(Decimal("0.01"))
         income_amount = total_amount - total_commission
         balance = income_amount
         if income_amount <= 0:
-            return error_response(status_code=400, message="No positive payout available from savings")
-    elif request.income_type in [IncomeType.SALARY, IncomeType.BORROWED, IncomeType.BUSINESS, IncomeType.OTHER]:
+            return error_response(
+                status_code=400, message="No positive payout available from savings"
+            )
+    elif request.income_type in [
+        IncomeType.SALARY,
+        IncomeType.BORROWED,
+        IncomeType.BUSINESS,
+        IncomeType.OTHER,
+    ]:
         if request.income_type == IncomeType.OTHER and not request.income_details:
-            return error_response(status_code=400, message="income_details is required for OTHER income type")
+            return error_response(
+                status_code=400, message="income_details is required for OTHER income type"
+            )
         if request.income_type != IncomeType.OTHER and request.income_details:
-            return error_response(status_code=400, message="income_details should only be provided for OTHER income type")
+            return error_response(
+                status_code=400,
+                message="income_details should only be provided for OTHER income type",
+            )
         if request.initial_income is not None:
             if request.initial_income < 0:
                 return error_response(status_code=400, message="Initial income cannot be negative")
             income_amount = request.initial_income
             balance = request.initial_income
 
-    expense_card = ExpenseCard(
-        customer_id=current_user["user_id"],
-        business_id=target_business_id,
-        name=request.name,
-        income_type=request.income_type,
-        income_amount=income_amount,
-        balance=balance,
-        savings_id=request.savings_id if request.income_type == IncomeType.SAVINGS else None,
-        income_details=request.income_details if request.income_type == IncomeType.OTHER else None,
-        created_by=current_user["user_id"],
-        created_at=datetime.now(timezone.utc)
+    expense_card = expense_card_repo.create(
+        {
+            "customer_id": current_user["user_id"],
+            "business_id": target_business_id,
+            "name": request.name,
+            "income_type": request.income_type,
+            "income_amount": income_amount,
+            "balance": balance,
+            "savings_id": request.savings_id
+            if request.income_type == IncomeType.SAVINGS
+            else None,
+            "income_details": request.income_details
+            if request.income_type == IncomeType.OTHER
+            else None,
+            "created_by": current_user["user_id"],
+            "created_at": datetime.now(timezone.utc),
+        }
     )
-    db.add(expense_card)
-    db.commit()
-    db.refresh(expense_card)
+    session.commit()
+    session.refresh(expense_card)
 
-    logger.info(f"Created expense card {expense_card.id} for user {current_user['user_id']}")
+    logger.info(
+        "Created expense card %s for user %s",
+        expense_card.id,
+        current_user["user_id"],
+    )
     return ExpenseCardResponse.from_orm(expense_card)
 
 async def get_expense_cards(
@@ -110,60 +166,90 @@ async def get_expense_cards(
     current_user: dict,
     db: Session,
     search: str | None = None,
+    *,
+    expense_card_repo: ExpenseCardRepository | None = None,
 ):
-    query = db.query(ExpenseCard).filter(ExpenseCard.customer_id == current_user["user_id"])
+    expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
 
-    if search:
-        search_pattern = f"%{search.lower()}%"
-        query = query.filter(
-            func.lower(ExpenseCard.name).like(search_pattern)
-            | func.lower(func.coalesce(ExpenseCard.income_details, "")).like(search_pattern)
-        )
-    total_count = query.count()
-    cards = query.order_by(ExpenseCard.created_at.desc()).offset(offset).limit(limit).all()
+    cards, total_count = expense_card_repo.list_for_user(
+        user_id=current_user["user_id"],
+        search=search,
+        limit=limit,
+        offset=offset,
+    )
+
     response_data = [ExpenseCardResponse.from_orm(card) for card in cards]
     return success_response(
         status_code=200,
         message="Expense cards retrieved successfully",
-        data={"cards": response_data, "total_count": total_count, "limit": limit, "offset": offset}
+        data={
+            "cards": response_data,
+            "total_count": total_count,
+            "limit": limit,
+            "offset": offset,
+        },
     )
 
-async def record_expense(card_id: int, request: ExpenseCreate, current_user: dict, db: Session):
-    card = db.query(ExpenseCard).filter(ExpenseCard.id == card_id).first()
+async def record_expense(
+    card_id: int,
+    request: ExpenseCreate,
+    current_user: dict,
+    db: Session,
+    *,
+    expense_card_repo: ExpenseCardRepository | None = None,
+    expense_repo: ExpenseRepository | None = None,
+):
+    expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+    expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+    session = expense_repo.db
+
+    card = expense_card_repo.get_by_id_for_user(card_id, current_user["user_id"])
     if not card:
         return error_response(status_code=404, message="Expense card not found")
-    if card.customer_id != current_user["user_id"]:
-        return error_response(status_code=403, message="Not your expense card")
     if request.amount <= 0:
         return error_response(status_code=400, message="Amount must be positive")
     if request.amount > card.balance:
         return error_response(status_code=400, message="Insufficient balance")
 
-    expense = Expense(
-        expense_card_id=card_id,
-        category=request.category,
-        description=request.description,
-        amount=request.amount,
-        date=request.date,
-        created_by=current_user["user_id"],
-        created_at=datetime.now(timezone.utc)
+    expense = expense_repo.create(
+        {
+            "expense_card_id": card_id,
+            "category": request.category,
+            "description": request.description,
+            "amount": request.amount,
+            "date": request.date,
+            "created_by": current_user["user_id"],
+            "created_at": datetime.now(timezone.utc),
+        }
     )
     card.balance -= request.amount
     card.updated_at = datetime.now(timezone.utc)
     card.updated_by = current_user["user_id"]
-    db.add(expense)
-    db.commit()
-    db.refresh(expense)
+    session.commit()
+    session.refresh(expense)
 
-    logger.info(f"Recorded expense {expense.id} for card {card_id} by user {current_user['user_id']}")
+    logger.info(
+        "Recorded expense %s for card %s by user %s",
+        expense.id,
+        card_id,
+        current_user["user_id"],
+    )
     return ExpenseResponse.from_orm(expense)
 
-async def top_up_expense_card(card_id: int, request: TopUpRequest, current_user: dict, db: Session):
-    card = db.query(ExpenseCard).filter(ExpenseCard.id == card_id).first()
+async def top_up_expense_card(
+    card_id: int,
+    request: TopUpRequest,
+    current_user: dict,
+    db: Session,
+    *,
+    expense_card_repo: ExpenseCardRepository | None = None,
+):
+    expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+    session = expense_card_repo.db
+
+    card = expense_card_repo.get_by_id_for_user(card_id, current_user["user_id"])
     if not card:
         return error_response(status_code=404, message="Expense card not found")
-    if card.customer_id != current_user["user_id"]:
-        return error_response(status_code=403, message="Not your expense card")
     if request.amount <= 0:
         return error_response(status_code=400, message="Top-up amount must be positive")
     if card.income_type == IncomeType.SAVINGS:
@@ -173,10 +259,15 @@ async def top_up_expense_card(card_id: int, request: TopUpRequest, current_user:
     card.balance += request.amount
     card.updated_at = datetime.now(timezone.utc)
     card.updated_by = current_user["user_id"]
-    db.commit()
-    db.refresh(card)
+    session.commit()
+    session.refresh(card)
 
-    logger.info(f"Topped up expense card {card_id} by {request.amount} for user {current_user['user_id']}")
+    logger.info(
+        "Topped up expense card %s by %s for user %s",
+        card_id,
+        request.amount,
+        current_user["user_id"],
+    )
     return ExpenseCardResponse.from_orm(card)
 
 async def get_expenses_by_card(
@@ -186,41 +277,53 @@ async def get_expenses_by_card(
     current_user: dict,
     db: Session,
     search: str | None = None,
+    *,
+    expense_card_repo: ExpenseCardRepository | None = None,
+    expense_repo: ExpenseRepository | None = None,
 ):
-    card = db.query(ExpenseCard).filter(ExpenseCard.id == card_id).first()
+    expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+    expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+
+    card = expense_card_repo.get_by_id_for_user(card_id, current_user["user_id"])
     if not card:
         return error_response(status_code=404, message="Expense card not found")
-    if card.customer_id != current_user["user_id"]:
-        return error_response(status_code=403, message="Not your expense card")
 
-    query = db.query(Expense).filter(Expense.expense_card_id == card_id)
-
-    if search:
-        search_pattern = f"%{search.lower()}%"
-        query = (
-            query.join(ExpenseCard, Expense.expense_card_id == ExpenseCard.id)
-            .filter(
-                func.lower(func.coalesce(Expense.description, "")).like(search_pattern)
-                | func.lower(ExpenseCard.name).like(search_pattern)
-            )
-        )
-    total_count = query.count()
-    expenses = query.order_by(Expense.date.desc()).offset(offset).limit(limit).all()
+    expenses, total_count = expense_repo.list_for_card(
+        card_id=card_id,
+        search=search,
+        limit=limit,
+        offset=offset,
+    )
     response_data = [ExpenseResponse.from_orm(exp) for exp in expenses]
     return success_response(
         status_code=200,
         message="Expenses retrieved successfully",
-        data={"expenses": response_data, "total_count": total_count, "limit": limit, "offset": offset}
+        data={
+            "expenses": response_data,
+            "total_count": total_count,
+            "limit": limit,
+            "offset": offset,
+        },
     )
 
-async def update_expense_card(card_id: int, request: ExpenseCardCreate, current_user: dict, db: Session):
-    card = db.query(ExpenseCard).filter(ExpenseCard.id == card_id).first()
+async def update_expense_card(
+    card_id: int,
+    request: ExpenseCardCreate,
+    current_user: dict,
+    db: Session,
+    *,
+    expense_card_repo: ExpenseCardRepository | None = None,
+    savings_repo: SavingsRepository | None = None,
+):
+    expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+    savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
+    session = expense_card_repo.db
+
+    card = expense_card_repo.get_by_id_for_user(card_id, current_user["user_id"])
     if not card:
         return error_response(status_code=404, message="Expense card not found")
-    if card.customer_id != current_user["user_id"]:
-        return error_response(status_code=403, message="Not your expense card")
 
-    if db.query(Expense).filter(Expense.expense_card_id == card_id).first():
+    if session.query(Expense).filter(Expense.expense_card_id == card_id).first():
         if request.income_type != card.income_type:
             return error_response(status_code=400, message="Cannot change income type after expenses are recorded")
 
@@ -229,12 +332,12 @@ async def update_expense_card(card_id: int, request: ExpenseCardCreate, current_
             return error_response(status_code=400, message="savings_id required for SAVINGS type")
         if request.income_details:
             return error_response(status_code=400, message="income_details should only be provided for OTHER income type")
-        savings = db.query(SavingsAccount).filter(SavingsAccount.id == request.savings_id).first()
+        savings = savings_repo.get_by_id(request.savings_id)
         if not savings or savings.customer_id != current_user["user_id"]:
             return error_response(status_code=400, message="Invalid or not owned savings account")
         if savings.marking_status != MarkingStatus.COMPLETED:
             return error_response(status_code=400, message="Savings account must be marked as COMPLETED")
-        paid_markings = db.query(SavingsMarking).filter(
+        paid_markings = session.query(SavingsMarking).filter(
             SavingsMarking.savings_account_id == savings.id,
             SavingsMarking.status == SavingsStatus.PAID
         ).order_by(SavingsMarking.marked_date).all()
@@ -269,30 +372,57 @@ async def update_expense_card(card_id: int, request: ExpenseCardCreate, current_
     card.income_type = request.income_type
     card.updated_at = datetime.now(timezone.utc)
     card.updated_by = current_user["user_id"]
-    db.commit()
-    db.refresh(card)
+    session.commit()
+    session.refresh(card)
 
     logger.info(f"Updated expense card {card_id} for user {current_user['user_id']}")
     return ExpenseCardResponse.from_orm(card)
 
-async def delete_expense_card(card_id: int, current_user: dict, db: Session):
-    card = db.query(ExpenseCard).filter(ExpenseCard.id == card_id).first()
+async def delete_expense_card(
+    card_id: int,
+    current_user: dict,
+    db: Session,
+    *,
+    expense_card_repo: ExpenseCardRepository | None = None,
+):
+    expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+    session = expense_card_repo.db
+
+    card = expense_card_repo.get_by_id_for_user(card_id, current_user["user_id"])
     if not card:
         return error_response(status_code=404, message="Expense card not found")
-    if card.customer_id != current_user["user_id"]:
-        return error_response(status_code=403, message="Not your expense card")
 
-    db.delete(card)
-    db.commit()
+    session.delete(card)
+    session.commit()
 
-    logger.info(f"Deleted expense card {card_id} for user {current_user['user_id']}")
-    return success_response(status_code=200, message="Expense card deleted successfully", data={"card_id": card_id})
+    logger.info(
+        "Deleted expense card %s for user %s",
+        card_id,
+        current_user["user_id"],
+    )
+    return success_response(
+        status_code=200,
+        message="Expense card deleted successfully",
+        data={"card_id": card_id},
+    )
 
-async def get_expense_stats(from_date: date | None, to_date: date | None, current_user: dict, db: Session):
-    cards = db.query(ExpenseCard).filter(ExpenseCard.customer_id == current_user["user_id"]).all()
-    savings_markings = db.query(SavingsMarking).join(SavingsAccount).filter(
+async def get_expense_stats(
+    from_date: date | None,
+    to_date: date | None,
+    current_user: dict,
+    db: Session,
+    *,
+    expense_card_repo: ExpenseCardRepository | None = None,
+    expense_repo: ExpenseRepository | None = None,
+):
+    expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+    expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+    session = expense_card_repo.db
+
+    cards = expense_card_repo.get_all_for_user(current_user["user_id"])
+    savings_markings = session.query(SavingsMarking).join(SavingsAccount).filter(
         SavingsAccount.customer_id == current_user["user_id"],
-        SavingsMarking.status == SavingsStatus.PAID
+        SavingsMarking.status == SavingsStatus.PAID,
     )
     if from_date:
         savings_markings = savings_markings.filter(SavingsMarking.marked_date >= from_date)
@@ -300,19 +430,19 @@ async def get_expense_stats(from_date: date | None, to_date: date | None, curren
         savings_markings = savings_markings.filter(SavingsMarking.marked_date <= to_date)
     savings_markings = savings_markings.all()
 
-    savings_accounts = db.query(SavingsAccount).filter(
+    savings_accounts = session.query(SavingsAccount).filter(
         SavingsAccount.customer_id == current_user["user_id"],
         SavingsAccount.marking_status == MarkingStatus.COMPLETED
     ).all()
     savings_payout = sum(
-        sum(marking.amount for marking in db.query(SavingsMarking).filter(
+        sum(marking.amount for marking in session.query(SavingsMarking).filter(
             SavingsMarking.savings_account_id == account.id,
             SavingsMarking.status == SavingsStatus.PAID
         ).all()) - (account.commission_amount * Decimal(
-            ((max(m.marked_date for m in db.query(SavingsMarking).filter(
+            ((max(m.marked_date for m in session.query(SavingsMarking).filter(
                 SavingsMarking.savings_account_id == account.id,
                 SavingsMarking.status == SavingsStatus.PAID
-            ).all()) - min(m.marked_date for m in db.query(SavingsMarking).filter(
+            ).all()) - min(m.marked_date for m in session.query(SavingsMarking).filter(
                 SavingsMarking.savings_account_id == account.id,
                 SavingsMarking.status == SavingsStatus.PAID
             ).all())).days + 1) / account.commission_days
@@ -332,19 +462,21 @@ async def get_expense_stats(from_date: date | None, to_date: date | None, curren
 
     total_income = sum(card.income_amount for card in cards)
 
-    expenses_query = db.query(Expense).join(ExpenseCard).filter(ExpenseCard.customer_id == current_user["user_id"])
-    if from_date:
-        expenses_query = expenses_query.filter(Expense.date >= from_date)
-    if to_date:
-        expenses_query = expenses_query.filter(Expense.date <= to_date)
+    total_expenses = expense_repo.sum_by_user(
+        user_id=current_user["user_id"],
+        from_date=from_date,
+        to_date=to_date,
+    )
 
-    total_expenses = expenses_query.with_entities(func.sum(Expense.amount)).scalar() or Decimal(0)
+    expenses_by_category_query = expense_repo.grouped_by_category(
+        user_id=current_user["user_id"],
+        from_date=from_date,
+        to_date=to_date,
+    )
 
-    expenses_by_category_query = expenses_query.with_entities(
-        Expense.category, func.sum(Expense.amount)
-    ).group_by(Expense.category).all()
-
-    expenses_by_category = {cat.value if cat else "Uncategorized": amt for cat, amt in expenses_by_category_query}
+    expenses_by_category = {
+        cat.value if cat else "Uncategorized": amt for cat, amt in expenses_by_category_query
+    }
     savings_contribution = sum(marking.amount for marking in savings_markings)
 
     net_balance = total_income - total_expenses
@@ -358,10 +490,31 @@ async def get_expense_stats(from_date: date | None, to_date: date | None, curren
         savings_payout=savings_payout
     )
 
-async def get_financial_advice(from_date: date | None, to_date: date | None, current_user: dict, db: Session):
-    stats = await get_expense_stats(from_date, to_date, current_user, db)
+async def get_financial_advice(
+    from_date: date | None,
+    to_date: date | None,
+    current_user: dict,
+    db: Session,
+    *,
+    expense_repo: ExpenseRepository | None = None,
+    expense_card_repo: ExpenseCardRepository | None = None,
+):
+    expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+    expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+    session = expense_repo.db
 
-    expenses_query = db.query(Expense).join(ExpenseCard).filter(ExpenseCard.customer_id == current_user["user_id"])
+    stats = await get_expense_stats(
+        from_date,
+        to_date,
+        current_user,
+        db,
+        expense_card_repo=expense_card_repo,
+        expense_repo=expense_repo,
+    )
+
+    expenses_query = session.query(Expense).join(ExpenseCard).filter(
+        ExpenseCard.customer_id == current_user["user_id"]
+    )
     if from_date:
         expenses_query = expenses_query.filter(Expense.date >= from_date)
     if to_date:
@@ -462,10 +615,31 @@ async def get_financial_advice(from_date: date | None, to_date: date | None, cur
     logger.info(f"Generated financial advice for user {current_user['user_id']}")
     return response_data
 
-async def get_financial_analytics(from_date: date | None, to_date: date | None, current_user: dict, db: Session):
-    stats = await get_expense_stats(from_date, to_date, current_user, db)
+async def get_financial_analytics(
+    from_date: date | None,
+    to_date: date | None,
+    current_user: dict,
+    db: Session,
+    *,
+    expense_repo: ExpenseRepository | None = None,
+    expense_card_repo: ExpenseCardRepository | None = None,
+):
+    expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+    expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+    session = expense_repo.db
 
-    expenses_query = db.query(Expense).join(ExpenseCard).filter(ExpenseCard.customer_id == current_user["user_id"])
+    stats = await get_expense_stats(
+        from_date,
+        to_date,
+        current_user,
+        db,
+        expense_card_repo=expense_card_repo,
+        expense_repo=expense_repo,
+    )
+
+    expenses_query = session.query(Expense).join(ExpenseCard).filter(
+        ExpenseCard.customer_id == current_user["user_id"]
+    )
     if from_date:
         expenses_query = expenses_query.filter(Expense.date >= from_date)
     if to_date:
@@ -537,7 +711,14 @@ async def get_financial_analytics(from_date: date | None, to_date: date | None, 
     logger.info(f"Generated financial analytics for user {current_user['user_id']}")
     return response_data
 
-async def expense_planner(capital: Decimal, planned_expenses: list, current_user: dict, db: Session):
+async def expense_planner(
+    capital: Decimal,
+    planned_expenses: list,
+    current_user: dict,
+    db: Session,
+    *,
+    user_repo: UserRepository | None = None,
+):
     """AI-powered expense planner that analyzes if capital is sufficient"""
     from schemas.expenses import ExpensePlannerResponse
     
@@ -611,12 +792,31 @@ async def expense_planner(capital: Decimal, planned_expenses: list, current_user
         recommendations=recommendations[:5]  # Limit to top 5 recommendations
     )
 
-async def get_eligible_savings(current_user: dict, db: Session):
+async def get_eligible_savings(
+    current_user: dict,
+    db: Session,
+    *,
+    savings_repo: SavingsRepository | None = None,
+    expense_card_repo: ExpenseCardRepository | None = None,
+):
     """Get list of completed savings accounts eligible for expense cards"""
     from schemas.expenses import EligibleSavingsResponse
     
+    # Get user's active_business_id
+    user = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not user:
+        return error_response(status_code=404, message="User not found")
+    
+    business_id = user.active_business_id
+    if not business_id:
+        return error_response(status_code=400, message="No business context available. Please ensure you belong to a business.")
+    
+    savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
+    expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+    session = savings_repo.db
+
     # Get completed savings for this user
-    eligible_savings = db.query(SavingsAccount).filter(
+    eligible_savings = session.query(SavingsAccount).filter(
         SavingsAccount.customer_id == current_user["user_id"],
         SavingsAccount.marking_status == MarkingStatus.COMPLETED
     ).all()
@@ -624,7 +824,7 @@ async def get_eligible_savings(current_user: dict, db: Session):
     results = []
     for savings in eligible_savings:
         # Calculate payout
-        paid_markings = db.query(SavingsMarking).filter(
+        paid_markings = session.query(SavingsMarking).filter(
             SavingsMarking.savings_account_id == savings.id,
             SavingsMarking.status == SavingsStatus.PAID
         ).order_by(SavingsMarking.marked_date).all()
@@ -646,14 +846,14 @@ async def get_eligible_savings(current_user: dict, db: Session):
         net_payout = total_amount - total_commission
         
         # Check if already linked to expense card
-        already_linked = db.query(ExpenseCard).filter(
+        already_linked = session.query(ExpenseCard).filter(
             ExpenseCard.savings_id == savings.id,
             ExpenseCard.customer_id == current_user["user_id"]
         ).first() is not None
         
         # Check payment request status
         from models.payments import PaymentRequest
-        payment_request = db.query(PaymentRequest).filter(
+        payment_request = session.query(PaymentRequest).filter(
             PaymentRequest.savings_account_id == savings.id
         ).order_by(PaymentRequest.created_at.desc()).first()
         
@@ -680,14 +880,26 @@ async def get_eligible_savings(current_user: dict, db: Session):
     )
 
 async def get_all_expenses(
-    limit: int, offset: int, from_date: date | None, to_date: date | None,
-    category: str | None, min_amount: Decimal | None, max_amount: Decimal | None,
-    search: str | None, current_user: dict, db: Session
+    limit: int,
+    offset: int,
+    from_date: date | None,
+    to_date: date | None,
+    category: str | None,
+    min_amount: Decimal | None,
+    max_amount: Decimal | None,
+    search: str | None,
+    current_user: dict,
+    db: Session,
+    *,
+    expense_repo: ExpenseRepository | None = None,
 ):
     """Get all expenses across all cards with advanced filtering"""
-    
+
+    expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+    session = expense_repo.db
+
     # Base query
-    query = db.query(Expense).join(ExpenseCard).filter(
+    query = session.query(Expense).join(ExpenseCard).filter(
         ExpenseCard.customer_id == current_user["user_id"]
     )
     
@@ -736,14 +948,29 @@ async def get_all_expenses(
         }
     )
 
-async def update_expense(expense_id: int, updates: dict, current_user: dict, db: Session):
+async def update_expense(
+    expense_id: int,
+    updates: dict,
+    current_user: dict,
+    db: Session,
+    *,
+    expense_repo: ExpenseRepository | None = None,
+):
     """Update an existing expense"""
     from schemas.expenses import ExpenseResponse
     
-    expense = db.query(Expense).join(ExpenseCard).filter(
-        Expense.id == expense_id,
-        ExpenseCard.customer_id == current_user["user_id"]
-    ).first()
+    expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+    session = expense_repo.db
+
+    expense = (
+        session.query(Expense)
+        .join(ExpenseCard)
+        .filter(
+            Expense.id == expense_id,
+            ExpenseCard.customer_id == current_user["user_id"],
+        )
+        .first()
+    )
     
     if not expense:
         return error_response(status_code=404, message="Expense not found or access denied")
@@ -776,19 +1003,33 @@ async def update_expense(expense_id: int, updates: dict, current_user: dict, db:
     card.updated_at = datetime.now(timezone.utc)
     card.updated_by = current_user["user_id"]
     
-    db.commit()
-    db.refresh(expense)
+    session.commit()
+    session.refresh(expense)
     
     logger.info(f"Updated expense {expense_id} for user {current_user['user_id']}")
     return ExpenseResponse.from_orm(expense)
 
-async def delete_expense(expense_id: int, current_user: dict, db: Session):
+async def delete_expense(
+    expense_id: int,
+    current_user: dict,
+    db: Session,
+    *,
+    expense_repo: ExpenseRepository | None = None,
+):
     """Delete an expense and refund card balance"""
     
-    expense = db.query(Expense).join(ExpenseCard).filter(
-        Expense.id == expense_id,
-        ExpenseCard.customer_id == current_user["user_id"]
-    ).first()
+    expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+    session = expense_repo.db
+
+    expense = (
+        session.query(Expense)
+        .join(ExpenseCard)
+        .filter(
+            Expense.id == expense_id,
+            ExpenseCard.customer_id == current_user["user_id"],
+        )
+        .first()
+    )
     
     if not expense:
         return error_response(status_code=404, message="Expense not found or access denied")
@@ -801,8 +1042,8 @@ async def delete_expense(expense_id: int, current_user: dict, db: Session):
     card.updated_at = datetime.now(timezone.utc)
     card.updated_by = current_user["user_id"]
     
-    db.delete(expense)
-    db.commit()
+    session.delete(expense)
+    session.commit()
     
     logger.info(f"Deleted expense {expense_id}, refunded {refund_amount} to card {card.id}")
     return success_response(
@@ -813,7 +1054,17 @@ async def delete_expense(expense_id: int, current_user: dict, db: Session):
 
 # ==================== NEW PLANNER WORKFLOW FUNCTIONS ====================
 
-async def create_planner_card(name: str, capital: Decimal, planned_expenses: list, current_user: dict, db: Session):
+async def create_planner_card(
+    name: str,
+    capital: Decimal,
+    planned_expenses: list,
+    current_user: dict,
+    db: Session,
+    *,
+    user_repo: UserRepository | None = None,
+    expense_card_repo: ExpenseCardRepository | None = None,
+    expense_repo: ExpenseRepository | None = None,
+):
     """
     Create a draft expense card (planner) with planned expenses
     Returns card + AI analysis
@@ -821,8 +1072,12 @@ async def create_planner_card(name: str, capital: Decimal, planned_expenses: lis
     from schemas.expenses import PlannerCardResponse, ExpenseCardResponse
     from models.expenses import CardStatus, IncomeType
     
-    # Get user's active_business_id
-    user = db.query(User).filter(User.id == current_user["user_id"]).first()
+    user_repo = _resolve_repo(user_repo, UserRepository, db)
+    expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+    expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+    session = expense_card_repo.db
+
+    user = user_repo.get_by_id(current_user["user_id"])
     if not user:
         return error_response(status_code=404, message="User not found")
     
@@ -842,40 +1097,42 @@ async def create_planner_card(name: str, capital: Decimal, planned_expenses: lis
         category_breakdown[category] = category_breakdown.get(category, Decimal(0)) + expense['amount']
     
     # Create expense card as DRAFT/PLANNER
-    expense_card = ExpenseCard(
-        customer_id=current_user["user_id"],
-        business_id=business_id,
-        name=name,
-        income_type=IncomeType.PLANNER,
-        income_amount=capital,
-        balance=capital,  # Full capital available (nothing spent yet)
-        status=CardStatus.DRAFT,
-        is_plan=True,
-        created_by=current_user["user_id"],
-        created_at=datetime.now(timezone.utc)
+    expense_card = expense_card_repo.create(
+        {
+            "customer_id": current_user["user_id"],
+            "business_id": business_id,
+            "name": name,
+            "income_type": IncomeType.PLANNER,
+            "income_amount": capital,
+            "balance": capital,
+            "status": CardStatus.DRAFT,
+            "is_plan": True,
+            "created_by": current_user["user_id"],
+            "created_at": datetime.now(timezone.utc),
+        }
     )
-    db.add(expense_card)
-    db.flush()  # Get ID without committing
+    session.flush()
     
     # Create planned expenses
     for expense_data in planned_expenses:
-        expense = Expense(
-            expense_card_id=expense_card.id,
-            category=expense_data['category'],
-            amount=expense_data['amount'],
-            planned_amount=expense_data['amount'],  # Store original plan
-            purpose=expense_data.get('purpose', ''),
-            description=expense_data.get('purpose', ''),
-            date=datetime.now(timezone.utc).date(),
-            is_planned=True,  # This is a planned expense
-            is_completed=False,  # Not yet executed
-            created_by=current_user["user_id"],
-            created_at=datetime.now(timezone.utc)
+        expense_repo.create(
+            {
+                "expense_card_id": expense_card.id,
+                "category": expense_data['category'],
+                "amount": expense_data['amount'],
+                "planned_amount": expense_data['amount'],
+                "purpose": expense_data.get('purpose', ''),
+                "description": expense_data.get('purpose', ''),
+                "date": datetime.now(timezone.utc).date(),
+                "is_planned": True,
+                "is_completed": False,
+                "created_by": current_user["user_id"],
+                "created_at": datetime.now(timezone.utc),
+            }
         )
-        db.add(expense)
-    
-    db.commit()
-    db.refresh(expense_card)
+ 
+    session.commit()
+    session.refresh(expense_card)
     
     # Generate AI advice (reuse existing logic)
     advice_parts = []
@@ -927,15 +1184,24 @@ async def create_planner_card(name: str, capital: Decimal, planned_expenses: lis
         recommendations=recommendations[:5]
     )
 
-async def activate_planner_card(card_id: int, current_user: dict, db: Session):
+async def activate_planner_card(
+    card_id: int,
+    current_user: dict,
+    db: Session,
+    *,
+    expense_card_repo: ExpenseCardRepository | None = None,
+):
     """
     Activate a draft planner card - converts it to an active expense tracker
     """
     from schemas.expenses import ExpenseCardResponse
     from models.expenses import CardStatus
     
+    expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+    session = expense_card_repo.db
+
     # Get the planner card
-    card = db.query(ExpenseCard).filter(
+    card = session.query(ExpenseCard).filter(
         ExpenseCard.id == card_id,
         ExpenseCard.customer_id == current_user["user_id"],
         ExpenseCard.is_plan == True,
@@ -950,22 +1216,32 @@ async def activate_planner_card(card_id: int, current_user: dict, db: Session):
     card.updated_at = datetime.now(timezone.utc)
     card.updated_by = current_user["user_id"]
     
-    db.commit()
-    db.refresh(card)
+    session.commit()
+    session.refresh(card)
     
     logger.info(f"Activated planner card {card_id} for user {current_user['user_id']}")
     
     return ExpenseCardResponse.from_orm(card)
 
-async def complete_planned_item(expense_id: int, actual_amount: Decimal | None, current_user: dict, db: Session):
+async def complete_planned_item(
+    expense_id: int,
+    actual_amount: Decimal | None,
+    current_user: dict,
+    db: Session,
+    *,
+    expense_repo: ExpenseRepository | None = None,
+):
     """
     Mark a planned expense as completed (checklist)
     Optionally record actual amount spent
     """
     from schemas.expenses import ExpenseResponse
     
+    expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+    session = expense_repo.db
+
     # Get the planned expense
-    expense = db.query(Expense).join(ExpenseCard).filter(
+    expense = session.query(Expense).join(ExpenseCard).filter(
         Expense.id == expense_id,
         ExpenseCard.customer_id == current_user["user_id"],
         Expense.is_planned == True
@@ -996,23 +1272,36 @@ async def complete_planned_item(expense_id: int, actual_amount: Decimal | None, 
     card.updated_at = datetime.now(timezone.utc)
     card.updated_by = current_user["user_id"]
     
-    db.commit()
-    db.refresh(expense)
+    session.commit()
+    session.refresh(expense)
     
     logger.info(f"Completed planned item {expense_id} for user {current_user['user_id']}")
     
     return ExpenseResponse.from_orm(expense)
 
-async def get_expense_metrics(current_user: dict, db: Session, business_id: int = None):
+async def get_expense_metrics(
+    current_user: dict,
+    db: Session,
+    business_id: int = None,
+    *,
+    expense_card_repo: ExpenseCardRepository | None = None,
+    expense_repo: ExpenseRepository | None = None,
+    user_repo: UserRepository | None = None,
+):
     """Get aggregated expense metrics for dashboard and Expenses page"""
     from models.user import User
     from datetime import datetime
     from dateutil.relativedelta import relativedelta
     
+    expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+    expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+    user_repo = _resolve_repo(user_repo, UserRepository, db)
+    session = expense_card_repo.db
+
     user_id = current_user["user_id"]
     
     # Get user to determine active_business_id if not provided
-    user = db.query(User).filter(User.id == user_id).first()
+    user = user_repo.get_by_id(user_id)
     target_business_id = business_id or (user.active_business_id if user else None)
     
     today = datetime.now()
@@ -1020,7 +1309,7 @@ async def get_expense_metrics(current_user: dict, db: Session, business_id: int 
     month_end = month_start + relativedelta(months=1)
     
     # Base query for expense cards with business filter
-    cards_query = db.query(ExpenseCard).filter(ExpenseCard.customer_id == user_id)
+    cards_query = session.query(ExpenseCard).filter(ExpenseCard.customer_id == user_id)
     if target_business_id:
         cards_query = cards_query.filter(ExpenseCard.business_id == target_business_id)
     
@@ -1030,7 +1319,7 @@ async def get_expense_metrics(current_user: dict, db: Session, business_id: int 
     total_income = sum(card.income_amount for card in cards) if cards else Decimal(0)
     
     # Total expenses (all-time)
-    expenses_all_time_query = db.query(func.coalesce(func.sum(Expense.amount), 0))\
+    expenses_all_time_query = session.query(func.coalesce(func.sum(Expense.amount), 0))\
         .join(ExpenseCard, Expense.expense_card_id == ExpenseCard.id)\
         .filter(ExpenseCard.customer_id == user_id)
     
@@ -1040,7 +1329,7 @@ async def get_expense_metrics(current_user: dict, db: Session, business_id: int 
     total_expenses_all_time = expenses_all_time_query.scalar() or Decimal(0)
     
     # This month expenses
-    expenses_this_month_query = db.query(func.coalesce(func.sum(Expense.amount), 0))\
+    expenses_this_month_query = session.query(func.coalesce(func.sum(Expense.amount), 0))\
         .join(ExpenseCard, Expense.expense_card_id == ExpenseCard.id)\
         .filter(
             ExpenseCard.customer_id == user_id,
@@ -1077,14 +1366,25 @@ async def get_expense_metrics(current_user: dict, db: Session, business_id: int 
         }
     )
 
-async def get_planner_progress(card_id: int, current_user: dict, db: Session):
+async def get_planner_progress(
+    card_id: int,
+    current_user: dict,
+    db: Session,
+    *,
+    expense_card_repo: ExpenseCardRepository | None = None,
+    expense_repo: ExpenseRepository | None = None,
+):
     """
     Get progress tracking for a planner card - planned vs actual
     """
     from schemas.expenses import PlannerProgressResponse
     
+    expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+    expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+    session = expense_repo.db
+
     # Get the planner card
-    card = db.query(ExpenseCard).filter(
+    card = session.query(ExpenseCard).filter(
         ExpenseCard.id == card_id,
         ExpenseCard.customer_id == current_user["user_id"],
         ExpenseCard.is_plan == True
@@ -1094,7 +1394,7 @@ async def get_planner_progress(card_id: int, current_user: dict, db: Session):
         return error_response(status_code=404, message="Planner card not found")
     
     # Get all planned expenses
-    expenses = db.query(Expense).filter(
+    expenses = session.query(Expense).filter(
         Expense.expense_card_id == card_id,
         Expense.is_planned == True
     ).all()

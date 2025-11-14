@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 from models.financial_advisor import (
     SavingsGoal, FinancialHealthScore, SpendingPattern, UserNotification,
     GoalPriority, GoalStatus, PatternType, NotificationType, NotificationPriority
@@ -17,6 +17,14 @@ from schemas.financial_advisor import (
     SavingsOpportunityResponse, SavingsOpportunitiesResponse
 )
 from utils.response import success_response, error_response
+from store.repositories import (
+    ExpenseCardRepository,
+    ExpenseRepository,
+    SavingsRepository,
+    SavingsGoalRepository,
+    FinancialHealthScoreRepository,
+    SpendingPatternRepository,
+)
 from datetime import datetime, timezone, date, timedelta
 from decimal import Decimal
 from dateutil.relativedelta import relativedelta
@@ -37,27 +45,43 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+def _resolve_repo(repo, repo_cls, db: Session):
+    return repo if repo is not None else repo_cls(db)
+
 # ========================
 # SAVINGS GOAL INTELLIGENCE
 # ========================
 
-async def analyze_savings_capacity(customer_id: int, db: Session) -> Dict:
+async def analyze_savings_capacity(
+    customer_id: int,
+    db: Session,
+    *,
+    expense_card_repo: ExpenseCardRepository | None = None,
+    expense_repo: ExpenseRepository | None = None,
+    savings_repo: SavingsRepository | None = None,
+) -> Dict:
     """Calculate optimal savings capacity based on income/expense patterns."""
     try:
+        expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+        expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+        savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
+        session = expense_repo.db
+
         # Get expense cards and total income
-        cards = db.query(ExpenseCard).filter(ExpenseCard.customer_id == customer_id).all()
+        cards = expense_card_repo.get_all_for_user(customer_id)
         total_income = sum(card.income_amount for card in cards)
         
         # Get total expenses from last 3 months
         three_months_ago = date.today() - timedelta(days=90)
-        expenses_query = db.query(Expense).join(ExpenseCard).filter(
+        expenses_query = session.query(Expense).join(ExpenseCard).filter(
             ExpenseCard.customer_id == customer_id,
             Expense.date >= three_months_ago
         )
         total_expenses = expenses_query.with_entities(func.sum(Expense.amount)).scalar() or Decimal(0)
         
         # Get current savings contribution
-        savings_markings = db.query(SavingsMarking).join(SavingsAccount).filter(
+        savings_markings = savings_repo.db.query(SavingsMarking).join(SavingsAccount).filter(
             SavingsAccount.customer_id == customer_id,
             SavingsMarking.status == SavingsStatus.PAID,
             SavingsMarking.marked_date >= three_months_ago
@@ -106,7 +130,13 @@ async def analyze_savings_capacity(customer_id: int, db: Session) -> Dict:
 async def recommend_savings_goals(customer_id: int, db: Session) -> List[SavingsGoalResponse]:
     """Generate AI-recommended savings goals based on user's financial situation."""
     try:
-        capacity = await analyze_savings_capacity(customer_id, db)
+        capacity = await analyze_savings_capacity(
+            customer_id,
+            db,
+            expense_card_repo=expense_card_repo,
+            expense_repo=expense_repo,
+            savings_repo=savings_repo,
+        )
         if not capacity:
             return []
         
@@ -175,13 +205,18 @@ async def recommend_savings_goals(customer_id: int, db: Session) -> List[Savings
         return []
 
 
-async def track_goal_progress(goal_id: int, customer_id: int, db: Session) -> Dict:
+async def track_goal_progress(
+    goal_id: int,
+    customer_id: int,
+    db: Session,
+    *,
+    savings_goal_repo: SavingsGoalRepository | None = None,
+) -> Dict:
     """Monitor progress and suggest adjustments for a savings goal."""
     try:
-        goal = db.query(SavingsGoal).filter(
-            SavingsGoal.id == goal_id,
-            SavingsGoal.customer_id == customer_id
-        ).first()
+        savings_goal_repo = _resolve_repo(savings_goal_repo, SavingsGoalRepository, db)
+
+        goal = savings_goal_repo.get_by_id_for_customer(goal_id, customer_id)
         
         if not goal:
             return error_response(status_code=404, message="Goal not found")
@@ -236,11 +271,21 @@ async def track_goal_progress(goal_id: int, customer_id: int, db: Session) -> Di
 # SPENDING PATTERN ANALYSIS
 # ========================
 
-async def detect_spending_patterns(customer_id: int, db: Session) -> List[SpendingPatternResponse]:
+async def detect_spending_patterns(
+    customer_id: int,
+    db: Session,
+    *,
+    expense_repo: ExpenseRepository | None = None,
+    spending_pattern_repo: SpendingPatternRepository | None = None,
+) -> List[SpendingPatternResponse]:
     """Identify recurring, seasonal, and anomalous spending using ML."""
     try:
+        expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+        spending_pattern_repo = _resolve_repo(spending_pattern_repo, SpendingPatternRepository, db)
+        session = expense_repo.db
+
         # Get all expenses for the customer
-        expenses = db.query(Expense).join(ExpenseCard).filter(
+        expenses = session.query(Expense).join(ExpenseCard).filter(
             ExpenseCard.customer_id == customer_id
         ).order_by(Expense.date).all()
         
@@ -250,16 +295,28 @@ async def detect_spending_patterns(customer_id: int, db: Session) -> List[Spendi
         patterns = []
         
         # Detect recurring expenses
-        recurring = await _detect_recurring_expenses(expenses, customer_id, db)
+        recurring = await _detect_recurring_expenses(
+            expenses,
+            customer_id,
+            pattern_repo=spending_pattern_repo,
+        )
         patterns.extend(recurring)
         
         # Detect anomalies
-        anomalies = await _detect_anomalous_spending(expenses, customer_id, db)
+        anomalies = await _detect_anomalous_spending(
+            expenses,
+            customer_id,
+            pattern_repo=spending_pattern_repo,
+        )
         patterns.extend(anomalies)
         
         # Detect seasonal patterns (if enough data)
         if len(expenses) >= 30:
-            seasonal = await _detect_seasonal_patterns(expenses, customer_id, db)
+            seasonal = await _detect_seasonal_patterns(
+                expenses,
+                customer_id,
+                pattern_repo=spending_pattern_repo,
+            )
             patterns.extend(seasonal)
         
         return [SpendingPatternResponse.model_validate(p) for p in patterns]
@@ -268,7 +325,12 @@ async def detect_spending_patterns(customer_id: int, db: Session) -> List[Spendi
         return []
 
 
-async def _detect_recurring_expenses(expenses: List[Expense], customer_id: int, db: Session) -> List[SpendingPattern]:
+async def _detect_recurring_expenses(
+    expenses: List[Expense],
+    customer_id: int,
+    *,
+    pattern_repo: SpendingPatternRepository,
+) -> List[SpendingPattern]:
     """Detect recurring expenses using frequency analysis."""
     try:
         # Group expenses by similar amounts and categories
@@ -280,6 +342,8 @@ async def _detect_recurring_expenses(expenses: List[Expense], customer_id: int, 
             expense_groups[key].append(exp)
         
         patterns = []
+        session = pattern_repo.db
+
         for (category, amount), exps in expense_groups.items():
             if len(exps) >= 3:  # At least 3 occurrences
                 # Calculate average interval between expenses
@@ -295,7 +359,7 @@ async def _detect_recurring_expenses(expenses: List[Expense], customer_id: int, 
                         frequency = "weekly" if avg_interval <= 10 else "monthly" if avg_interval <= 35 else "quarterly"
                         
                         # Check if pattern already exists
-                        existing = db.query(SpendingPattern).filter(
+                        existing = session.query(SpendingPattern).filter(
                             SpendingPattern.customer_id == customer_id,
                             SpendingPattern.pattern_type == PatternType.RECURRING,
                             SpendingPattern.description.like(f"%{category}%"),
@@ -315,11 +379,11 @@ async def _detect_recurring_expenses(expenses: List[Expense], customer_id: int, 
                                 created_by=customer_id,
                                 created_at=datetime.now(timezone.utc)
                             )
-                            db.add(pattern)
+                            session.add(pattern)
                             patterns.append(pattern)
         
         if patterns:
-            db.commit()
+            session.commit()
         
         return patterns
     except Exception as e:
@@ -327,7 +391,12 @@ async def _detect_recurring_expenses(expenses: List[Expense], customer_id: int, 
         return []
 
 
-async def _detect_anomalous_spending(expenses: List[Expense], customer_id: int, db: Session) -> List[SpendingPattern]:
+async def _detect_anomalous_spending(
+    expenses: List[Expense],
+    customer_id: int,
+    *,
+    pattern_repo: SpendingPatternRepository,
+) -> List[SpendingPattern]:
     """Detect unusual spending using Isolation Forest."""
     try:
         if len(expenses) < 20:  # Need enough data for anomaly detection
@@ -340,6 +409,8 @@ async def _detect_anomalous_spending(expenses: List[Expense], customer_id: int, 
         iso_forest = IsolationForest(contamination=0.1, random_state=42)
         predictions = iso_forest.fit_predict(amounts)
         
+        session = pattern_repo.db
+
         patterns = []
         for i, pred in enumerate(predictions):
             if pred == -1:  # Anomaly detected
@@ -352,7 +423,7 @@ async def _detect_anomalous_spending(expenses: List[Expense], customer_id: int, 
                 # Only flag significant anomalies (>50% deviation)
                 if deviation > 50:
                     # Check if not already flagged recently
-                    recent_anomaly = db.query(SpendingPattern).filter(
+                    recent_anomaly = session.query(SpendingPattern).filter(
                         SpendingPattern.customer_id == customer_id,
                         SpendingPattern.pattern_type == PatternType.ANOMALY,
                         SpendingPattern.last_occurrence >= exp.date - timedelta(days=7)
@@ -372,11 +443,11 @@ async def _detect_anomalous_spending(expenses: List[Expense], customer_id: int, 
                             created_by=customer_id,
                             created_at=datetime.now(timezone.utc)
                         )
-                        db.add(pattern)
+                        session.add(pattern)
                         patterns.append(pattern)
         
         if patterns:
-            db.commit()
+            session.commit()
         
         return patterns
     except Exception as e:
@@ -384,7 +455,12 @@ async def _detect_anomalous_spending(expenses: List[Expense], customer_id: int, 
         return []
 
 
-async def _detect_seasonal_patterns(expenses: List[Expense], customer_id: int, db: Session) -> List[SpendingPattern]:
+async def _detect_seasonal_patterns(
+    expenses: List[Expense],
+    customer_id: int,
+    *,
+    pattern_repo: SpendingPatternRepository,
+) -> List[SpendingPattern]:
     """Detect seasonal spending patterns using time series decomposition."""
     try:
         # Create time series data
@@ -399,6 +475,8 @@ async def _detect_seasonal_patterns(expenses: List[Expense], customer_id: int, d
         if len(df) < 52:  # Need at least a year of weekly data
             return []
         
+        session = pattern_repo.db
+
         # Perform seasonal decomposition
         decomposition = seasonal_decompose(df['amount'], model='additive', period=4)  # Monthly cycle
         seasonal_component = decomposition.seasonal
@@ -420,8 +498,8 @@ async def _detect_seasonal_patterns(expenses: List[Expense], customer_id: int, d
                 created_by=customer_id,
                 created_at=datetime.now(timezone.utc)
             )
-            db.add(pattern)
-            db.commit()
+            session.add(pattern)
+            session.commit()
             patterns.append(pattern)
         
         return patterns
@@ -430,16 +508,20 @@ async def _detect_seasonal_patterns(expenses: List[Expense], customer_id: int, d
         return []
 
 
-async def identify_wasteful_spending(customer_id: int, db: Session) -> List[Dict]:
+async def identify_wasteful_spending(
+    customer_id: int,
+    db: Session,
+    *,
+    spending_pattern_repo: SpendingPatternRepository | None = None,
+) -> List[Dict]:
     """Flag unnecessary expenses based on patterns."""
     try:
         wasteful = []
         
+        spending_pattern_repo = _resolve_repo(spending_pattern_repo, SpendingPatternRepository, db)
+
         # Get recurring expenses
-        recurring_patterns = db.query(SpendingPattern).filter(
-            SpendingPattern.customer_id == customer_id,
-            SpendingPattern.pattern_type == PatternType.RECURRING
-        ).all()
+        recurring_patterns = spending_pattern_repo.get_by_type(customer_id, PatternType.RECURRING)
         
         for pattern in recurring_patterns:
             if pattern.frequency == "monthly" and pattern.amount:
@@ -463,11 +545,28 @@ async def identify_wasteful_spending(customer_id: int, db: Session) -> List[Dict
 # FINANCIAL HEALTH SCORING
 # ========================
 
-async def calculate_financial_health_score(customer_id: int, db: Session) -> FinancialHealthScoreResponse:
+async def calculate_financial_health_score(
+    customer_id: int,
+    db: Session,
+    *,
+    financial_health_repo: FinancialHealthScoreRepository | None = None,
+    savings_goal_repo: SavingsGoalRepository | None = None,
+    expense_repo: ExpenseRepository | None = None,
+    expense_card_repo: ExpenseCardRepository | None = None,
+    savings_repo: SavingsRepository | None = None,
+) -> FinancialHealthScoreResponse:
     """Calculate multi-factor financial health score (0-100)."""
     try:
         factors = {}
         
+        financial_health_repo = _resolve_repo(financial_health_repo, FinancialHealthScoreRepository, db)
+        savings_goal_repo = _resolve_repo(savings_goal_repo, SavingsGoalRepository, db)
+        expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+        expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+        savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
+
+        session = financial_health_repo.db
+
         # Factor 1: Expense Ratio (30 points)
         capacity = await analyze_savings_capacity(customer_id, db)
         if capacity:
@@ -495,7 +594,7 @@ async def calculate_financial_health_score(customer_id: int, db: Session) -> Fin
             factors["savings_rate"] = 5
         
         # Factor 3: Goal Achievement (20 points)
-        goals = db.query(SavingsGoal).filter(SavingsGoal.customer_id == customer_id).all()
+        goals = savings_goal_repo.get_all_for_customer(customer_id)
         if goals:
             achieved_goals = [g for g in goals if g.status == GoalStatus.ACHIEVED]
             active_goals = [g for g in goals if g.status == GoalStatus.ACTIVE]
@@ -522,9 +621,14 @@ async def calculate_financial_health_score(customer_id: int, db: Session) -> Fin
             factors["goal_achievement"] = 10  # Neutral if no goals
         
         # Factor 4: Spending Consistency (15 points)
-        expenses = db.query(Expense).join(ExpenseCard).filter(
-            ExpenseCard.customer_id == customer_id
-        ).order_by(Expense.date.desc()).limit(90).all()
+        expenses = (
+            expense_repo.db.query(Expense)
+            .join(ExpenseCard)
+            .filter(ExpenseCard.customer_id == customer_id)
+            .order_by(Expense.date.desc())
+            .limit(90)
+            .all()
+        )
         
         if len(expenses) >= 30:
             daily_expenses = [float(e.amount) for e in expenses]
@@ -542,7 +646,7 @@ async def calculate_financial_health_score(customer_id: int, db: Session) -> Fin
             factors["spending_consistency"] = 10
         
         # Factor 5: Savings Account Activity (10 points)
-        savings_accounts = db.query(SavingsAccount).filter(
+        savings_accounts = savings_repo.db.query(SavingsAccount).filter(
             SavingsAccount.customer_id == customer_id,
             SavingsAccount.marking_status == MarkingStatus.COMPLETED
         ).count()
@@ -569,44 +673,72 @@ async def calculate_financial_health_score(customer_id: int, db: Session) -> Fin
             recommendations.append({"area": "Goals", "suggestion": "Set and work towards achievable savings goals"})
         
         # Save to database
-        health_score = FinancialHealthScore(
-            customer_id=customer_id,
-            score=total_score,
-            score_date=datetime.now(timezone.utc),
-            factors_breakdown=factors,
-            recommendations=recommendations,
-            created_by=customer_id,
-            created_at=datetime.now(timezone.utc)
+        health_score = financial_health_repo.create(
+            {
+                "customer_id": customer_id,
+                "score": total_score,
+                "score_date": datetime.now(timezone.utc),
+                "factors_breakdown": factors,
+                "recommendations": recommendations,
+                "created_by": customer_id,
+                "created_at": datetime.now(timezone.utc),
+            }
         )
-        db.add(health_score)
-        db.commit()
-        db.refresh(health_score)
-        
+        session.commit()
+        session.refresh(health_score)
+
         return FinancialHealthScoreResponse.model_validate(health_score)
     except Exception as e:
         logger.error(f"Error calculating financial health score for customer {customer_id}: {str(e)}")
         raise
 
 
-async def generate_improvement_roadmap(customer_id: int, db: Session) -> ImprovementRoadmapResponse:
+async def generate_improvement_roadmap(
+    customer_id: int,
+    db: Session,
+    *,
+    financial_health_repo: FinancialHealthScoreRepository | None = None,
+    savings_goal_repo: SavingsGoalRepository | None = None,
+    expense_repo: ExpenseRepository | None = None,
+    expense_card_repo: ExpenseCardRepository | None = None,
+    savings_repo: SavingsRepository | None = None,
+) -> ImprovementRoadmapResponse:
     """Generate actionable steps to improve financial health score."""
     try:
+        financial_health_repo = _resolve_repo(financial_health_repo, FinancialHealthScoreRepository, db)
+        savings_goal_repo = _resolve_repo(savings_goal_repo, SavingsGoalRepository, db)
+        expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+        expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+        savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
+
         # Get current score
-        current_score_record = db.query(FinancialHealthScore).filter(
-            FinancialHealthScore.customer_id == customer_id
-        ).order_by(FinancialHealthScore.score_date.desc()).first()
+        current_record = (
+            financial_health_repo.db.query(FinancialHealthScore)
+            .filter(FinancialHealthScore.customer_id == customer_id)
+            .order_by(FinancialHealthScore.score_date.desc())
+            .first()
+        )
+
+        if current_record:
+            current_score_response = FinancialHealthScoreResponse.model_validate(current_record)
+        else:
+            current_score_response = await calculate_financial_health_score(
+                customer_id,
+                db,
+                financial_health_repo=financial_health_repo,
+                savings_goal_repo=savings_goal_repo,
+                expense_repo=expense_repo,
+                expense_card_repo=expense_card_repo,
+                savings_repo=savings_repo,
+            )
         
-        if not current_score_record:
-            # Calculate if doesn't exist
-            current_score_record = await calculate_financial_health_score(customer_id, db)
-        
-        current_score = current_score_record.score
+        current_score = current_score_response.score
         target_score = min(current_score + 20, 100)
         
         steps = []
         step_num = 1
         
-        factors = current_score_record.factors_breakdown
+        factors = current_score_response.factors_breakdown
         
         # Step for expense ratio
         if factors.get("expense_ratio", 0) < 20:
@@ -682,23 +814,63 @@ async def generate_improvement_roadmap(customer_id: int, db: Session) -> Improve
 # PERSONALIZED RECOMMENDATIONS
 # ========================
 
-async def generate_personalized_advice(customer_id: int, db: Session) -> PersonalizedAdviceResponse:
+async def generate_personalized_advice(
+    customer_id: int,
+    db: Session,
+    *,
+    financial_health_repo: FinancialHealthScoreRepository | None = None,
+    savings_goal_repo: SavingsGoalRepository | None = None,
+    expense_repo: ExpenseRepository | None = None,
+    expense_card_repo: ExpenseCardRepository | None = None,
+    savings_repo: SavingsRepository | None = None,
+    spending_pattern_repo: SpendingPatternRepository | None = None,
+) -> PersonalizedAdviceResponse:
     """Generate context-aware recommendations using user history."""
     try:
+        financial_health_repo = _resolve_repo(financial_health_repo, FinancialHealthScoreRepository, db)
+        savings_goal_repo = _resolve_repo(savings_goal_repo, SavingsGoalRepository, db)
+        expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+        expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+        savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
+        spending_pattern_repo = _resolve_repo(spending_pattern_repo, SpendingPatternRepository, db)
+
         # Get financial health score
-        health_score_record = await calculate_financial_health_score(customer_id, db)
+        health_score_record = await calculate_financial_health_score(
+            customer_id,
+            db,
+            financial_health_repo=financial_health_repo,
+            savings_goal_repo=savings_goal_repo,
+            expense_repo=expense_repo,
+            expense_card_repo=expense_card_repo,
+            savings_repo=savings_repo,
+        )
         
         # Get capacity analysis
-        capacity = await analyze_savings_capacity(customer_id, db)
+        capacity = await analyze_savings_capacity(
+            customer_id,
+            db,
+            expense_card_repo=expense_card_repo,
+            expense_repo=expense_repo,
+            savings_repo=savings_repo,
+        )
         
         # Get spending patterns
-        patterns = await detect_spending_patterns(customer_id, db)
+        patterns = await detect_spending_patterns(
+            customer_id,
+            db,
+            expense_repo=expense_repo,
+            spending_pattern_repo=spending_pattern_repo,
+        )
         
         # Generate recommendations
         recommendations = []
         
         # Recommendation 1: Based on recurring expenses
-        wasteful = await identify_wasteful_spending(customer_id, db)
+        wasteful = await identify_wasteful_spending(
+            customer_id,
+            db,
+            spending_pattern_repo=spending_pattern_repo,
+        )
         if wasteful:
             total_wasteful = sum(w["yearly_cost"] for w in wasteful)
             recommendations.append(RecommendationResponse(
@@ -733,7 +905,11 @@ async def generate_personalized_advice(customer_id: int, db: Session) -> Persona
                     ))
         
         # Recommendation 3: Category-specific
-        category_advice = await suggest_category_optimizations(customer_id, db)
+        category_advice = await suggest_category_optimizations(
+            customer_id,
+            db,
+            expense_repo=expense_repo,
+        )
         for advice in category_advice[:2]:  # Top 2 categories
             recommendations.append(RecommendationResponse(
                 title=f"Optimize {advice['category']} Spending",
@@ -783,11 +959,20 @@ async def generate_personalized_advice(customer_id: int, db: Session) -> Persona
         raise
 
 
-async def suggest_category_optimizations(customer_id: int, db: Session) -> List[Dict]:
+async def suggest_category_optimizations(
+    customer_id: int,
+    db: Session,
+    *,
+    expense_repo: ExpenseRepository | None = None,
+) -> List[Dict]:
     """Suggest category-specific optimizations."""
     try:
         # Get expenses by category
-        expenses_query = db.query(
+        expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+
+        session = expense_repo.db
+
+        expenses_query = session.query(
             Expense.category,
             func.sum(Expense.amount).label('total')
         ).join(ExpenseCard).filter(
@@ -833,13 +1018,26 @@ async def suggest_category_optimizations(customer_id: int, db: Session) -> List[
         return []
 
 
-async def recommend_savings_opportunities(customer_id: int, db: Session) -> SavingsOpportunitiesResponse:
+async def recommend_savings_opportunities(
+    customer_id: int,
+    db: Session,
+    *,
+    expense_repo: ExpenseRepository | None = None,
+    spending_pattern_repo: SpendingPatternRepository | None = None,
+) -> SavingsOpportunitiesResponse:
     """Identify where to cut spending and save money."""
     try:
         opportunities = []
         
+        expense_repo = _resolve_repo(expense_repo, ExpenseRepository, db)
+        spending_pattern_repo = _resolve_repo(spending_pattern_repo, SpendingPatternRepository, db)
+
         # Get category spending
-        category_suggestions = await suggest_category_optimizations(customer_id, db)
+        category_suggestions = await suggest_category_optimizations(
+            customer_id,
+            db,
+            expense_repo=expense_repo,
+        )
         for suggestion in category_suggestions:
             opportunities.append(SavingsOpportunityResponse(
                 category=suggestion['category'],
@@ -851,7 +1049,11 @@ async def recommend_savings_opportunities(customer_id: int, db: Session) -> Savi
             ))
         
         # Get recurring expenses analysis
-        wasteful = await identify_wasteful_spending(customer_id, db)
+        wasteful = await identify_wasteful_spending(
+            customer_id,
+            db,
+            spending_pattern_repo=spending_pattern_repo,
+        )
         for waste in wasteful:
             opportunities.append(SavingsOpportunityResponse(
                 category="Subscriptions",

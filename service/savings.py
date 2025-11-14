@@ -29,6 +29,14 @@ import requests
 import uuid
 import math
 
+from store.repositories import (
+    BusinessRepository,
+    SavingsRepository,
+    UnitRepository,
+    UserBusinessRepository,
+    UserRepository,
+)
+
 paystack = Paystack(secret_key=os.getenv("PAYSTACK_SECRET_KEY"))
 
 logging.basicConfig(
@@ -38,11 +46,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 def calculate_total_commission(savings: SavingsAccount) -> Decimal:
     total_days = _calculate_total_days(savings.start_date, savings.duration_months)
     commission_periods = math.ceil(total_days / savings.commission_days)
     total_commission = savings.commission_amount * Decimal(commission_periods)
     return total_commission.quantize(Decimal("0.01"))
+
+
+def _resolve_repo(repo, repo_cls, db: Session):
+    return repo if repo is not None else repo_cls(db)
+
 
 async def initiate_virtual_account_payment(amount: Decimal, email: str, customer_id: int, reference: str, db: Session):
     try:
@@ -235,9 +249,22 @@ def _savings_response(savings: SavingsAccount) -> dict:
         ).model_dump(),
     )
 
-async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, db: Session):
-    current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
-    if not has_permission(current_user_obj, Permission.CREATE_SAVINGS, db):
+async def create_savings_daily(
+    request: SavingsCreateDaily,
+    current_user: dict,
+    db: Session,
+    *,
+    user_repo: UserRepository | None = None,
+    savings_repo: SavingsRepository | None = None,
+    unit_repo: UnitRepository | None = None,
+):
+    user_repo = _resolve_repo(user_repo, UserRepository, db)
+    savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
+    unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
+    session = user_repo.db
+
+    current_user_obj = user_repo.get_by_id(current_user["user_id"])
+    if not has_permission(current_user_obj, Permission.CREATE_SAVINGS, session):
         return error_response(status_code=403, message="No permission to create savings")
 
     customer_id = (
@@ -248,7 +275,7 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
     if not customer_id:
         return error_response(status_code=400, message="Invalid customer_id or role")
 
-    customer = db.query(User).filter(User.id == customer_id, User.role == "customer").first()
+    customer = session.query(User).filter(User.id == customer_id, User.role == "customer").first()
     if not customer:
         return error_response(status_code=400, message=f"User {customer_id} is not a customer")
 
@@ -258,15 +285,11 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
     if request.commission_days <= 0:
         return error_response(status_code=400, message="Commission days must be positive")
 
-    unit_exists = db.query(exists().where(
-        user_units.c.user_id == customer_id
-    ).where(
-        user_units.c.unit_id == request.unit_id
-    ).where(
-        Unit.id == request.unit_id
-    ).where(
-        Unit.business_id == request.business_id
-    )).scalar()
+    unit_exists = savings_repo.get_customer_unit_association(
+        user_id=customer_id,
+        unit_id=request.unit_id,
+        business_id=request.business_id,
+    )
     if not unit_exists:
         return error_response(status_code=400, message=f"Customer {customer_id} is not associated with unit {request.unit_id} in business {request.business_id}")
 
@@ -277,7 +300,7 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
     if commission_amount < 0:
         return error_response(status_code=400, message="Commission amount cannot be negative")
 
-    tracking_number = _generate_unique_tracking_number(db, SavingsAccount)
+    tracking_number = _generate_unique_tracking_number(session, SavingsAccount)
     end_date = request.start_date + relativedelta(months=request.duration_months) - timedelta(days=1)
 
     savings = SavingsAccount(
@@ -296,8 +319,8 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
         created_by=current_user["user_id"],
         marking_status=MarkingStatus.NOT_STARTED,
     )
-    db.add(savings)
-    db.flush()
+    session.add(savings)
+    session.flush()
 
     total_commission = calculate_total_commission(savings)
     logger.info(f"Set target_amount={total_amount} for daily savings {tracking_number} with {total_days} days")
@@ -315,8 +338,8 @@ async def create_savings_daily(request: SavingsCreateDaily, current_user: dict, 
         )
         for i in range(total_days)
     ]
-    db.add_all(markings)
-    db.commit()
+    session.add_all(markings)
+    session.commit()
 
     logger.info(f"Created daily savings {tracking_number} with {len(markings)} markings for customer {customer_id}")
     return _savings_response(savings)
@@ -341,9 +364,20 @@ async def calculate_target_savings(request: SavingsCreateTarget):
         ).model_dump(),
     )
 
-async def create_savings_target(request: SavingsCreateTarget, current_user: dict, db: Session):
-    current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
-    if not has_permission(current_user_obj, Permission.CREATE_SAVINGS, db):
+async def create_savings_target(
+    request: SavingsCreateTarget,
+    current_user: dict,
+    db: Session,
+    *,
+    user_repo: UserRepository | None = None,
+    savings_repo: SavingsRepository | None = None,
+):
+    user_repo = _resolve_repo(user_repo, UserRepository, db)
+    savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
+    session = user_repo.db
+
+    current_user_obj = user_repo.get_by_id(current_user["user_id"])
+    if not has_permission(current_user_obj, Permission.CREATE_SAVINGS, session):
         return error_response(status_code=403, message="No permission to create savings")
 
     customer_id = (
@@ -354,7 +388,7 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
     if not customer_id:
         return error_response(status_code=400, message="Invalid customer_id or role")
 
-    customer = db.query(User).filter(User.id == customer_id, User.role == "customer").first()
+    customer = session.query(User).filter(User.id == customer_id, User.role == "customer").first()
     if not customer:
         return error_response(status_code=400, message=f"User {customer_id} is not a customer")
 
@@ -367,20 +401,16 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
     if request.commission_days <= 0:
         return error_response(status_code=400, message="Commission days must be positive")
 
-    unit_exists = db.query(exists().where(
-        user_units.c.user_id == customer_id
-    ).where(
-        user_units.c.unit_id == request.unit_id
-    ).where(
-        Unit.id == request.unit_id
-    ).where(
-        Unit.business_id == request.business_id
-    )).scalar()
+    unit_exists = savings_repo.get_customer_unit_association(
+        user_id=customer_id,
+        unit_id=request.unit_id,
+        business_id=request.business_id,
+    )
     if not unit_exists:
         return error_response(status_code=400, message=f"Customer {customer_id} is not associated with unit {request.unit_id} in business {request.business_id}")
 
     duration_months = (request.end_date.year - request.start_date.year) * 12 + request.end_date.month - request.start_date.month + 1
-    tracking_number = _generate_unique_tracking_number(db, SavingsAccount)
+    tracking_number = _generate_unique_tracking_number(session, SavingsAccount)
     daily_amount = request.target_amount / Decimal(total_days)
     commission_amount = request.commission_amount if request.commission_amount is not None else daily_amount.quantize(Decimal("0.01"))
 
@@ -403,8 +433,8 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
         created_by=current_user["user_id"],
         marking_status=MarkingStatus.NOT_STARTED,
     )
-    db.add(savings)
-    db.flush()
+    session.add(savings)
+    session.flush()
 
     total_commission = calculate_total_commission(savings)
     logger.info(f"Created target savings {tracking_number} with commission_amount={commission_amount}, commission_days={request.commission_days}, total_commission={total_commission} for customer {customer_id}")
@@ -420,8 +450,8 @@ async def create_savings_target(request: SavingsCreateTarget, current_user: dict
         )
         for i in range(total_days)
     ]
-    db.add_all(markings)
-    db.commit()
+    session.add_all(markings)
+    session.commit()
 
     return _savings_response(savings)
 
@@ -554,12 +584,23 @@ async def update_savings(savings_id: int, request: SavingsUpdate, current_user: 
     logger.info(f"Updated savings {savings.tracking_number} with commission_amount={savings.commission_amount}, commission_days={savings.commission_days}, total_commission={total_commission} for customer {current_user['user_id']}")
     return _savings_response(savings)
 
-async def delete_savings(savings_id: int, current_user: dict, db: Session):
-    current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
-    if not has_permission(current_user_obj, Permission.UPDATE_SAVINGS, db):
+async def delete_savings(
+    savings_id: int,
+    current_user: dict,
+    db: Session,
+    *,
+    user_repo: UserRepository | None = None,
+    savings_repo: SavingsRepository | None = None,
+):
+    user_repo = _resolve_repo(user_repo, UserRepository, db)
+    savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
+    session = savings_repo.db
+
+    current_user_obj = user_repo.get_by_id(current_user["user_id"])
+    if not has_permission(current_user_obj, Permission.UPDATE_SAVINGS, session):
         return error_response(status_code=403, message="No permission to delete savings")
 
-    savings = db.query(SavingsAccount).filter(SavingsAccount.id == savings_id).first()
+    savings = session.query(SavingsAccount).filter(SavingsAccount.id == savings_id).first()
     if not savings:
         return error_response(status_code=404, message="Savings account not found")
 
@@ -568,7 +609,7 @@ async def delete_savings(savings_id: int, current_user: dict, db: Session):
     elif current_user["role"] not in ["agent", "sub_agent", "admin", "customer"]:
         return error_response(status_code=401, message="Unauthorized role")
 
-    has_paid_markings = db.query(SavingsMarking).filter(
+    has_paid_markings = session.query(SavingsMarking).filter(
         SavingsMarking.savings_account_id == savings_id,
         SavingsMarking.status == SavingsStatus.PAID
     ).first()
@@ -576,8 +617,8 @@ async def delete_savings(savings_id: int, current_user: dict, db: Session):
         return error_response(status_code=400, message="Cannot delete savings account with paid markings")
 
     tracking_number = savings.tracking_number
-    db.delete(savings)
-    db.commit()
+    session.delete(savings)
+    session.commit()
 
     logger.info(f"Deleted savings account {tracking_number} (ID: {savings_id}) for customer {savings.customer_id}")
     return success_response(
@@ -592,130 +633,77 @@ async def get_all_savings(
     unit_id: int | None,
     savings_type: str | None,
     search: str | None,
-    limit: int, 
-    offset: int, 
-    current_user: dict, 
-    db: Session
+    limit: int,
+    offset: int,
+    current_user: dict,
+    db: Session,
+    *,
+    savings_repo: SavingsRepository | None = None,
+    user_repo: UserRepository | None = None,
+    business_repo: BusinessRepository | None = None,
+    user_business_repo: UserBusinessRepository | None = None,
+    unit_repo: UnitRepository | None = None,
 ):
-    """
-    Get all savings accounts with flexible business filtering.
-    
-    Business selection logic:
-    1. If business_id provided → use it (with validation)
-    2. Else use active_business_id from current_user
-    3. Super admin with no business_id → show all businesses
-    """
-    current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
-    if not current_user_obj:
-        return error_response(status_code=404, message="User not found")
-    
-    query = db.query(SavingsAccount)
-    target_business_id = None
+    target_business_id: int | None = None
+    effective_customer_id: int | None = None
 
-    if current_user["role"] == "customer":
+    role = current_user["role"]
+
+    if role == "customer":
         if customer_id and customer_id != current_user["user_id"]:
             return error_response(status_code=403, message="Customers can only view their own savings")
-        query = query.filter(SavingsAccount.customer_id == current_user["user_id"])
-        
-        # Customers: use explicit business_id or active_business_id or all their businesses
+        effective_customer_id = current_user["user_id"]
         if business_id:
             user_business_ids = [b.id for b in current_user_obj.businesses]
             if business_id not in user_business_ids:
                 return error_response(status_code=403, message="You don't have access to this business")
             target_business_id = business_id
-            query = query.filter(SavingsAccount.business_id == target_business_id)
         elif current_user.get("active_business_id"):
             target_business_id = current_user["active_business_id"]
-            query = query.filter(SavingsAccount.business_id == target_business_id)
-        # else: show savings from all their businesses
-        
-    elif current_user["role"] in ["agent", "sub_agent"]:
-        user_business_ids = [b.id for b in current_user_obj.businesses]
-        if not user_business_ids:
+
+    elif role in {"agent", "sub_agent"}:
+        business_ids = [b.id for b in business_repo.get_user_businesses_with_units(current_user["user_id"]) or []]
+        if not business_ids:
             return error_response(status_code=400, message="No business associated with user")
-        
-        # Determine target business
+
         if business_id:
-            if business_id not in user_business_ids:
+            if business_id not in business_ids:
                 return error_response(status_code=403, message="You don't have access to this business")
             target_business_id = business_id
-        elif current_user.get("active_business_id"):
+        elif current_user.get("active_business_id") and current_user["active_business_id"] in business_ids:
             target_business_id = current_user["active_business_id"]
         else:
             return error_response(status_code=400, message="Please specify a business_id or set an active business")
-        
-        query = query.filter(SavingsAccount.business_id == target_business_id)
-        
-        if unit_id:
-            unit_exists = db.query(exists().where(Unit.id == unit_id).where(Unit.business_id == target_business_id)).scalar()
-            if not unit_exists:
-                return error_response(status_code=400, message=f"Unit {unit_id} not found in business {target_business_id}")
-            query = query.filter(SavingsAccount.unit_id == unit_id)
-            
-    elif current_user["role"] == "admin":
+
+    elif role == "admin":
         target_business_id = business_id or current_user.get("active_business_id")
         if not target_business_id:
             return error_response(status_code=400, message="Please specify a business_id parameter")
-        
-        query = query.filter(SavingsAccount.business_id == target_business_id)
-        
-        if unit_id:
-            unit_exists = db.query(exists().where(Unit.id == unit_id).where(Unit.business_id == target_business_id)).scalar()
-            if not unit_exists:
-                return error_response(status_code=400, message=f"Unit {unit_id} not found in business {target_business_id}")
-            query = query.filter(SavingsAccount.unit_id == unit_id)
-            
-    elif current_user["role"] == "super_admin":
-        # Super admin can query specific business or all businesses
-        if business_id:
-            business_exists = db.query(exists().where(Business.id == business_id)).scalar()
-            if not business_exists:
-                return error_response(status_code=404, message=f"Business {business_id} not found")
-            query = query.filter(SavingsAccount.business_id == business_id)
-            target_business_id = business_id
-        elif current_user.get("active_business_id"):
-            query = query.filter(SavingsAccount.business_id == current_user["active_business_id"])
-            target_business_id = current_user["active_business_id"]
-        # else: no filter - super admin sees all businesses
-        
+
+    elif role == "super_admin":
+        target_business_id = business_id or current_user.get("active_business_id")
+
     else:
         return error_response(status_code=401, message="Unauthorized role")
 
-    if customer_id and current_user["role"] != "customer":
-        customer = db.query(User).filter(User.id == customer_id, User.role == "customer").first()
+    if customer_id and role != "customer":
+        customer = user_repo.find_one_by(id=customer_id, role="customer")
         if not customer:
             return error_response(status_code=400, message=f"User {customer_id} is not a customer")
-        query = query.filter(SavingsAccount.customer_id == customer_id)
+        effective_customer_id = customer_id
 
-    if savings_type:
-        # Map legacy savings types to enum values
-        savings_type_map = {
-            "single": SavingsType.DAILY,
-            "target": SavingsType.TARGET,
-            "daily": SavingsType.DAILY
-        }
-        if savings_type.lower() not in savings_type_map and savings_type not in [SavingsType.DAILY, SavingsType.TARGET]:
-            return error_response(status_code=400, message="Invalid savings type. Use DAILY, TARGET, single, or target")
-        query = query.filter(SavingsAccount.savings_type == savings_type_map.get(savings_type.lower(), savings_type))
-    
-    if search:
-        search_pattern = f"%{search.lower()}%"
-        query = query.join(User, User.id == SavingsAccount.customer_id, isouter=True)
-        query = query.filter(
-            or_(
-                func.lower(SavingsAccount.tracking_number).like(search_pattern),
-                func.lower(User.full_name).like(search_pattern),
-                func.lower(User.phone_number).like(search_pattern),
-                func.lower(User.email).like(search_pattern),
-            )
-        )
-    
     if limit < 1 or offset < 0:
         return error_response(status_code=400, message="Limit must be positive and offset non-negative")
 
-    total_count = query.count()
-
-    savings = query.order_by(SavingsAccount.created_at.desc()).offset(offset).limit(limit).all()
+    savings, total_count = savings_repo.get_savings_with_filters(
+        customer_id=effective_customer_id,
+        business_id=target_business_id,
+        unit_id=unit_id,
+        savings_type=savings_type,
+        search=search,
+        limit=limit,
+        offset=offset,
+    )
 
     if not savings:
         return success_response(
@@ -755,15 +743,23 @@ async def get_all_savings(
         status_code=200,
         message="Savings accounts retrieved successfully",
         data={
-            "savings": response_data, 
+            "savings": response_data,
             "total_count": total_count,
             "limit": limit,
             "offset": offset,
-        }
+        },
     )
 
-async def get_savings_markings_by_tracking_number(tracking_number: str, db: Session):
-    savings_account = db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tracking_number).first()
+async def get_savings_markings_by_tracking_number(
+    tracking_number: str,
+    db: Session,
+    *,
+    savings_repo: SavingsRepository | None = None,
+):
+    savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
+    session = savings_repo.db
+
+    savings_account = session.query(SavingsAccount).filter(SavingsAccount.tracking_number == tracking_number).first()
     
     if not savings_account:
         return error_response(status_code=404, message="Savings account not found")
@@ -1191,21 +1187,33 @@ async def end_savings_markings(tracking_number: str, current_user: dict, db: Ses
         }
     )
 
-async def get_savings_metrics(user_id: str, db: Session, tracking_number: str = None, business_id: int = None):
+async def get_savings_metrics(
+    user_id: str,
+    db: Session,
+    tracking_number: str = None,
+    business_id: int = None,
+    *,
+    savings_repo: SavingsRepository | None = None,
+    user_repo: UserRepository | None = None,
+):
     logger.info(f"Fetching savings metrics for user_id: {user_id}, tracking_number: {tracking_number}, business_id: {business_id}")
-    
+
+    savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
+    user_repo = _resolve_repo(user_repo, UserRepository, db)
+    session = savings_repo.db
+
     if tracking_number:
         # Metrics for a specific savings account (for SavingsMarkings.jsx)
-        savings_account = db.query(SavingsAccount).filter(
+        savings_account = session.query(SavingsAccount).filter(
             SavingsAccount.tracking_number == tracking_number,
             SavingsAccount.customer_id == user_id
         ).first()
-        
+
         if not savings_account:
             logger.error(f"Savings account {tracking_number} not found for user {user_id}")
             return error_response(status_code=404, message="Savings account not found")
 
-        markings = db.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings_account.id).all()
+        markings = session.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings_account.id).all()
 
         if not markings:
             logger.error(f"No markings found for savings {tracking_number}")
@@ -1219,14 +1227,14 @@ async def get_savings_metrics(user_id: str, db: Session, tracking_number: str = 
 
         # Check for existing payment request
         from models.payments import PaymentRequest, PaymentRequestStatus
-        payment_request = db.query(PaymentRequest).filter(
+
+        payment_request = session.query(PaymentRequest).filter(
             PaymentRequest.savings_account_id == savings_account.id,
-            PaymentRequest.status.in_([
-                PaymentRequestStatus.PENDING,
-                PaymentRequestStatus.APPROVED
-            ])
+            PaymentRequest.status.in_(
+                [PaymentRequestStatus.PENDING, PaymentRequestStatus.APPROVED]
+            ),
         ).first()
-        
+
         payment_request_status = payment_request.status.value if payment_request else None
 
         response_data = SavingsMetricsResponse(
@@ -1238,95 +1246,142 @@ async def get_savings_metrics(user_id: str, db: Session, tracking_number: str = 
             can_extend=can_extend,
             total_commission=total_commission,
             marking_status=savings_account.marking_status,
-            payment_request_status=payment_request_status
+            payment_request_status=payment_request_status,
         ).model_dump()
 
-        logger.info(f"Retrieved metrics for savings {tracking_number}: savings_account_id={savings_account.id}, "
-                    f"total={total_amount}, marked={amount_marked}, days_remaining={days_remaining}, "
-                    f"can_extend={can_extend}, total_commission={total_commission}, "
-                    f"marking_status={savings_account.marking_status}, payment_request_status={payment_request_status}")
-        return success_response(status_code=200, message="Savings metrics retrieved successfully", data=response_data)
-    else:
-        # Aggregated metrics for all accounts (for Savings.jsx and Dashboard)
-        from models.user import User
-        
-        # Get user to determine active_business_id if not provided
-        user = db.query(User).filter(User.id == user_id).first()
-        target_business_id = business_id or (user.active_business_id if user else None)
-        
-        today = datetime.now()
-        month_start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        month_end = month_start + relativedelta(months=1)
-        logger.info(f"Month range: {month_start.date()} to {month_end.date()}, business_id: {target_business_id}")
-
-        # Total savings (all-time): Sum of amount for PAID markings across all accounts
-        total_savings_query = db.query(func.coalesce(func.sum(SavingsMarking.amount), 0))\
-            .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)\
-            .filter(
-                SavingsAccount.customer_id == user_id,
-                SavingsMarking.status == SavingsStatus.PAID
-            )
-        
-        if target_business_id:
-            total_savings_query = total_savings_query.filter(SavingsAccount.business_id == target_business_id)
-        
-        total_savings_all_time = total_savings_query.scalar()
-
-        # This month savings: Sum of amount for PAID markings in the current month
-        this_month_query = db.query(func.coalesce(func.sum(SavingsMarking.amount), 0))\
-            .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)\
-            .filter(
-                SavingsAccount.customer_id == user_id,
-                SavingsMarking.status == SavingsStatus.PAID,
-                SavingsMarking.marked_date >= month_start,
-                SavingsMarking.marked_date < month_end
-            )
-        
-        if target_business_id:
-            this_month_query = this_month_query.filter(SavingsAccount.business_id == target_business_id)
-        
-        this_month_savings = this_month_query.scalar()
-
-        # Total savings cards: Count of all savings accounts for the user
-        total_cards_query = db.query(SavingsAccount)\
-            .filter(SavingsAccount.customer_id == user_id)
-        
-        if target_business_id:
-            total_cards_query = total_cards_query.filter(SavingsAccount.business_id == target_business_id)
-        
-        total_savings_cards = total_cards_query.count()
-
-        # Active cards: Count of savings accounts with marking_status != 'completed'
-        active_cards_query = db.query(SavingsAccount)\
-            .filter(
-                SavingsAccount.customer_id == user_id,
-                SavingsAccount.marking_status != MarkingStatus.COMPLETED
-            )
-        
-        if target_business_id:
-            active_cards_query = active_cards_query.filter(SavingsAccount.business_id == target_business_id)
-        
-        active_cards = active_cards_query.count()
-
-        logger.info(f"Aggregated metrics for user {user_id}, business {target_business_id}: "
-                    f"total_savings_all_time={total_savings_all_time}, "
-                    f"this_month_savings={this_month_savings}, total_savings_cards={total_savings_cards}, "
-                    f"active_cards={active_cards}")
-
-        response_data = {
-            "business_id": target_business_id,
-            "total_savings_all_time": float(total_savings_all_time or 0),
-            "this_month_savings": float(this_month_savings or 0),
-            "total_savings_cards": total_savings_cards,
-            "active_cards": active_cards
-        }
-
-        return success_response(
-            status_code=200,
-            message="Aggregated savings metrics retrieved successfully",
-            data=response_data
+        logger.info(
+            "Retrieved metrics for savings %s: savings_account_id=%s, total=%s, marked=%s, days_remaining=%s, "
+            "can_extend=%s, total_commission=%s, marking_status=%s, payment_request_status=%s",
+            tracking_number,
+            savings_account.id,
+            total_amount,
+            amount_marked,
+            days_remaining,
+            can_extend,
+            total_commission,
+            savings_account.marking_status,
+            payment_request_status,
         )
+        return success_response(status_code=200, message="Savings metrics retrieved successfully", data=response_data)
 
+    # Aggregated metrics for all accounts (for Savings.jsx and Dashboard)
+    user = user_repo.get_by_id(user_id)
+    target_business_id = business_id or (user.active_business_id if user else None)
+
+    today = datetime.now()
+    month_start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_end = month_start + relativedelta(months=1)
+    logger.info(
+        "Month range: %s to %s, business_id: %s",
+        month_start.date(),
+        month_end.date(),
+        target_business_id,
+    )
+
+    total_savings_query = (
+        session.query(func.coalesce(func.sum(SavingsMarking.amount), 0))
+        .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)
+        .filter(
+            SavingsAccount.customer_id == user_id,
+            SavingsMarking.status == SavingsStatus.PAID,
+        )
+    )
+    if target_business_id:
+        total_savings_query = total_savings_query.filter(
+            SavingsAccount.business_id == target_business_id
+        )
+    total_savings_all_time = total_savings_query.scalar()
+
+    this_month_query = (
+        session.query(func.coalesce(func.sum(SavingsMarking.amount), 0))
+        .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)
+        .filter(
+            SavingsAccount.customer_id == user_id,
+            SavingsMarking.status == SavingsStatus.PAID,
+            SavingsMarking.marked_date >= month_start,
+            SavingsMarking.marked_date < month_end,
+        )
+    )
+    if target_business_id:
+        this_month_query = this_month_query.filter(
+            SavingsAccount.business_id == target_business_id
+        )
+    this_month_savings = this_month_query.scalar()
+
+    total_cards_query = session.query(SavingsAccount).filter(SavingsAccount.customer_id == user_id)
+    if target_business_id:
+        total_cards_query = total_cards_query.filter(
+            SavingsAccount.business_id == target_business_id
+        )
+    total_savings_cards = total_cards_query.count()
+
+    total_markings_query = (
+        session.query(func.count(SavingsMarking.id))
+        .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)
+        .filter(SavingsAccount.customer_id == user_id)
+    )
+    if target_business_id:
+        total_markings_query = total_markings_query.filter(
+            SavingsAccount.business_id == target_business_id
+        )
+    total_markings_all_time = total_markings_query.scalar()
+
+    pending_markings_query = (
+        session.query(func.count(SavingsMarking.id))
+        .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)
+        .filter(
+            SavingsAccount.customer_id == user_id,
+            SavingsMarking.status == SavingsStatus.PENDING,
+        )
+    )
+    if target_business_id:
+        pending_markings_query = pending_markings_query.filter(
+            SavingsAccount.business_id == target_business_id
+        )
+    total_pending_markings = pending_markings_query.scalar()
+
+    paid_markings_query = (
+        session.query(func.count(SavingsMarking.id))
+        .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)
+        .filter(
+            SavingsAccount.customer_id == user_id,
+            SavingsMarking.status == SavingsStatus.PAID,
+        )
+    )
+    if target_business_id:
+        paid_markings_query = paid_markings_query.filter(
+            SavingsAccount.business_id == target_business_id
+        )
+    total_paid_markings = paid_markings_query.scalar()
+
+    logger.info(
+        "Aggregated metrics for user %s: cards=%s, total_markings=%s, pending_markings=%s, paid_markings=%s",
+        user_id,
+        total_savings_cards,
+        total_markings_all_time,
+        total_pending_markings,
+        total_paid_markings,
+    )
+
+    response_data = {
+        "overview": {
+            "total_savings_all_time": float(total_savings_all_time or 0),
+            "total_savings_this_month": float(this_month_savings or 0),
+            "total_savings_cards": total_savings_cards,
+        },
+        "markings": {
+            "total_markings": int(total_markings_all_time or 0),
+            "pending_markings": int(total_pending_markings or 0),
+            "completed_markings": int(total_paid_markings or 0),
+        },
+    }
+
+    logger.info("Aggregated metrics payload for user %s: %s", user_id, response_data)
+    return success_response(
+        status_code=200,
+        message="Savings metrics retrieved successfully",
+        data=response_data,
+    )
 
 async def verify_savings_payment(reference: str, db: Session):
     markings = db.query(SavingsMarking).filter(SavingsMarking.payment_reference == reference).all()
@@ -1533,7 +1588,7 @@ async def confirm_bank_transfer(reference: str, current_user: dict, db: Session)
         data=response_data
     )
 
-async def get_monthly_summary(current_user: dict, db: Session):
+async def get_monthly_summary(current_user: dict, db: Session, business_id: int | None = None):
     """Get monthly summary of savings and expenses for the current month, plus all-time totals"""
     from models.expenses import ExpenseCard, Expense
     from datetime import datetime
@@ -1561,6 +1616,19 @@ async def get_monthly_summary(current_user: dict, db: Session):
         SavingsMarking.marked_date <= month_end.date()
     ).scalar() or Decimal('0')
     
+    if business_id:
+        total_savings_current_month = db.query(
+            func.coalesce(func.sum(SavingsMarking.amount), 0)
+        ).join(
+            SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id
+        ).filter(
+            SavingsAccount.customer_id == user_id,
+            SavingsAccount.business_id == business_id,
+            SavingsMarking.status == SavingsStatus.PAID,
+            SavingsMarking.marked_date >= month_start.date(),
+            SavingsMarking.marked_date <= month_end.date(),
+        ).scalar() or Decimal("0")
+    
     # Calculate total expenses for current month
     total_expenses_current_month = db.query(
         func.coalesce(func.sum(Expense.amount), 0)
@@ -1573,14 +1641,17 @@ async def get_monthly_summary(current_user: dict, db: Session):
     ).scalar() or Decimal('0')
     
     # Calculate ALL-TIME total savings (all paid markings ever)
-    total_savings_all_time = db.query(
+    total_savings_all_time_query = db.query(
         func.coalesce(func.sum(SavingsMarking.amount), 0)
     ).join(
         SavingsAccount, SavingsMarking.savings_account_id == SavingsAccount.id
     ).filter(
         SavingsAccount.customer_id == user_id,
         SavingsMarking.status == SavingsStatus.PAID
-    ).scalar() or Decimal('0')
+    )
+    if business_id:
+        total_savings_all_time_query = total_savings_all_time_query.filter(SavingsAccount.business_id == business_id)
+    total_savings_all_time = total_savings_all_time_query.scalar() or Decimal("0")
     
     # Calculate ALL-TIME total expenses (all expenses ever)
     total_expenses_all_time = db.query(

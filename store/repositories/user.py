@@ -52,6 +52,14 @@ class UserRepository(BaseRepository[User]):
         """Get all active users"""
         return self.find_by(is_active=True)[:limit]
     
+    def get_active_customers(self) -> List[User]:
+        """Get all active customers."""
+        return (
+            self.db.query(User)
+            .filter(User.role == Role.CUSTOMER, User.is_active.is_(True))
+            .all()
+        )
+
     def get_with_businesses(self, user_id: int) -> Optional[User]:
         """Get user with businesses loaded"""
         return (

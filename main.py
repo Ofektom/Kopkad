@@ -22,12 +22,11 @@ from api.router.user import user_router as user_router_new
 from api.router.analytics import analytics_router
 from api.router.search import search_router
 from api.router.business import business_router as business_router_new
+from api.router.savings import savings_router as savings_router_new
 # OLD: Keep for backwards compatibility during migration
-from api.user import user_router as user_router_old
-from api.savings import savings_router
-from api.payments import payment_router
-from api.expenses import expenses_router
-from api.financial_advisor import financial_advisor_router
+from api.router.payments import payments_router as payments_router_new
+from api.router.expenses import expenses_router as expenses_router_new
+from api.router.financial_advisor import financial_advisor_router as financial_advisor_router_new
 
 # Import scripts
 from scripts.bootstrap_super_admin import bootstrap_super_admin
@@ -106,10 +105,10 @@ app.include_router(search_router, prefix="/api/v1")
 # OLD: Commented out - keeping for reference during migration
 # app.include_router(user_router_old, prefix="/api/v1")
 app.include_router(business_router_new, prefix="/api/v1")
-app.include_router(savings_router, prefix="/api/v1")
-app.include_router(payment_router, prefix="/api/v1")
-app.include_router(expenses_router, prefix="/api/v1")
-app.include_router(financial_advisor_router, prefix="/api/v1")
+app.include_router(savings_router_new, prefix="/api/v1")
+app.include_router(payments_router_new, prefix="/api/v1")
+app.include_router(expenses_router_new, prefix="/api/v1")
+app.include_router(financial_advisor_router_new, prefix="/api/v1")
 
 @app.on_event("startup")
 async def on_startup():
