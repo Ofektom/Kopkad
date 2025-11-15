@@ -153,6 +153,22 @@ async def create_expense_card(
     session.commit()
     session.refresh(expense_card)
 
+    # Notify customer about expense card creation
+    from service.notifications import notify_user
+    from models.financial_advisor import NotificationType, NotificationPriority
+    from store.repositories import UserNotificationRepository
+    await notify_user(
+        user_id=current_user["user_id"],
+        notification_type=NotificationType.EXPENSE_CARD_CREATED,
+        title="Expense Card Created",
+        message=f"Expense card '{expense_card.name}' has been created with balance {balance:.2f}",
+        priority=NotificationPriority.LOW,
+        db=session,
+        notification_repo=UserNotificationRepository(session),
+        related_entity_id=expense_card.id,
+        related_entity_type="expense_card",
+    )
+
     logger.info(
         "Created expense card %s for user %s",
         expense_card.id,
@@ -227,6 +243,22 @@ async def record_expense(
     card.updated_by = current_user["user_id"]
     session.commit()
     session.refresh(expense)
+
+    # Notify customer about expense recorded (if threshold exceeded - optional check)
+    from service.notifications import notify_user
+    from models.financial_advisor import NotificationType, NotificationPriority
+    from store.repositories import UserNotificationRepository
+    await notify_user(
+        user_id=current_user["user_id"],
+        notification_type=NotificationType.EXPENSE_RECORDED,
+        title="Expense Recorded",
+        message=f"Expense of {request.amount:.2f} recorded in '{card.name}'. Remaining balance: {card.balance:.2f}",
+        priority=NotificationPriority.LOW,
+        db=session,
+        notification_repo=UserNotificationRepository(session),
+        related_entity_id=expense.id,
+        related_entity_type="expense",
+    )
 
     logger.info(
         "Recorded expense %s for card %s by user %s",

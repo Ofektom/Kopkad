@@ -18,6 +18,7 @@ from store.repositories import (
     UserBusinessRepository,
     SavingsRepository,
     PermissionRepository,
+    UserNotificationRepository,
 )
 
 # Enums (centralized)
@@ -364,6 +365,34 @@ async def signup_authenticated(
 
         settings_obj = settings_repo.create_default_settings(user.id)
         db.commit()
+
+        # Notify creator about user creation
+        from service.notifications import notify_user
+        from models.financial_advisor import NotificationType, NotificationPriority
+        await notify_user(
+            user_id=current_user["user_id"],
+            notification_type=NotificationType.USER_CREATED,
+            title="User Created",
+            message=f"New {requested_role.value} account has been created for {user.full_name}",
+            priority=NotificationPriority.LOW,
+            db=db,
+            notification_repo=UserNotificationRepository(db),
+            related_entity_id=user.id,
+            related_entity_type="user",
+        )
+        
+        # Notify new user about account creation
+        await notify_user(
+            user_id=user.id,
+            notification_type=NotificationType.USER_CREATED,
+            title="Account Created",
+            message=f"New {requested_role.value} account has been created for you",
+            priority=NotificationPriority.LOW,
+            db=db,
+            notification_repo=UserNotificationRepository(db),
+            related_entity_id=user.id,
+            related_entity_type="user",
+        )
 
         if request.email and (settings_obj.notification_method in [NotificationMethod.EMAIL.value, NotificationMethod.BOTH.value]):
             await send_welcome_email(
@@ -835,6 +864,37 @@ async def toggle_user_status(
         if updated_user:
             db.refresh(updated_user)
         target_user = updated_user or user_repo.get_by_id(user_id)
+        
+        # Notify user about status change
+        from service.notifications import notify_user, notify_super_admins
+        from models.financial_advisor import NotificationType, NotificationPriority
+        status_text = "activated" if is_active else "deactivated"
+        await notify_user(
+            user_id=user_id,
+            notification_type=NotificationType.USER_STATUS_CHANGED,
+            title="Account Status Changed",
+            message=f"Your account has been {status_text}",
+            priority=NotificationPriority.HIGH,
+            db=db,
+            notification_repo=UserNotificationRepository(db),
+            related_entity_id=user_id,
+            related_entity_type="user",
+        )
+        
+        # Notify super admins if user was deactivated
+        if not is_active:
+            await notify_super_admins(
+                notification_type=NotificationType.USER_DEACTIVATED,
+                title="User Deactivated",
+                message=f"User {target_user.full_name} has been deactivated",
+                priority=NotificationPriority.HIGH,
+                db=db,
+                user_repo=user_repo,
+                notification_repo=UserNotificationRepository(db),
+                related_entity_id=user_id,
+                related_entity_type="user",
+            )
+        
         user_response = UserResponse(
             user_id=target_user.id,
             full_name=target_user.full_name,
@@ -900,12 +960,31 @@ async def delete_user(
         )
 
     try:
+        user_name = user.full_name
+        user_role = user.role
+        
         # Delete associated records via repositories
         user_business_repo.unlink_user_from_all_businesses(user_id)
         user_repo.delete_user_permissions(user_id)
         settings_repo.delete_by_user_id(user_id)
         user_repo.delete(user_id)
         db.commit()
+        
+        # Notify super admins about user deletion
+        from service.notifications import notify_super_admins
+        from models.financial_advisor import NotificationType, NotificationPriority
+        await notify_super_admins(
+            notification_type=NotificationType.USER_DELETED,
+            title="User Deleted",
+            message=f"User {user_name} ({user_role}) has been deleted from the system",
+            priority=NotificationPriority.HIGH,
+            db=db,
+            user_repo=user_repo,
+            notification_repo=UserNotificationRepository(db),
+            related_entity_id=user_id,
+            related_entity_type="user",
+        )
+        
         return success_response(
             status_code=200,
             message="User deleted successfully",
@@ -973,11 +1052,30 @@ async def switch_business(
                 message="You do not have access to this business"
             )
         
+        # Get business name before switching
+        business = business_repo.get_by_id(business_id)
+        business_name = business.name if business else f"Business {business_id}"
+        
         # Update user's active business
         user_repo.update_active_business(user.id, business_id)
         db.commit()
         
         logger.info(f"User {user.id} switched to business {business_id}")
+        
+        # Notify user about business switch
+        from service.notifications import notify_user
+        from models.financial_advisor import NotificationType, NotificationPriority
+        await notify_user(
+            user_id=user.id,
+            notification_type=NotificationType.BUSINESS_SWITCHED,
+            title="Business Switched",
+            message=f"You've switched to '{business_name}'",
+            priority=NotificationPriority.LOW,
+            db=db,
+            notification_repo=UserNotificationRepository(db),
+            related_entity_id=business_id,
+            related_entity_type="business",
+        )
         
         # Fetch businesses for response
         businesses = business_repo.get_user_businesses_with_units(user.id)
@@ -1096,6 +1194,48 @@ async def assign_admin_to_business(
             business_repo.update_admin_credentials(business_id, person.id, True)
         
         db.commit()
+        
+        # Notify assigned admin
+        from service.notifications import notify_user, notify_super_admins, notify_business_admin
+        from models.financial_advisor import NotificationType, NotificationPriority
+        await notify_user(
+            user_id=person.id,
+            notification_type=NotificationType.ADMIN_ASSIGNED,
+            title="Admin Assignment",
+            message=f"You have been assigned as admin for '{business.name}'. Please change your password.",
+            priority=NotificationPriority.HIGH,
+            db=db,
+            notification_repo=UserNotificationRepository(db),
+            related_entity_id=business_id,
+            related_entity_type="business",
+        )
+        
+        # Notify agent (owner) about admin assignment
+        if business.agent_id:
+            await notify_user(
+                user_id=business.agent_id,
+                notification_type=NotificationType.ADMIN_ASSIGNED,
+                title="Admin Assigned",
+                message=f"{person.full_name} has been assigned as admin for '{business.name}'",
+                priority=NotificationPriority.HIGH,
+                db=db,
+                notification_repo=UserNotificationRepository(db),
+                related_entity_id=business_id,
+                related_entity_type="business",
+            )
+        
+        # Notify super admins
+        await notify_super_admins(
+            notification_type=NotificationType.NEW_ADMIN_CREATED,
+            title="New Admin Created",
+            message=f"New admin account has been created: {person.full_name} for '{business.name}'",
+            priority=NotificationPriority.MEDIUM,
+            db=db,
+            user_repo=user_repo,
+            notification_repo=UserNotificationRepository(db),
+            related_entity_id=person.id,
+            related_entity_type="user",
+        )
         
         logger.info(f"Assigned {person.full_name} (ID: {person.id}) as admin for business {business.id}")
         

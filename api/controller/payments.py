@@ -40,7 +40,11 @@ from store.repositories import (
     PaymentAccountRepository,
     PaymentsRepository,
     UserRepository,
+    UserNotificationRepository,
+    SavingsRepository,
 )
+from models.financial_advisor import NotificationType, NotificationPriority
+from service.notifications import notify_user, notify_business_admin
 from utils.auth import get_current_user
 from utils.dependencies import get_repository
 
@@ -48,6 +52,9 @@ from utils.dependencies import get_repository
 async def paystack_webhook_controller(
     request: Request,
     db: Session = Depends(get_db),
+    notification_repo: UserNotificationRepository = Depends(get_repository(UserNotificationRepository)),
+    savings_repo: SavingsRepository = Depends(get_repository(SavingsRepository)),
+    business_repo: BusinessRepository = Depends(get_repository(BusinessRepository)),
 ):
     """
     Handle Paystack webhook events to mark savings as paid.
@@ -109,11 +116,131 @@ async def paystack_webhook_controller(
             if paid_at
             else datetime.utcnow()
         )
+        from models.savings import SavingsAccount, MarkingStatus
+        
         for marking in markings:
             marking.status = SavingsStatus.PAID.value
             marking.marked_by_id = markings[0].savings_account.customer_id
             marking.updated_by = marking.marked_by_id
             marking.updated_at = paid_at_dt
+        
+        # Check if this is a bulk marking (multiple savings accounts)
+        unique_savings_accounts = {}
+        for marking in markings:
+            savings_id = marking.savings_account_id
+            if savings_id not in unique_savings_accounts:
+                unique_savings_accounts[savings_id] = marking.savings_account
+        
+        is_bulk_marking = len(unique_savings_accounts) > 1
+        
+        # If bulk marking, notify each customer about bulk marking
+        if is_bulk_marking:
+            from service.notifications import notify_user
+            from models.financial_advisor import NotificationType, NotificationPriority
+            customers_notified = set()
+            for savings_id, savings_account in unique_savings_accounts.items():
+                if savings_account.customer_id not in customers_notified:
+                    await notify_user(
+                        user_id=savings_account.customer_id,
+                        notification_type=NotificationType.SAVINGS_BULK_MARKED,
+                        title="Multiple Payments Confirmed",
+                        message=f"Multiple payments have been marked for your savings accounts",
+                        priority=NotificationPriority.MEDIUM,
+                        db=db,
+                        notification_repo=notification_repo,
+                        related_entity_id=None,
+                        related_entity_type="savings_marking",
+                    )
+                    customers_notified.add(savings_account.customer_id)
+        
+        # Check if savings account is completed (for single account or each account in bulk)
+        if is_bulk_marking:
+            # Check completion for each savings account in bulk
+            for savings_id, savings_account in unique_savings_accounts.items():
+                all_markings = db.query(SavingsMarking).filter(
+                    SavingsMarking.savings_account_id == savings_id
+                ).all()
+                all_paid = all(m.status == SavingsStatus.PAID.value for m in all_markings)
+                
+                if all_paid and savings_account.marking_status != MarkingStatus.COMPLETED:
+                    savings_account.marking_status = MarkingStatus.COMPLETED
+                    # Notify customer about completion
+                    await notify_user(
+                        user_id=savings_account.customer_id,
+                        notification_type=NotificationType.SAVINGS_ACCOUNT_COMPLETED,
+                        title="Savings Account Completed",
+                        message=f"Congratulations! Your savings account {savings_account.tracking_number} has been completed successfully!",
+                        priority=NotificationPriority.HIGH,
+                        db=db,
+                        notification_repo=notification_repo,
+                        related_entity_id=savings_account.id,
+                        related_entity_type="savings_account",
+                    )
+                    # Notify business admin
+                    if savings_account.business_id:
+                        await notify_business_admin(
+                            business_id=savings_account.business_id,
+                            notification_type=NotificationType.SAVINGS_ACCOUNT_COMPLETED,
+                            title="Savings Account Completed",
+                            message=f"Savings account {savings_account.tracking_number} has been completed.",
+                            priority=NotificationPriority.MEDIUM,
+                            db=db,
+                            business_repo=business_repo,
+                            notification_repo=notification_repo,
+                            related_entity_id=savings_account.id,
+                            related_entity_type="savings_account",
+                        )
+        
+        savings_account = markings[0].savings_account if markings else None
+        if savings_account and not is_bulk_marking:
+            # Check if all markings are paid
+            all_markings = db.query(SavingsMarking).filter(
+                SavingsMarking.savings_account_id == savings_account.id
+            ).all()
+            all_paid = all(m.status == SavingsStatus.PAID.value for m in all_markings)
+            
+            if all_paid and savings_account.marking_status != MarkingStatus.COMPLETED:
+                savings_account.marking_status = MarkingStatus.COMPLETED
+                # Notify customer about completion
+                await notify_user(
+                    user_id=savings_account.customer_id,
+                    notification_type=NotificationType.SAVINGS_ACCOUNT_COMPLETED,
+                    title="Savings Account Completed",
+                    message=f"Congratulations! Your savings account {savings_account.tracking_number} has been completed successfully!",
+                    priority=NotificationPriority.HIGH,
+                    db=db,
+                    notification_repo=notification_repo,
+                    related_entity_id=savings_account.id,
+                    related_entity_type="savings_account",
+                )
+                # Notify business admin
+                if savings_account.business_id:
+                    await notify_business_admin(
+                        business_id=savings_account.business_id,
+                        notification_type=NotificationType.SAVINGS_ACCOUNT_COMPLETED,
+                        title="Savings Account Completed",
+                        message=f"Savings account {savings_account.tracking_number} has been completed.",
+                        priority=NotificationPriority.MEDIUM,
+                        db=db,
+                        business_repo=business_repo,
+                        notification_repo=notification_repo,
+                        related_entity_id=savings_account.id,
+                        related_entity_type="savings_account",
+                    )
+            else:
+                # Notify customer about payment marked
+                await notify_user(
+                    user_id=savings_account.customer_id,
+                    notification_type=NotificationType.SAVINGS_PAYMENT_MARKED,
+                    title="Payment Confirmed",
+                    message=f"Your payment of {amount_paid:.2f} for savings account {savings_account.tracking_number} has been confirmed.",
+                    priority=NotificationPriority.MEDIUM,
+                    db=db,
+                    notification_repo=notification_repo,
+                    related_entity_id=markings[0].id,
+                    related_entity_type="savings_marking",
+                )
+        
         db.commit()
 
     return {"status": "success"}
@@ -303,6 +430,7 @@ async def create_payment_request_controller(
     payments_repo: PaymentsRepository = Depends(get_repository(PaymentsRepository)),
     commission_repo: CommissionRepository = Depends(get_repository(CommissionRepository)),
     business_repo: BusinessRepository = Depends(get_repository(BusinessRepository)),
+    notification_repo: UserNotificationRepository = Depends(get_repository(UserNotificationRepository)),
 ):
     return await create_payment_request(
         request=request,
@@ -314,6 +442,7 @@ async def create_payment_request_controller(
         payments_repo=payments_repo,
         commission_repo=commission_repo,
         business_repo=business_repo,
+        notification_repo=notification_repo,
     )
 
 
@@ -354,12 +483,16 @@ async def approve_payment_request_controller(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
     payments_repo: PaymentsRepository = Depends(get_repository(PaymentsRepository)),
+    user_repo: UserRepository = Depends(get_repository(UserRepository)),
+    notification_repo: UserNotificationRepository = Depends(get_repository(UserNotificationRepository)),
 ):
     return await approve_payment_request(
         request_id=request_id,
         current_user=current_user,
         db=db,
         payments_repo=payments_repo,
+        user_repo=user_repo,
+        notification_repo=notification_repo,
     )
 
 
@@ -369,6 +502,7 @@ async def reject_payment_request_controller(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
     payments_repo: PaymentsRepository = Depends(get_repository(PaymentsRepository)),
+    notification_repo: UserNotificationRepository = Depends(get_repository(UserNotificationRepository)),
 ):
     return await reject_payment_request(
         request_id=request_id,
@@ -376,6 +510,7 @@ async def reject_payment_request_controller(
         current_user=current_user,
         db=db,
         payments_repo=payments_repo,
+        notification_repo=notification_repo,
     )
 
 
@@ -388,6 +523,8 @@ async def cancel_payment_request_controller(
     payment_account_repo: PaymentAccountRepository = Depends(
         get_repository(PaymentAccountRepository)
     ),
+    business_repo: BusinessRepository = Depends(get_repository(BusinessRepository)),
+    notification_repo: UserNotificationRepository = Depends(get_repository(UserNotificationRepository)),
 ):
     return await cancel_payment_request(
         request_id=request_id,
@@ -396,6 +533,8 @@ async def cancel_payment_request_controller(
         user_repo=user_repo,
         payments_repo=payments_repo,
         payment_account_repo=payment_account_repo,
+        business_repo=business_repo,
+        notification_repo=notification_repo,
     )
 
 

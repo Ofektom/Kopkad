@@ -39,7 +39,10 @@ from store.repositories import (
     PaymentAccountRepository,
     PaymentsRepository,
     UserRepository,
+    UserNotificationRepository,
 )
+from models.financial_advisor import NotificationType, NotificationPriority
+from service.notifications import notify_user, notify_business_admin
 
 logging.basicConfig(
     filename="payments.log",
@@ -517,6 +520,7 @@ async def create_payment_request(
     payments_repo: PaymentsRepository | None = None,
     commission_repo: CommissionRepository | None = None,
     business_repo: BusinessRepository | None = None,
+    notification_repo: UserNotificationRepository | None = None,
 ):
     """Create a payment request for a completed savings account."""
 
@@ -641,7 +645,7 @@ async def create_payment_request(
         agent_id = business.agent_id if business else None
 
         if total_commission > 0 and agent_id:
-            commission_repo.create(
+            commission = commission_repo.create(
                 {
                     "savings_account_id": request.savings_account_id,
                     "agent_id": agent_id,
@@ -656,6 +660,19 @@ async def create_payment_request(
                 "Created commission for payment request %s with agent %s",
                 payment_request.id,
                 agent_id,
+            )
+            
+            # Notify agent about commission earned
+            await notify_user(
+                user_id=agent_id,
+                notification_type=NotificationType.COMMISSION_EARNED,
+                title="Commission Earned",
+                message=f"You've earned {total_commission:.2f} commission from savings account {savings_account.tracking_number}",
+                priority=NotificationPriority.MEDIUM,
+                db=session,
+                notification_repo=notification_repo,
+                related_entity_id=commission.id if hasattr(commission, 'id') else None,
+                related_entity_type="commission",
             )
 
         response_data = PaymentRequestResponse(
@@ -676,6 +693,22 @@ async def create_payment_request(
             payment_request.id,
             current_user["user_id"],
         )
+        
+        # Notify business admin about new payment request
+        if savings_account.business_id:
+            await notify_business_admin(
+                business_id=savings_account.business_id,
+                notification_type=NotificationType.PAYMENT_REQUEST_PENDING,
+                title="New Payment Request",
+                message=f"New payment request of {payout_amount:.2f} from {current_user_obj.full_name} for savings account {savings_account.tracking_number}",
+                priority=NotificationPriority.HIGH,
+                db=session,
+                business_repo=business_repo,
+                notification_repo=notification_repo,
+                related_entity_id=payment_request.id,
+                related_entity_type="payment_request",
+            )
+        
         return success_response(
             status_code=201,
             message="Payment request created successfully",
@@ -825,6 +858,8 @@ async def approve_payment_request(
     db: Session,
     *,
     payments_repo: PaymentsRepository | None = None,
+    user_repo: UserRepository | None = None,
+    notification_repo: UserNotificationRepository | None = None,
 ):
     """Approve a payment request with business-scoped validation."""
 
@@ -864,6 +899,44 @@ async def approve_payment_request(
             request_id,
             current_user["user_id"],
         )
+        
+        # Notify customer about approval
+        if payment_request.payment_account and payment_request.payment_account.customer_id:
+            customer_id = payment_request.payment_account.customer_id
+            await notify_user(
+                user_id=customer_id,
+                notification_type=NotificationType.PAYMENT_APPROVED,
+                title="Payment Request Approved",
+                message=f"Your payment request of {payment_request.amount:.2f} has been approved and will be processed shortly.",
+                priority=NotificationPriority.MEDIUM,
+                db=session,
+                notification_repo=notification_repo,
+                related_entity_id=payment_request.id,
+                related_entity_type="payment_request",
+            )
+        
+        # Notify agent about commission paid (if commission exists for this payment request)
+        if payment_request.savings_account_id:
+            savings_account = payment_request.savings_account
+            if savings_account:
+                # Get commission for this payment request
+                commission = session.query(Commission).filter(
+                    Commission.savings_account_id == payment_request.savings_account_id
+                ).order_by(Commission.created_at.desc()).first()
+                
+                if commission and commission.agent_id:
+                    await notify_user(
+                        user_id=commission.agent_id,
+                        notification_type=NotificationType.COMMISSION_PAID,
+                        title="Commission Paid",
+                        message=f"Commission of {commission.amount:.2f} has been paid to your account from savings account {savings_account.tracking_number}",
+                        priority=NotificationPriority.HIGH,
+                        db=session,
+                        notification_repo=notification_repo,
+                        related_entity_id=commission.id,
+                        related_entity_type="commission",
+            )
+        
         return success_response(
             status_code=200,
             message="Payment request approved successfully",
@@ -881,6 +954,7 @@ async def reject_payment_request(
     db: Session,
     *,
     payments_repo: PaymentsRepository | None = None,
+    notification_repo: UserNotificationRepository | None = None,
 ):
     """Reject a payment request with business-scoped validation."""
 
@@ -924,6 +998,22 @@ async def reject_payment_request(
             current_user["user_id"],
             reject_data.rejection_reason,
         )
+        
+        # Notify customer about rejection
+        if payment_request.payment_account and payment_request.payment_account.customer_id:
+            customer_id = payment_request.payment_account.customer_id
+            await notify_user(
+                user_id=customer_id,
+                notification_type=NotificationType.PAYMENT_REJECTED,
+                title="Payment Request Rejected",
+                message=f"Your payment request of {payment_request.amount:.2f} was rejected. Reason: {reject_data.rejection_reason}",
+                priority=NotificationPriority.HIGH,
+                db=session,
+                notification_repo=notification_repo,
+                related_entity_id=payment_request.id,
+                related_entity_type="payment_request",
+            )
+        
         return success_response(
             status_code=200,
             message="Payment request rejected successfully",
@@ -945,6 +1035,8 @@ async def cancel_payment_request(
     user_repo: UserRepository | None = None,
     payments_repo: PaymentsRepository | None = None,
     payment_account_repo: PaymentAccountRepository | None = None,
+    business_repo: BusinessRepository | None = None,
+    notification_repo: UserNotificationRepository | None = None,
 ):
     """Cancel a pending payment request. Only customers can cancel their own requests."""
 
@@ -982,6 +1074,25 @@ async def cancel_payment_request(
             request_id,
             current_user["user_id"],
         )
+        
+        # Notify business admin about cancellation
+        payment_request_with_relations = payments_repo.get_by_id_with_relations(request_id)
+        if payment_request_with_relations and payment_request_with_relations.savings_account:
+            savings_account = payment_request_with_relations.savings_account
+            if savings_account.business_id:
+                await notify_business_admin(
+                    business_id=savings_account.business_id,
+                    notification_type=NotificationType.PAYMENT_CANCELLED,
+                    title="Payment Request Cancelled",
+                    message=f"Payment request {payment_request.reference} of {payment_request.amount:.2f} was cancelled by {current_user_obj.full_name}",
+                    priority=NotificationPriority.MEDIUM,
+                    db=session,
+                    business_repo=business_repo,
+                    notification_repo=notification_repo,
+                    related_entity_id=payment_request.id,
+                    related_entity_type="payment_request",
+                )
+        
         return success_response(
             status_code=200,
             message="Payment request cancelled successfully",

@@ -35,7 +35,10 @@ from store.repositories import (
     UnitRepository,
     UserBusinessRepository,
     UserRepository,
+    UserNotificationRepository,
 )
+from models.financial_advisor import NotificationType, NotificationPriority
+from service.notifications import notify_user, notify_business_admin
 
 paystack = Paystack(secret_key=os.getenv("PAYSTACK_SECRET_KEY"))
 
@@ -257,6 +260,8 @@ async def create_savings_daily(
     user_repo: UserRepository | None = None,
     savings_repo: SavingsRepository | None = None,
     unit_repo: UnitRepository | None = None,
+    notification_repo: UserNotificationRepository | None = None,
+    business_repo: BusinessRepository | None = None,
 ):
     user_repo = _resolve_repo(user_repo, UserRepository, db)
     savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
@@ -342,6 +347,20 @@ async def create_savings_daily(
     session.commit()
 
     logger.info(f"Created daily savings {tracking_number} with {len(markings)} markings for customer {customer_id}")
+    
+    # Notify customer about savings account creation
+    await notify_user(
+        user_id=customer_id,
+        notification_type=NotificationType.SAVINGS_ACCOUNT_CREATED,
+        title="Savings Account Created",
+        message=f"Your daily savings account {tracking_number} has been created successfully. Daily amount: {request.daily_amount:.2f}",
+        priority=NotificationPriority.LOW,
+        db=session,
+        notification_repo=notification_repo,
+        related_entity_id=savings.id,
+        related_entity_type="savings_account",
+    )
+    
     return _savings_response(savings)
 
 async def calculate_target_savings(request: SavingsCreateTarget):
@@ -371,6 +390,7 @@ async def create_savings_target(
     *,
     user_repo: UserRepository | None = None,
     savings_repo: SavingsRepository | None = None,
+    notification_repo: UserNotificationRepository | None = None,
 ):
     user_repo = _resolve_repo(user_repo, UserRepository, db)
     savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
@@ -453,9 +473,28 @@ async def create_savings_target(
     session.add_all(markings)
     session.commit()
 
+    # Notify customer about savings account creation
+    await notify_user(
+        user_id=customer_id,
+        notification_type=NotificationType.SAVINGS_ACCOUNT_CREATED,
+        title="Savings Account Created",
+        message=f"Your target savings account {tracking_number} has been created successfully. Target amount: {request.target_amount:.2f}",
+        priority=NotificationPriority.LOW,
+        db=session,
+        notification_repo=notification_repo,
+        related_entity_id=savings.id,
+        related_entity_type="savings_account",
+    )
+
     return _savings_response(savings)
 
-async def extend_savings(request: SavingsExtend, current_user: dict, db: Session):
+async def extend_savings(
+    request: SavingsExtend,
+    current_user: dict,
+    db: Session,
+    *,
+    notification_repo: UserNotificationRepository | None = None,
+):
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not has_permission(current_user_obj, Permission.UPDATE_SAVINGS, db):
         return error_response(status_code=403, message="No permission to extend savings")
@@ -495,9 +534,30 @@ async def extend_savings(request: SavingsExtend, current_user: dict, db: Session
     logger.info(f"Extended savings {savings.tracking_number} by {request.additional_months} months, new total_commission={total_commission} for customer {current_user['user_id']}")
 
     db.commit()
+    
+    # Notify customer about extension
+    await notify_user(
+        user_id=savings.customer_id,
+        notification_type=NotificationType.SAVINGS_ACCOUNT_EXTENDED,
+        title="Savings Account Extended",
+        message=f"Your savings account {savings.tracking_number} has been extended by {request.additional_months} months. New end date: {savings.end_date}",
+        priority=NotificationPriority.LOW,
+        db=db,
+        notification_repo=notification_repo,
+        related_entity_id=savings.id,
+        related_entity_type="savings_account",
+    )
+    
     return _savings_response(savings)
 
-async def update_savings(savings_id: int, request: SavingsUpdate, current_user: dict, db: Session):
+async def update_savings(
+    savings_id: int,
+    request: SavingsUpdate,
+    current_user: dict,
+    db: Session,
+    *,
+    notification_repo: UserNotificationRepository | None = None,
+):
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not has_permission(current_user_obj, Permission.UPDATE_SAVINGS, db):
         return error_response(status_code=403, message="No permission to update savings")
@@ -582,6 +642,20 @@ async def update_savings(savings_id: int, request: SavingsUpdate, current_user: 
     db.commit()
     total_commission = calculate_total_commission(savings)
     logger.info(f"Updated savings {savings.tracking_number} with commission_amount={savings.commission_amount}, commission_days={savings.commission_days}, total_commission={total_commission} for customer {current_user['user_id']}")
+    
+    # Notify customer about update
+    await notify_user(
+        user_id=savings.customer_id,
+        notification_type=NotificationType.SAVINGS_ACCOUNT_UPDATED,
+        title="Savings Account Updated",
+        message=f"Your savings account {savings.tracking_number} has been updated successfully.",
+        priority=NotificationPriority.LOW,
+        db=db,
+        notification_repo=notification_repo,
+        related_entity_id=savings.id,
+        related_entity_type="savings_account",
+    )
+    
     return _savings_response(savings)
 
 async def delete_savings(
@@ -591,6 +665,8 @@ async def delete_savings(
     *,
     user_repo: UserRepository | None = None,
     savings_repo: SavingsRepository | None = None,
+    notification_repo: UserNotificationRepository | None = None,
+    business_repo: BusinessRepository | None = None,
 ):
     user_repo = _resolve_repo(user_repo, UserRepository, db)
     savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
@@ -617,10 +693,41 @@ async def delete_savings(
         return error_response(status_code=400, message="Cannot delete savings account with paid markings")
 
     tracking_number = savings.tracking_number
+    customer_id = savings.customer_id
+    business_id = savings.business_id
     session.delete(savings)
     session.commit()
 
-    logger.info(f"Deleted savings account {tracking_number} (ID: {savings_id}) for customer {savings.customer_id}")
+    logger.info(f"Deleted savings account {tracking_number} (ID: {savings_id}) for customer {customer_id}")
+    
+    # Notify customer about deletion
+    await notify_user(
+        user_id=customer_id,
+        notification_type=NotificationType.SAVINGS_ACCOUNT_DELETED,
+        title="Savings Account Deleted",
+        message=f"Your savings account {tracking_number} has been deleted.",
+        priority=NotificationPriority.MEDIUM,
+        db=session,
+        notification_repo=notification_repo,
+        related_entity_id=savings_id,
+        related_entity_type="savings_account",
+    )
+    
+    # Notify business admin about deletion
+    if business_id:
+        await notify_business_admin(
+            business_id=business_id,
+            notification_type=NotificationType.SAVINGS_ACCOUNT_DELETED,
+            title="Savings Account Deleted",
+            message=f"Savings account {tracking_number} has been deleted.",
+            priority=NotificationPriority.MEDIUM,
+            db=session,
+            business_repo=business_repo,
+            notification_repo=notification_repo,
+            related_entity_id=savings_id,
+            related_entity_type="savings_account",
+        )
+    
     return success_response(
         status_code=200,
         message="Savings account deleted successfully",
@@ -786,7 +893,14 @@ async def get_savings_markings_by_tracking_number(
     logger.info(f"Retrieved {len(savings_schedule)} markings for savings {tracking_number}")
     return success_response(status_code=200, message="Savings schedule retrieved successfully", data=response_data.model_dump())
 
-async def mark_savings_payment(tracking_number: str, request: SavingsMarkingRequest, current_user: dict, db: Session):
+async def mark_savings_payment(
+    tracking_number: str,
+    request: SavingsMarkingRequest,
+    current_user: dict,
+    db: Session,
+    *,
+    notification_repo: UserNotificationRepository | None = None,
+):
     savings = db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tracking_number).first()
     if not savings:
         logger.error(f"Savings account with tracking_number {tracking_number} not found")

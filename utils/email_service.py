@@ -15,7 +15,12 @@ logger = logging.getLogger(__name__)
 
 # Retrieve SMTP and BASE_DIR settings from environment variables
 SMTP_HOST = os.getenv("SMTP_HOST")
-SMTP_PORT = int(os.getenv("SMTP_PORT"))
+SMTP_PORT_STR = os.getenv("SMTP_PORT", "587")
+try:
+    SMTP_PORT = int(SMTP_PORT_STR)
+except (ValueError, TypeError):
+    SMTP_PORT = 587
+    logger.warning(f"Invalid SMTP_PORT '{SMTP_PORT_STR}', defaulting to 587")
 SMTP_USERNAME = os.getenv("SMTP_USERNAME")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL")
@@ -24,27 +29,45 @@ BASE_DIR = os.getenv("BASE_DIR") or os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..")
 )
 
-# Log settings for debugging
-logger.info(f"BASE_DIR: {BASE_DIR}")
-logger.info(f"SMTP_HOST: {SMTP_HOST}")
-logger.info(f"SMTP_PORT: {SMTP_PORT}")
-logger.info(f"SMTP_USERNAME: {SMTP_USERNAME}")
-logger.info(f"SMTP_PASSWORD: {SMTP_PASSWORD[:4]}****")
-logger.info(f"SMTP_FROM_EMAIL: {SMTP_FROM_EMAIL}")
-logger.info(f"SMTP_FROM_NAME: {SMTP_FROM_NAME}")
-
+# Initialize template environment with error handling
 template_dir = os.path.join(BASE_DIR, "static", "templates")
-logger.info(f"Template directory: {template_dir}")
-if not os.path.exists(template_dir):
-    raise FileNotFoundError(f"Template directory not found: {template_dir}")
-if not os.path.isfile(os.path.join(template_dir, "welcome_email.html")):
-    raise FileNotFoundError(f"welcome_email.html not found in {template_dir}")
-env = Environment(loader=FileSystemLoader(template_dir))
+env = None
+
+try:
+    if os.path.exists(template_dir):
+        env = Environment(loader=FileSystemLoader(template_dir))
+        logger.info(f"Template directory initialized: {template_dir}")
+    else:
+        logger.warning(f"Template directory not found: {template_dir}. Template-based emails will fail.")
+except Exception as e:
+    logger.warning(f"Failed to initialize template environment: {str(e)}. Template-based emails will fail.")
+
+# Log settings for debugging (only if available)
+if SMTP_HOST:
+    logger.info(f"SMTP_HOST: {SMTP_HOST}")
+    logger.info(f"SMTP_PORT: {SMTP_PORT}")
+    logger.info(f"SMTP_USERNAME: {SMTP_USERNAME}")
+if SMTP_PASSWORD:
+    logger.info(f"SMTP_PASSWORD: {SMTP_PASSWORD[:4]}****")
+    logger.info(f"SMTP_FROM_EMAIL: {SMTP_FROM_EMAIL}")
+    logger.info(f"SMTP_FROM_NAME: {SMTP_FROM_NAME}")
+else:
+    logger.warning("SMTP configuration not found. Email sending will fail.")
 
 
 async def send_email_async(to_email: str, subject: str, body: str):
+    """Send an email asynchronously using SMTP."""
+    if not SMTP_HOST or not SMTP_FROM_EMAIL:
+        error_msg = "SMTP configuration not available. Cannot send email."
+        logger.error(error_msg)
+        return {
+            "status": "error",
+            "message": error_msg,
+        }
+    
     message = EmailMessage()
-    message["From"] = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>"
+    from_header = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>" if SMTP_FROM_NAME else SMTP_FROM_EMAIL
+    message["From"] = from_header
     message["To"] = to_email
     message["Subject"] = subject
     message.set_content(body, subtype="html")
@@ -77,12 +100,26 @@ async def send_email_async(to_email: str, subject: str, body: str):
 async def send_welcome_email(
     to_email: str, user_name: str, phone_number: str, role: str
 ):
-    template = env.get_template("welcome_email.html")
-    body = template.render(
-        user_name=user_name, phone_number=phone_number, role=role, app_name="Kopkad"
-    )
-    result = await send_email_async(to_email, "Welcome to Kopkad!", body)
-    return result
+    """Send a welcome email to a new user."""
+    if env is None:
+        logger.error("Template environment not initialized. Cannot send welcome email.")
+        return {
+            "status": "error",
+            "message": "Email template system not available.",
+        }
+    try:
+        template = env.get_template("welcome_email.html")
+        body = template.render(
+            user_name=user_name, phone_number=phone_number, role=role, app_name="Kopkad"
+        )
+        result = await send_email_async(to_email, "Welcome to Kopkad!", body)
+        return result
+    except Exception as e:
+        logger.error(f"Failed to send welcome email: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Failed to send welcome email: {str(e)}",
+        }
 
 
 async def send_business_created_email(
@@ -112,12 +149,44 @@ async def send_business_invitation_email(
     accept_url: str,
     reject_url: str,
 ):
-    template = env.get_template("business_invitation_email.html")
-    body = template.render(
-        customer_name=customer_name,
-        business_name=business_name,
-        accept_url=accept_url,
-        reject_url=reject_url,
-        app_name="Kopkad",
-    )
-    return await send_email_async(to_email, f"Invitation to Join {business_name}", body)
+    """Send a business invitation email to a customer."""
+    if env is None:
+        logger.error("Template environment not initialized. Cannot send business invitation email.")
+        return {
+            "status": "error",
+            "message": "Email template system not available.",
+        }
+    try:
+        template = env.get_template("business_invitation_email.html")
+        body = template.render(
+            customer_name=customer_name,
+            business_name=business_name,
+            accept_url=accept_url,
+            reject_url=reject_url,
+            app_name="Kopkad",
+        )
+        return await send_email_async(to_email, f"Invitation to Join {business_name}", body)
+    except Exception as e:
+        logger.error(f"Failed to send business invitation email: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Failed to send business invitation email: {str(e)}",
+        }
+
+
+async def send_email(to_email: str, subject: str, html_content: str):
+    """
+    Backwards-compatible helper to send arbitrary HTML emails.
+    This is the main export function for Uvicorn and other services.
+    """
+    return await send_email_async(to_email, subject, html_content)
+
+
+# Explicit exports for better IDE support and Uvicorn imports
+__all__ = [
+    "send_email",
+    "send_email_async",
+    "send_welcome_email",
+    "send_business_created_email",
+    "send_business_invitation_email",
+]

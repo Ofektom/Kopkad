@@ -38,7 +38,10 @@ from store.repositories import (
     UserRepository,
     UserBusinessRepository,
     PendingBusinessRequestRepository,
+    UserNotificationRepository,
 )
+from models.financial_advisor import NotificationType, NotificationPriority
+from service.notifications import notify_user, notify_super_admins, notify_business_admin
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -60,6 +63,7 @@ async def create_business(
     user_repo: UserRepository | None = None,
     unit_repo: UnitRepository | None = None,
     user_business_repo: UserBusinessRepository | None = None,
+    notification_repo: UserNotificationRepository | None = None,
 ):
     """Create a thrift business."""
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
@@ -139,6 +143,20 @@ async def create_business(
         # 5. Grant business-scoped permissions to admin
         grant_admin_permissions(admin_user.id, business.id, current_user["user_id"], session)
         
+        # Notify super admins about admin credentials generated
+        from service.notifications import notify_super_admins
+        await notify_super_admins(
+            notification_type=NotificationType.ADMIN_CREDENTIALS_GENERATED,
+            title="Admin Credentials Generated",
+            message=f"Admin credentials have been generated for '{business.name}'. Please assign an admin.",
+            priority=NotificationPriority.HIGH,
+            db=session,
+            user_repo=user_repo,
+            notification_repo=UserNotificationRepository(session),
+            related_entity_id=business.id,
+            related_entity_type="business",
+        )
+        
         # 6. Create default unit (existing logic)
         if request.address:
             unit = Unit(
@@ -155,6 +173,32 @@ async def create_business(
         
         session.commit()
         session.refresh(business)
+
+        # Notify agent about business creation
+        await notify_user(
+            user_id=current_user["user_id"],
+            notification_type=NotificationType.BUSINESS_CREATED,
+            title="Business Created",
+            message=f"Your business '{business.name}' has been created successfully with unique code: {unique_code}",
+            priority=NotificationPriority.LOW,
+            db=session,
+            notification_repo=notification_repo,
+            related_entity_id=business.id,
+            related_entity_type="business",
+        )
+        
+        # Notify super admins about new business
+        await notify_super_admins(
+            notification_type=NotificationType.NEW_BUSINESS_REGISTERED,
+            title="New Business Registered",
+            message=f"New business '{business.name}' has been registered by {current_user_obj.full_name}",
+            priority=NotificationPriority.MEDIUM,
+            db=session,
+            user_repo=user_repo,
+            notification_repo=notification_repo,
+            related_entity_id=business.id,
+            related_entity_type="business",
+        )
 
         user = user_repo.get_by_id(current_user["user_id"])
         notification_method = user.settings.notification_method if user.settings else "both"
@@ -294,6 +338,20 @@ async def add_customer_to_business(
                 status_code=500, message="No valid notification method available"
             )
 
+        # Notify customer about invitation
+        from service.notifications import notify_user
+        await notify_user(
+            user_id=customer.id,
+            notification_type=NotificationType.BUSINESS_INVITATION_SENT,
+            title="Business Invitation",
+            message=f"You've been invited to join '{business.name}'. Please check your email to accept or reject.",
+            priority=NotificationPriority.MEDIUM,
+            db=session,
+            notification_repo=UserNotificationRepository(session),
+            related_entity_id=business.id,
+            related_entity_type="business",
+            )
+
         return success_response(
             status_code=200,
             message=f"Invitation sent to customer {customer.full_name} via {', '.join(delivery_method)}, it expires in 24 hours",
@@ -342,6 +400,36 @@ async def accept_business_invitation(
         session.commit()
 
         business = business_repo.get_by_id(pending_request.business_id)
+        customer = user_repo.get_by_id(pending_request.customer_id)
+        
+        # Notify customer about acceptance
+        from service.notifications import notify_user, notify_business_admin
+        await notify_user(
+            user_id=pending_request.customer_id,
+            notification_type=NotificationType.BUSINESS_INVITATION_ACCEPTED,
+            title="Invitation Accepted",
+            message=f"You've successfully joined '{business.name}'",
+            priority=NotificationPriority.MEDIUM,
+            db=session,
+            notification_repo=UserNotificationRepository(session),
+            related_entity_id=business.id,
+            related_entity_type="business",
+        )
+        
+        # Notify business admin and agent about acceptance
+        await notify_business_admin(
+            business_id=business.id,
+            notification_type=NotificationType.BUSINESS_INVITATION_ACCEPTED,
+            title="Customer Joined Business",
+            message=f"{customer.full_name} has accepted the invitation to join '{business.name}'",
+            priority=NotificationPriority.MEDIUM,
+            db=session,
+            business_repo=business_repo,
+            notification_repo=UserNotificationRepository(session),
+            related_entity_id=pending_request.customer_id,
+            related_entity_type="user",
+        )
+        
         return success_response(
             status_code=200,
             message=f"Successfully joined {business.name}",
@@ -372,8 +460,42 @@ async def reject_business_invitation(
         return error_response(status_code=410, message="Invitation has expired")
 
     try:
+        business_repo = _resolve_repo(None, BusinessRepository, db)
+        user_repo = _resolve_repo(None, UserRepository, db)
+        business = business_repo.get_by_id(pending_request.business_id)
+        customer = user_repo.get_by_id(pending_request.customer_id)
+        
         pending_repo.delete_request(pending_request)
         session.commit()
+        
+        # Notify customer about rejection
+        from service.notifications import notify_user, notify_business_admin
+        await notify_user(
+            user_id=pending_request.customer_id,
+            notification_type=NotificationType.BUSINESS_INVITATION_REJECTED,
+            title="Invitation Rejected",
+            message=f"You've rejected the invitation to join '{business.name}'",
+            priority=NotificationPriority.LOW,
+            db=session,
+            notification_repo=UserNotificationRepository(session),
+            related_entity_id=business.id,
+            related_entity_type="business",
+        )
+        
+        # Notify business admin and agent about rejection
+        await notify_business_admin(
+            business_id=business.id,
+            notification_type=NotificationType.BUSINESS_INVITATION_REJECTED,
+            title="Invitation Rejected",
+            message=f"{customer.full_name} has rejected the invitation to join '{business.name}'",
+            priority=NotificationPriority.LOW,
+            db=session,
+            business_repo=business_repo,
+            notification_repo=UserNotificationRepository(session),
+            related_entity_id=pending_request.customer_id,
+            related_entity_type="user",
+        )
+        
         return success_response(status_code=200, message="Invitation rejected", data={})
     except Exception as e:
         session.rollback()
@@ -526,6 +648,36 @@ async def update_business(
         session.commit()
         session.refresh(business)
 
+        # Notify business admin and agent about business update
+        from service.notifications import notify_business_admin
+        await notify_business_admin(
+            business_id=business_id,
+            notification_type=NotificationType.BUSINESS_UPDATED,
+            title="Business Updated",
+            message=f"Business '{business.name}' details have been updated",
+            priority=NotificationPriority.LOW,
+            db=session,
+            business_repo=business_repo,
+            notification_repo=UserNotificationRepository(session),
+            related_entity_id=business_id,
+            related_entity_type="business",
+        )
+        
+        # Also notify agent if different from admin
+        if business.agent_id and business.agent_id != business.admin_id:
+            from service.notifications import notify_user
+            await notify_user(
+                user_id=business.agent_id,
+                notification_type=NotificationType.BUSINESS_UPDATED,
+                title="Business Updated",
+                message=f"Business '{business.name}' details have been updated",
+                priority=NotificationPriority.LOW,
+                db=session,
+                notification_repo=UserNotificationRepository(session),
+                related_entity_id=business_id,
+                related_entity_type="business",
+            )
+
         return success_response(
             status_code=200,
             message="Business updated successfully",
@@ -576,6 +728,13 @@ async def delete_business(
         )
 
     try:
+        # Get all associated users before deletion
+        associated_users = session.query(user_business.c.user_id).filter(
+            user_business.c.business_id == business_id
+        ).all()
+        user_ids = [user_id[0] for user_id in associated_users]
+        business_name = business.name
+        
         session.execute(user_business.delete().where(user_business.c.business_id == business_id))
         session.execute(
             user_units.delete().where(
@@ -585,6 +744,50 @@ async def delete_business(
         session.execute(Unit.__table__.delete().where(Unit.business_id == business_id))
         session.delete(business)
         session.commit()
+        
+        # Notify all associated users, business admin, and agent about deletion
+        from service.notifications import notify_multiple_users, notify_user
+        if user_ids:
+            await notify_multiple_users(
+                user_ids=user_ids,
+                notification_type=NotificationType.BUSINESS_DELETED,
+                title="Business Deleted",
+                message=f"Business '{business_name}' has been deleted",
+                priority=NotificationPriority.HIGH,
+                db=session,
+                notification_repo=UserNotificationRepository(session),
+                related_entity_id=business_id,
+                related_entity_type="business",
+            )
+        
+        # Notify business admin if exists
+        if business.admin_id and business.admin_id not in user_ids:
+            await notify_user(
+                user_id=business.admin_id,
+                notification_type=NotificationType.BUSINESS_DELETED,
+                title="Business Deleted",
+                message=f"Business '{business_name}' has been deleted",
+                priority=NotificationPriority.HIGH,
+                db=session,
+                notification_repo=UserNotificationRepository(session),
+                related_entity_id=business_id,
+                related_entity_type="business",
+            )
+        
+        # Notify agent if exists and different from admin
+        if business.agent_id and business.agent_id not in user_ids and business.agent_id != business.admin_id:
+            await notify_user(
+                user_id=business.agent_id,
+                notification_type=NotificationType.BUSINESS_DELETED,
+                title="Business Deleted",
+                message=f"Business '{business_name}' has been deleted",
+                priority=NotificationPriority.HIGH,
+                db=session,
+                notification_repo=UserNotificationRepository(session),
+                related_entity_id=business_id,
+                related_entity_type="business",
+            )
+        
         return success_response(
             status_code=200, message="Business deleted successfully", data={}
         )
@@ -630,6 +833,21 @@ async def create_unit(
         session.add(unit)
         session.commit()
         session.refresh(unit)
+
+        # Notify business admin and agent about unit creation
+        from service.notifications import notify_business_admin
+        await notify_business_admin(
+            business_id=business_id,
+            notification_type=NotificationType.UNIT_CREATED,
+            title="Unit Created",
+            message=f"Unit '{unit.name}' has been created in '{business.name}'",
+            priority=NotificationPriority.LOW,
+            db=session,
+            business_repo=business_repo,
+            notification_repo=UserNotificationRepository(session),
+            related_entity_id=unit.id,
+            related_entity_type="unit",
+        )
 
         unit_response = UnitResponse.model_validate(unit)
         return success_response(
@@ -933,6 +1151,23 @@ async def update_business_unit(
         session.commit()
         session.refresh(unit)
 
+        # Notify business admin and agent about unit update
+        business_repo = _resolve_repo(None, BusinessRepository, db)
+        business = business_repo.get_by_id(unit.business_id)
+        from service.notifications import notify_business_admin
+        await notify_business_admin(
+            business_id=unit.business_id,
+            notification_type=NotificationType.UNIT_UPDATED,
+            title="Unit Updated",
+            message=f"Unit '{unit.name}' has been updated in '{business.name}'",
+            priority=NotificationPriority.LOW,
+            db=session,
+            business_repo=business_repo,
+            notification_repo=UserNotificationRepository(session),
+            related_entity_id=unit.id,
+            related_entity_type="unit",
+        )
+
         return success_response(
             status_code=200,
             message="Business updated successfully",
@@ -972,8 +1207,45 @@ async def delete_unit(
         )
 
     try:
+        # Get business and unit members before deletion
+        business_repo = _resolve_repo(None, BusinessRepository, db)
+        business = business_repo.get_by_id(unit.business_id)
+        unit_name = unit.name
+        unit_members = session.query(user_units).filter(user_units.c.unit_id == unit_id).all()
+        member_ids = [member.user_id for member in unit_members]
+        
         session.delete(unit)
         session.commit()
+        
+        # Notify business admin and agent about unit deletion
+        from service.notifications import notify_business_admin, notify_multiple_users
+        await notify_business_admin(
+            business_id=unit.business_id,
+            notification_type=NotificationType.UNIT_DELETED,
+            title="Unit Deleted",
+            message=f"Unit '{unit_name}' has been deleted from '{business.name}'",
+            priority=NotificationPriority.MEDIUM,
+            db=session,
+            business_repo=business_repo,
+            notification_repo=UserNotificationRepository(session),
+            related_entity_id=unit_id,
+            related_entity_type="unit",
+        )
+        
+        # Notify unit members
+        if member_ids:
+            await notify_multiple_users(
+                user_ids=member_ids,
+                notification_type=NotificationType.UNIT_DELETED,
+                title="Unit Deleted",
+                message=f"Unit '{unit_name}' has been deleted from '{business.name}'",
+                priority=NotificationPriority.MEDIUM,
+                db=session,
+                notification_repo=UserNotificationRepository(session),
+                related_entity_id=unit_id,
+                related_entity_type="unit",
+            )
+        
         return success_response(
             status_code=200, message="Unit deleted successfully", data={}
         )

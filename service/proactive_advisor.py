@@ -2,7 +2,8 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 import logging
 
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, joinedload
 
 from models.financial_advisor import (
     GoalStatus,
@@ -10,6 +11,11 @@ from models.financial_advisor import (
     NotificationType,
     PatternType,
 )
+from models.savings import SavingsAccount, SavingsMarking, MarkingStatus, SavingsStatus
+from models.payments import PaymentRequest, PaymentRequestStatus, Commission
+from models.expenses import ExpenseCard, CardStatus
+from models.user import User
+from models.business import Business
 from service.financial_advisor import (
     analyze_savings_capacity,
     calculate_financial_health_score,
@@ -17,12 +23,17 @@ from service.financial_advisor import (
 )
 from store.repositories import (
     ExpenseRepository,
+    BusinessRepository,
+    ExpenseCardRepository,
     FinancialHealthScoreRepository,
+    PaymentsRepository,
+    SavingsRepository,
     SavingsGoalRepository,
     SpendingPatternRepository,
     UserNotificationRepository,
     UserRepository,
 )
+from store.enums import Role
 
 logging.basicConfig(
     filename="proactive_advisor.log",
@@ -570,4 +581,568 @@ async def update_financial_health_scores(
     except Exception as exc:
         session.rollback()
         logger.error("Error in update_financial_health_scores: %s", exc)
+
+
+async def check_savings_completion_reminders(
+    db: Session,
+    *,
+    savings_repo: SavingsRepository | None = None,
+    notification_repo: UserNotificationRepository | None = None,
+):
+    """Send reminders for savings accounts approaching completion."""
+    savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
+    notification_repo = _resolve_repo(notification_repo, UserNotificationRepository, db)
+    session = savings_repo.db
+
+    try:
+        logger.info("Running savings completion reminders check")
+        today = date.today()
+        reminder_windows = [
+            (7, NotificationType.SAVINGS_NEARING_COMPLETION, NotificationPriority.MEDIUM),
+            (3, NotificationType.SAVINGS_COMPLETION_REMINDER, NotificationPriority.MEDIUM),
+        ]
+
+        for days_out, notif_type, priority in reminder_windows:
+            target_date = today + timedelta(days=days_out)
+            accounts = (
+                session.query(SavingsAccount)
+                .filter(
+                    SavingsAccount.end_date.isnot(None),
+                    SavingsAccount.end_date == target_date,
+                    SavingsAccount.marking_status != MarkingStatus.COMPLETED,
+                )
+                .all()
+            )
+
+            for account in accounts:
+                since = datetime.now(timezone.utc) - timedelta(days=1)
+                existing = notification_repo.find_recent(
+                    user_id=account.customer_id,
+                    notification_type=notif_type,
+                    since=since,
+                    related_entity_id=account.id,
+                )
+                if existing:
+                    continue
+
+                days_text = "in 7 days" if days_out == 7 else "in 3 days"
+                notification_repo.create(
+                    {
+                        "user_id": account.customer_id,
+                        "notification_type": notif_type,
+                        "title": "Savings Account Reminder",
+                        "message": (
+                            f"Your savings account {account.tracking_number} will complete {days_text}. "
+                            "Please ensure all payments are up to date."
+                        ),
+                        "priority": priority,
+                        "related_entity_id": account.id,
+                        "related_entity_type": "savings_account",
+                        "created_by": account.customer_id,
+                        "created_at": datetime.now(timezone.utc),
+                    }
+                )
+
+        session.commit()
+        logger.info("Completed savings completion reminders check")
+    except Exception as exc:
+        session.rollback()
+        logger.error("Error in check_savings_completion_reminders: %s", exc)
+
+
+async def check_overdue_savings_payments(
+    db: Session,
+    *,
+    savings_repo: SavingsRepository | None = None,
+    business_repo: BusinessRepository | None = None,
+    notification_repo: UserNotificationRepository | None = None,
+):
+    """Notify customers and agents about overdue savings markings."""
+    savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
+    business_repo = _resolve_repo(business_repo, BusinessRepository, db)
+    notification_repo = _resolve_repo(notification_repo, UserNotificationRepository, db)
+    session = savings_repo.db
+
+    try:
+        logger.info("Running overdue savings payments check")
+        overdue_cutoff = date.today() - timedelta(days=1)
+        rows = (
+            session.query(
+                SavingsAccount.id.label("account_id"),
+                SavingsAccount.tracking_number,
+                SavingsAccount.customer_id,
+                SavingsAccount.business_id,
+                func.min(SavingsMarking.marked_date).label("oldest_mark"),
+            )
+            .join(SavingsMarking, SavingsMarking.savings_account_id == SavingsAccount.id)
+            .filter(
+                SavingsMarking.status == SavingsStatus.PENDING.value,
+                SavingsMarking.marked_date < overdue_cutoff,
+            )
+            .group_by(
+                SavingsAccount.id,
+                SavingsAccount.tracking_number,
+                SavingsAccount.customer_id,
+                SavingsAccount.business_id,
+            )
+            .all()
+        )
+
+        for row in rows:
+            since = datetime.now(timezone.utc) - timedelta(days=1)
+            existing = notification_repo.find_recent(
+                user_id=row.customer_id,
+                notification_type=NotificationType.SAVINGS_PAYMENT_OVERDUE,
+                since=since,
+                related_entity_id=row.account_id,
+            )
+            if not existing:
+                notification_repo.create(
+                    {
+                        "user_id": row.customer_id,
+                        "notification_type": NotificationType.SAVINGS_PAYMENT_OVERDUE,
+                        "title": "Savings Payment Overdue",
+                        "message": (
+                            f"You have overdue payments for savings account {row.tracking_number}. "
+                            "Please mark the pending payments to stay on track."
+                        ),
+                        "priority": NotificationPriority.HIGH,
+                        "related_entity_id": row.account_id,
+                        "related_entity_type": "savings_account",
+                        "created_by": row.customer_id,
+                        "created_at": datetime.now(timezone.utc),
+                    }
+                )
+
+            if row.business_id:
+                business = business_repo.get_by_id(row.business_id)
+                if business and business.agent_id:
+                    existing_agent = notification_repo.find_recent(
+                        user_id=business.agent_id,
+                        notification_type=NotificationType.SAVINGS_PAYMENT_OVERDUE,
+                        since=since,
+                        related_entity_id=row.account_id,
+                    )
+                    if not existing_agent:
+                        notification_repo.create(
+                            {
+                                "user_id": business.agent_id,
+                                "notification_type": NotificationType.SAVINGS_PAYMENT_OVERDUE,
+                                "title": "Customer Savings Payment Overdue",
+                                "message": (
+                                    f"Savings account {row.tracking_number} has overdue payments. "
+                                    "Kindly follow up with the customer."
+                                ),
+                                "priority": NotificationPriority.HIGH,
+                                "related_entity_id": row.account_id,
+                                "related_entity_type": "savings_account",
+                                "created_by": business.agent_id,
+                                "created_at": datetime.now(timezone.utc),
+                            }
+                        )
+
+        session.commit()
+        logger.info("Completed overdue savings payments check")
+    except Exception as exc:
+        session.rollback()
+        logger.error("Error in check_overdue_savings_payments: %s", exc)
+
+
+async def send_payment_request_reminders(
+    db: Session,
+    *,
+    payments_repo: PaymentsRepository | None = None,
+    business_repo: BusinessRepository | None = None,
+    notification_repo: UserNotificationRepository | None = None,
+):
+    """Remind business admins about pending payment requests older than 24 hours."""
+    payments_repo = _resolve_repo(payments_repo, PaymentsRepository, db)
+    business_repo = _resolve_repo(business_repo, BusinessRepository, db)
+    notification_repo = _resolve_repo(notification_repo, UserNotificationRepository, db)
+    session = payments_repo.db
+
+    try:
+        logger.info("Running payment request reminder job")
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+        pending_requests = (
+            session.query(PaymentRequest)
+            .options(joinedload(PaymentRequest.savings_account))
+            .filter(
+                PaymentRequest.status == PaymentRequestStatus.PENDING.value,
+                PaymentRequest.request_date <= cutoff,
+            )
+            .all()
+        )
+
+        for request in pending_requests:
+            savings_account = request.savings_account
+            if not savings_account or not savings_account.business_id:
+                continue
+
+            business = business_repo.get_by_id(savings_account.business_id)
+            admin_id = business.admin_id if business else None
+            if not admin_id:
+                continue
+
+            since = datetime.now(timezone.utc) - timedelta(hours=12)
+            existing = notification_repo.find_recent(
+                user_id=admin_id,
+                notification_type=NotificationType.PAYMENT_REQUEST_REMINDER,
+                since=since,
+                related_entity_id=request.id,
+            )
+            if existing:
+                continue
+
+            notification_repo.create(
+                {
+                    "user_id": admin_id,
+                    "notification_type": NotificationType.PAYMENT_REQUEST_REMINDER,
+                    "title": "Pending Payment Request",
+                    "message": (
+                        f"A payment request of {request.amount:.2f} for savings account "
+                        f"{savings_account.tracking_number} has been pending for over 24 hours."
+                    ),
+                    "priority": NotificationPriority.MEDIUM,
+                    "related_entity_id": request.id,
+                    "related_entity_type": "payment_request",
+                    "created_by": admin_id,
+                    "created_at": datetime.now(timezone.utc),
+                }
+            )
+
+        session.commit()
+        logger.info("Completed payment request reminder job")
+    except Exception as exc:
+        session.rollback()
+        logger.error("Error in send_payment_request_reminders: %s", exc)
+
+
+async def send_inactive_user_reminders(
+    db: Session,
+    *,
+    user_repo: UserRepository | None = None,
+    notification_repo: UserNotificationRepository | None = None,
+):
+    """Remind customers who have been inactive for 30 days."""
+    user_repo = _resolve_repo(user_repo, UserRepository, db)
+    notification_repo = _resolve_repo(notification_repo, UserNotificationRepository, db)
+    session = user_repo.db
+
+    try:
+        logger.info("Running inactive user reminder job")
+        threshold = datetime.now(timezone.utc) - timedelta(days=30)
+        users = (
+            session.query(User)
+            .filter(
+                User.role == Role.CUSTOMER,
+                User.is_active.is_(True),
+                or_(
+                    User.updated_at.is_(None),
+                    User.updated_at < threshold,
+                ),
+            )
+            .all()
+        )
+
+        for user in users:
+            since = datetime.now(timezone.utc) - timedelta(days=25)
+            existing = notification_repo.find_recent(
+                user_id=user.id,
+                notification_type=NotificationType.INACTIVE_USER_REMINDER,
+                since=since,
+            )
+            if existing:
+                continue
+
+            notification_repo.create(
+                {
+                    "user_id": user.id,
+                    "notification_type": NotificationType.INACTIVE_USER_REMINDER,
+                    "title": "We Miss You at Kopkad",
+                    "message": (
+                        "We haven't seen you in a while. Come back, review your finances, "
+                        "and continue your savings journey!"
+                    ),
+                    "priority": NotificationPriority.LOW,
+                    "created_by": user.id,
+                    "created_at": datetime.now(timezone.utc),
+                }
+            )
+
+        session.commit()
+        logger.info("Completed inactive user reminder job")
+    except Exception as exc:
+        session.rollback()
+        logger.error("Error in send_inactive_user_reminders: %s", exc)
+
+
+async def check_business_without_admin(
+    db: Session,
+    *,
+    business_repo: BusinessRepository | None = None,
+    user_repo: UserRepository | None = None,
+    notification_repo: UserNotificationRepository | None = None,
+):
+    """Alert super admins and agents when a business lacks an assigned admin."""
+    business_repo = _resolve_repo(business_repo, BusinessRepository, db)
+    user_repo = _resolve_repo(user_repo, UserRepository, db)
+    notification_repo = _resolve_repo(notification_repo, UserNotificationRepository, db)
+    session = business_repo.db
+
+    try:
+        logger.info("Running business-without-admin check")
+        threshold = datetime.now(timezone.utc) - timedelta(days=7)
+        businesses = business_repo.get_unassigned_businesses()
+        super_admins = user_repo.get_by_role(Role.SUPER_ADMIN)
+
+        for business in businesses:
+            if not business.created_at or business.created_at > threshold:
+                continue
+
+            since = datetime.now(timezone.utc) - timedelta(days=2)
+            for admin in super_admins:
+                existing = notification_repo.find_recent(
+                    user_id=admin.id,
+                    notification_type=NotificationType.BUSINESS_WITHOUT_ADMIN,
+                    since=since,
+                    related_entity_id=business.id,
+                )
+                if not existing:
+                    notification_repo.create(
+                        {
+                            "user_id": admin.id,
+                            "notification_type": NotificationType.BUSINESS_WITHOUT_ADMIN,
+                            "title": "Business Without Admin",
+                            "message": (
+                                f"Business '{business.name}' ({business.unique_code}) still has no assigned admin."
+                            ),
+                            "priority": NotificationPriority.HIGH,
+                            "related_entity_id": business.id,
+                            "related_entity_type": "business",
+                            "created_by": admin.id,
+                            "created_at": datetime.now(timezone.utc),
+                        }
+                    )
+
+            if business.agent_id:
+                existing_agent = notification_repo.find_recent(
+                    user_id=business.agent_id,
+                    notification_type=NotificationType.BUSINESS_WITHOUT_ADMIN,
+                    since=since,
+                    related_entity_id=business.id,
+                )
+                if not existing_agent:
+                    notification_repo.create(
+                        {
+                            "user_id": business.agent_id,
+                            "notification_type": NotificationType.BUSINESS_WITHOUT_ADMIN,
+                            "title": "Assign a Business Admin",
+                            "message": (
+                                f"Business '{business.name}' has been without an admin for over 7 days. "
+                                "Please complete the assignment."
+                            ),
+                            "priority": NotificationPriority.HIGH,
+                            "related_entity_id": business.id,
+                            "related_entity_type": "business",
+                            "created_by": business.agent_id,
+                            "created_at": datetime.now(timezone.utc),
+                        }
+                    )
+
+        session.commit()
+        logger.info("Completed business-without-admin check")
+    except Exception as exc:
+        session.rollback()
+        logger.error("Error in check_business_without_admin: %s", exc)
+
+
+async def check_low_balance_alerts(
+    db: Session,
+    *,
+    expense_card_repo: ExpenseCardRepository | None = None,
+    notification_repo: UserNotificationRepository | None = None,
+):
+    """Notify users when their expense card balances fall below 20%."""
+    expense_card_repo = _resolve_repo(expense_card_repo, ExpenseCardRepository, db)
+    notification_repo = _resolve_repo(notification_repo, UserNotificationRepository, db)
+    session = expense_card_repo.db
+
+    try:
+        logger.info("Running low balance alert check")
+        cards = (
+            session.query(ExpenseCard)
+            .filter(
+                ExpenseCard.status == CardStatus.ACTIVE,
+                ExpenseCard.is_plan.is_(False),
+                ExpenseCard.income_amount > 0,
+            )
+            .all()
+        )
+
+        for card in cards:
+            ratio = Decimal(card.balance or 0) / Decimal(card.income_amount or 1)
+            if ratio > Decimal("0.20"):
+                continue
+
+            since = datetime.now(timezone.utc) - timedelta(days=1)
+            existing = notification_repo.find_recent(
+                user_id=card.customer_id,
+                notification_type=NotificationType.LOW_BALANCE_ALERT,
+                since=since,
+                related_entity_id=card.id,
+            )
+            if existing:
+                continue
+
+            notification_repo.create(
+                {
+                    "user_id": card.customer_id,
+                    "notification_type": NotificationType.LOW_BALANCE_ALERT,
+                    "title": "Low Balance Alert",
+                    "message": (
+                        f"Your expense card '{card.name}' balance is low ({card.balance:.2f}). "
+                        "Consider topping up to keep your planned expenses on track."
+                    ),
+                    "priority": NotificationPriority.HIGH,
+                    "related_entity_id": card.id,
+                    "related_entity_type": "expense_card",
+                    "created_by": card.customer_id,
+                    "created_at": datetime.now(timezone.utc),
+                }
+            )
+
+        session.commit()
+        logger.info("Completed low balance alert check")
+    except Exception as exc:
+        session.rollback()
+        logger.error("Error in check_low_balance_alerts: %s", exc)
+
+
+async def send_system_summary(
+    db: Session,
+    *,
+    user_repo: UserRepository | None = None,
+    business_repo: BusinessRepository | None = None,
+    savings_repo: SavingsRepository | None = None,
+    payments_repo: PaymentsRepository | None = None,
+    notification_repo: UserNotificationRepository | None = None,
+):
+    """Send a daily system summary to super admins."""
+    user_repo = _resolve_repo(user_repo, UserRepository, db)
+    business_repo = _resolve_repo(business_repo, BusinessRepository, db)
+    savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
+    payments_repo = _resolve_repo(payments_repo, PaymentsRepository, db)
+    notification_repo = _resolve_repo(notification_repo, UserNotificationRepository, db)
+    session = user_repo.db
+
+    try:
+        logger.info("Running system summary job")
+        total_users = user_repo.count_all_users()
+        active_users = user_repo.count_active_users()
+        business_count = business_repo.db.query(func.count(Business.id)).scalar() or 0
+        savings_metrics = savings_repo.get_system_savings_metrics()
+        payment_summary = payments_repo.get_status_summary()
+
+        status_breakdown = ", ".join(
+            f"{item['status']}: {item['count']}" for item in payment_summary
+        )
+        message_lines = [
+            "Daily System Summary:",
+            f"- Total users: {total_users} ({active_users} active)",
+            f"- Total businesses: {business_count}",
+            f"- Savings accounts: {savings_metrics['total_accounts']}",
+            f"- Savings volume (paid): {savings_metrics['volume_by_status'].get('paid', 0):.2f}",
+            f"- Pending payment requests: {status_breakdown or 'None'}",
+        ]
+
+        since = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        super_admins = user_repo.get_by_role(Role.SUPER_ADMIN)
+
+        for admin in super_admins:
+            existing = notification_repo.find_recent(
+                user_id=admin.id,
+                notification_type=NotificationType.SYSTEM_SUMMARY,
+                since=since,
+            )
+            if existing:
+                continue
+
+            notification_repo.create(
+                {
+                    "user_id": admin.id,
+                    "notification_type": NotificationType.SYSTEM_SUMMARY,
+                    "title": "Daily System Summary",
+                    "message": "\n".join(message_lines),
+                    "priority": NotificationPriority.LOW,
+                    "created_by": admin.id,
+                    "created_at": datetime.now(timezone.utc),
+                }
+            )
+
+        session.commit()
+        logger.info("Completed system summary job")
+    except Exception as exc:
+        session.rollback()
+        logger.error("Error in send_system_summary: %s", exc)
+
+
+async def send_weekly_analytics_report(
+    db: Session,
+    *,
+    business_repo: BusinessRepository | None = None,
+    user_repo: UserRepository | None = None,
+    notification_repo: UserNotificationRepository | None = None,
+):
+    """Send weekly analytics highlights to super admins."""
+    business_repo = _resolve_repo(business_repo, BusinessRepository, db)
+    user_repo = _resolve_repo(user_repo, UserRepository, db)
+    notification_repo = _resolve_repo(notification_repo, UserNotificationRepository, db)
+    session = business_repo.db
+
+    try:
+        logger.info("Running weekly analytics report job")
+        metrics = business_repo.get_business_performance_metrics()
+        top_businesses = sorted(
+            metrics, key=lambda item: item["total_volume"], reverse=True
+        )[:3]
+
+        lines = ["Weekly Analytics Report:"]
+        for idx, business in enumerate(top_businesses, start=1):
+            lines.append(
+                f"{idx}. {business['name']} - Volume: {business['total_volume']:.2f}, "
+                f"Paid: {business['paid_volume']:.2f}, Pending: {business['pending_volume']:.2f}"
+            )
+        if len(lines) == 1:
+            lines.append("No business activity recorded this week.")
+
+        since = datetime.now(timezone.utc) - timedelta(days=6)
+        super_admins = user_repo.get_by_role(Role.SUPER_ADMIN)
+
+        for admin in super_admins:
+            existing = notification_repo.find_recent(
+                user_id=admin.id,
+                notification_type=NotificationType.WEEKLY_ANALYTICS,
+                since=since,
+            )
+            if existing:
+                continue
+
+            notification_repo.create(
+                {
+                    "user_id": admin.id,
+                    "notification_type": NotificationType.WEEKLY_ANALYTICS,
+                    "title": "Weekly Analytics Report",
+                    "message": "\n".join(lines),
+                    "priority": NotificationPriority.LOW,
+                    "created_by": admin.id,
+                    "created_at": datetime.now(timezone.utc),
+                }
+            )
+
+        session.commit()
+        logger.info("Completed weekly analytics report job")
+    except Exception as exc:
+        session.rollback()
+        logger.error("Error in send_weekly_analytics_report: %s", exc)
 

@@ -84,6 +84,22 @@ async def create_savings_goal_controller(
         session.commit()
         session.refresh(goal)
 
+        # Notify customer about savings goal creation
+        from service.notifications import notify_user
+        from models.financial_advisor import NotificationType, NotificationPriority
+        from store.repositories import UserNotificationRepository
+        await notify_user(
+            user_id=current_user["user_id"],
+            notification_type=NotificationType.SAVINGS_GOAL_CREATED,
+            title="Savings Goal Created",
+            message=f"New savings goal '{goal.name}' has been created. Target: {goal.target_amount:.2f}",
+            priority=NotificationPriority.LOW,
+            db=session,
+            notification_repo=UserNotificationRepository(session),
+            related_entity_id=goal.id,
+            related_entity_type="savings_goal",
+        )
+
         goal_response = SavingsGoalResponse.model_validate(goal)
         if goal.target_amount > 0:
             goal_response.progress_percentage = float(
@@ -184,18 +200,54 @@ async def update_savings_goal_controller(
         if not goal:
             raise HTTPException(status_code=404, detail="Goal not found")
 
+        old_status = goal.status
         update_data = request.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(goal, field, value)
 
+        was_achieved = False
+        was_abandoned = False
         if goal.current_amount >= goal.target_amount and goal.status != GoalStatus.ACHIEVED:
             goal.status = GoalStatus.ACHIEVED
+            was_achieved = True
+        
+        if goal.status == GoalStatus.ABANDONED and old_status != GoalStatus.ABANDONED:
+            was_abandoned = True
 
         goal.updated_by = current_user["user_id"]
         goal.updated_at = datetime.now(timezone.utc)
 
         session.commit()
         session.refresh(goal)
+
+        # Notify customer about status changes
+        from service.notifications import notify_user
+        from models.financial_advisor import NotificationType, NotificationPriority
+        from store.repositories import UserNotificationRepository
+        if was_achieved:
+            await notify_user(
+                user_id=current_user["user_id"],
+                notification_type=NotificationType.SAVINGS_GOAL_ACHIEVED,
+                title="Savings Goal Achieved!",
+                message=f"Congratulations! You've achieved your goal '{goal.name}'",
+                priority=NotificationPriority.HIGH,
+                db=session,
+                notification_repo=UserNotificationRepository(session),
+                related_entity_id=goal.id,
+                related_entity_type="savings_goal",
+            )
+        elif was_abandoned:
+            await notify_user(
+                user_id=current_user["user_id"],
+                notification_type=NotificationType.SAVINGS_GOAL_ABANDONED,
+                title="Savings Goal Abandoned",
+                message=f"Your savings goal '{goal.name}' has been marked as abandoned",
+                priority=NotificationPriority.MEDIUM,
+                db=session,
+                notification_repo=UserNotificationRepository(session),
+                related_entity_id=goal.id,
+                related_entity_type="savings_goal",
+            )
 
         goal_response = SavingsGoalResponse.model_validate(goal)
         if goal.target_amount > 0:
@@ -273,15 +325,34 @@ async def allocate_to_goal_controller(
         if request.amount <= 0:
             raise HTTPException(status_code=400, detail="Amount must be positive")
 
+        was_achieved = False
         goal.current_amount += request.amount
         if goal.current_amount >= goal.target_amount and goal.status == GoalStatus.ACTIVE:
             goal.status = GoalStatus.ACHIEVED
+            was_achieved = True
 
         goal.updated_by = current_user["user_id"]
         goal.updated_at = datetime.now(timezone.utc)
 
         session.commit()
         session.refresh(goal)
+
+        # Notify customer if goal was achieved
+        if was_achieved:
+            from service.notifications import notify_user
+            from models.financial_advisor import NotificationType, NotificationPriority
+            from store.repositories import UserNotificationRepository
+            await notify_user(
+                user_id=current_user["user_id"],
+                notification_type=NotificationType.SAVINGS_GOAL_ACHIEVED,
+                title="Savings Goal Achieved!",
+                message=f"Congratulations! You've achieved your goal '{goal.name}'",
+                priority=NotificationPriority.HIGH,
+                db=session,
+                notification_repo=UserNotificationRepository(session),
+                related_entity_id=goal.id,
+                related_entity_type="savings_goal",
+            )
 
         goal_response = SavingsGoalResponse.model_validate(goal)
         if goal.target_amount > 0:
