@@ -43,13 +43,12 @@ class PaymentAccountRepository(BaseRepository[PaymentAccount]):
         limit: int,
         offset: int,
     ) -> Tuple[List[PaymentAccount], int]:
-        load_options = [selectinload(PaymentAccount.account_details)]
-        if hasattr(PaymentAccount, "customer"):
-            load_options.append(joinedload(getattr(PaymentAccount, "customer")))
-
         query = (
             self.db.query(PaymentAccount)
-            .options(*load_options)
+            .options(
+                selectinload(PaymentAccount.account_details),
+                joinedload(PaymentAccount.customer),
+            )
             .order_by(PaymentAccount.created_at.desc())
         )
 
@@ -281,19 +280,15 @@ class PaymentsRepository(BaseRepository[PaymentRequest]):
         limit: int,
         offset: int,
     ) -> Tuple[List[PaymentRequest], int]:
-        payment_account_loader = joinedload(PaymentRequest.payment_account)
-        if hasattr(PaymentAccount, "customer"):
-            payment_account_loader = payment_account_loader.joinedload(
-                getattr(PaymentAccount, "customer")
-            )
-
         query = (
             self.db.query(PaymentRequest)
             .join(PaymentAccount, PaymentAccount.id == PaymentRequest.payment_account_id)
             .join(SavingsAccount, SavingsAccount.id == PaymentRequest.savings_account_id)
             .join(User, User.id == PaymentAccount.customer_id)
             .options(
-                payment_account_loader,
+                joinedload(PaymentRequest.payment_account).joinedload(
+                    PaymentAccount.customer
+                ),
                 joinedload(PaymentRequest.savings_account),
             )
         )

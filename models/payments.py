@@ -27,7 +27,7 @@ class PaymentAccount(AuditMixin, Base):
     customer_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=False)
     account_details = relationship("AccountDetails", back_populates="payment_account", cascade="all, delete")
     payment_requests = relationship("PaymentRequest", back_populates="payment_account", cascade="all, delete")
-    customer = relationship("User", back_populates="payment_accounts")
+    customer = relationship("User", foreign_keys=[customer_id], back_populates="payment_accounts")
 
 class AccountDetails(AuditMixin, Base):
     __tablename__ = "account_details"
