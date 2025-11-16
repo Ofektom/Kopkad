@@ -55,9 +55,12 @@ async def notify_user(
         logger.info(f"Created notification '{title}' for user {user_id}")
         return True
     except Exception as e:
-        logger.error(f"Error creating notification for user {user_id}: {str(e)}")
-        if db:
-            db.rollback()
+        logger.error(f"Error creating notification for user {user_id}: {str(e)}", exc_info=True)
+        if session:
+            try:
+                session.rollback()
+            except Exception as rollback_error:
+                logger.error(f"Error rolling back notification session: {str(rollback_error)}")
         return False
 
 

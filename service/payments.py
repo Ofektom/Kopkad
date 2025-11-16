@@ -530,6 +530,7 @@ async def create_payment_request(
     payments_repo = _resolve_repo(payments_repo, PaymentsRepository, db)
     commission_repo = _resolve_repo(commission_repo, CommissionRepository, db)
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
+    notification_repo = _resolve_repo(notification_repo, UserNotificationRepository, db)
     session = payments_repo.db
 
     current_user_obj = user_repo.get_by_id(current_user["user_id"])
@@ -881,6 +882,7 @@ async def approve_payment_request(
     from utils.permissions import can_approve_payment
 
     payments_repo = _resolve_repo(payments_repo, PaymentsRepository, db)
+    notification_repo = _resolve_repo(notification_repo, UserNotificationRepository, db)
     session = payments_repo.db
 
     payment_request = payments_repo.get_by_id_with_relations(request_id)
@@ -976,6 +978,7 @@ async def reject_payment_request(
     from utils.permissions import can_reject_payment
 
     payments_repo = _resolve_repo(payments_repo, PaymentsRepository, db)
+    notification_repo = _resolve_repo(notification_repo, UserNotificationRepository, db)
     session = payments_repo.db
 
     payment_request = payments_repo.get_by_id_with_relations(request_id)
@@ -1058,6 +1061,8 @@ async def cancel_payment_request(
     user_repo = _resolve_repo(user_repo, UserRepository, db)
     payments_repo = _resolve_repo(payments_repo, PaymentsRepository, db)
     payment_account_repo = _resolve_repo(payment_account_repo, PaymentAccountRepository, db)
+    business_repo = _resolve_repo(business_repo, BusinessRepository, db)
+    notification_repo = _resolve_repo(notification_repo, UserNotificationRepository, db)
     session = payments_repo.db
 
     current_user_obj = user_repo.get_by_id(current_user["user_id"])

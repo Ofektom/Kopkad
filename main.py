@@ -71,13 +71,17 @@ origins = [
     "http://localhost:8080",
     "http://localhost:5173",
     "https://kopkad-frontend.vercel.app",
+    "https://kopkad.onrender.com",  # Allow same-origin requests
 ]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
 # 2. Caching Middleware
