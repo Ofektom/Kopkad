@@ -93,7 +93,11 @@ class User(AuditMixin, Base):
         "Business", secondary=user_business, back_populates="users"
     )
     active_business = relationship("Business", foreign_keys=[active_business_id])
-    payment_accounts = relationship("PaymentAccount", back_populates="customer")
+    payment_accounts = relationship(
+        "PaymentAccount", 
+        back_populates="customer",
+        foreign_keys="PaymentAccount.customer_id"
+    )
     settings = relationship(
         "Settings",
         uselist=False,
