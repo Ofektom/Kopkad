@@ -694,6 +694,21 @@ async def create_payment_request(
             current_user["user_id"],
         )
         
+        # Notify customer about payment request creation
+        if payment_request.payment_account and payment_request.payment_account.customer_id:
+            customer_id = payment_request.payment_account.customer_id
+            await notify_user(
+                user_id=customer_id,
+                notification_type=NotificationType.PAYMENT_REQUEST_PENDING,
+                title="Payment Request Submitted",
+                message=f"Your payment request of {payout_amount:.2f} for savings account {savings_account.tracking_number} has been submitted and is pending approval.",
+                priority=NotificationPriority.MEDIUM,
+                db=session,
+                notification_repo=notification_repo,
+                related_entity_id=payment_request.id,
+                related_entity_type="payment_request",
+            )
+        
         # Notify business admin about new payment request
         if savings_account.business_id:
             await notify_business_admin(

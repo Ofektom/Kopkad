@@ -689,7 +689,15 @@ async def check_overdue_savings_payments(
         )
 
         for row in rows:
-            since = datetime.now(timezone.utc) - timedelta(days=1)
+            # Check if notification exists after the payment became overdue
+            # This ensures we create notifications for existing overdue payments
+            # Convert date to datetime at start of day in UTC
+            if isinstance(row.oldest_mark, date):
+                overdue_date = datetime.combine(row.oldest_mark, datetime.min.time()).replace(tzinfo=timezone.utc)
+            else:
+                # If it's already a datetime, ensure it has timezone
+                overdue_date = row.oldest_mark if row.oldest_mark.tzinfo else row.oldest_mark.replace(tzinfo=timezone.utc)
+            since = overdue_date
             existing = notification_repo.find_recent(
                 user_id=row.customer_id,
                 notification_type=NotificationType.SAVINGS_PAYMENT_OVERDUE,
@@ -717,10 +725,11 @@ async def check_overdue_savings_payments(
             if row.business_id:
                 business = business_repo.get_by_id(row.business_id)
                 if business and business.agent_id:
+                    # Use the same overdue_date for agent notifications
                     existing_agent = notification_repo.find_recent(
                         user_id=business.agent_id,
                         notification_type=NotificationType.SAVINGS_PAYMENT_OVERDUE,
-                        since=since,
+                        since=overdue_date,
                         related_entity_id=row.account_id,
                     )
                     if not existing_agent:
