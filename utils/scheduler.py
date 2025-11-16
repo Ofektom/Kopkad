@@ -113,10 +113,10 @@ def init_scheduler():
         replace_existing=True,
     )
 
-    # Overdue savings payments (daily 7:30 AM) - using proactive_advisor version with deduplication
+    # Overdue savings payments (every 5 minutes) - using proactive_advisor version with deduplication
     scheduler.add_job(
         run_overdue_savings_payments_check,
-        CronTrigger(hour=7, minute=30),
+        IntervalTrigger(minutes=5),
         id="overdue_savings_payments",
         name="Overdue savings payments",
         replace_existing=True,
