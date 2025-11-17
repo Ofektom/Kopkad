@@ -20,6 +20,7 @@ from service.cron_notifications import (
     send_savings_nearing_completion_notifications,
     send_savings_payment_overdue_notifications,
     send_weekly_analytics_report,
+    notify_legacy_pending_payment_requests,
 )
 import logging
 
@@ -173,6 +174,15 @@ def init_scheduler():
         CronTrigger(day_of_week='mon', hour=7, minute=45),
         id="weekly_analytics_report",
         name="Weekly analytics report",
+        replace_existing=True,
+    )
+
+    # Legacy pending payment requests notification (daily at 12:00 AM)
+    scheduler.add_job(
+        run_legacy_pending_payment_requests,
+        CronTrigger(hour=0, minute=0),
+        id="legacy_pending_payment_requests",
+        name="Notify about legacy pending payment requests",
         replace_existing=True,
     )
     
@@ -357,6 +367,17 @@ async def run_weekly_analytics_report():
         db.close()
     except Exception as e:
         logger.error(f"Error in weekly analytics report: {str(e)}")
+
+
+async def run_legacy_pending_payment_requests():
+    """Wrapper to notify about legacy pending payment requests."""
+    try:
+        logger.info("Running scheduled legacy pending payment requests notification")
+        db = next(get_db())
+        await notify_legacy_pending_payment_requests(db)
+        db.close()
+    except Exception as e:
+        logger.error(f"Error in legacy pending payment requests notification: {str(e)}")
 
 
 def start_scheduler():

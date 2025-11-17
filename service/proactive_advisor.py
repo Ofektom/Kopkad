@@ -14,7 +14,7 @@ from models.financial_advisor import (
 from models.savings import SavingsAccount, SavingsMarking, MarkingStatus, SavingsStatus
 from models.payments import PaymentRequest, PaymentRequestStatus, Commission
 from models.expenses import ExpenseCard, CardStatus
-from models.user import User
+from models.user import User, Role
 from models.business import Business
 from service.financial_advisor import (
     analyze_savings_capacity,
@@ -725,30 +725,33 @@ async def check_overdue_savings_payments(
             if row.business_id:
                 business = business_repo.get_by_id(row.business_id)
                 if business and business.agent_id:
-                    # Use the same overdue_date for agent notifications
-                    existing_agent = notification_repo.find_recent(
-                        user_id=business.agent_id,
-                        notification_type=NotificationType.SAVINGS_PAYMENT_OVERDUE,
-                        since=overdue_date,
-                        related_entity_id=row.account_id,
-                    )
-                    if not existing_agent:
-                        notification_repo.create(
-                            {
-                                "user_id": business.agent_id,
-                                "notification_type": NotificationType.SAVINGS_PAYMENT_OVERDUE,
-                                "title": "Customer Savings Payment Overdue",
-                                "message": (
-                                    f"Savings account {row.tracking_number} has overdue payments. "
-                                    "Kindly follow up with the customer."
-                                ),
-                                "priority": NotificationPriority.HIGH,
-                                "related_entity_id": row.account_id,
-                                "related_entity_type": "savings_account",
-                                "created_by": business.agent_id,
-                                "created_at": datetime.now(timezone.utc),
-                            }
+                    # Verify the agent_id is actually an agent, not a super admin
+                    agent = session.query(User).filter(User.id == business.agent_id).first()
+                    if agent and agent.role in [Role.AGENT, Role.SUB_AGENT]:
+                        # Use the same overdue_date for agent notifications
+                        existing_agent = notification_repo.find_recent(
+                            user_id=business.agent_id,
+                            notification_type=NotificationType.SAVINGS_PAYMENT_OVERDUE,
+                            since=overdue_date,
+                            related_entity_id=row.account_id,
                         )
+                        if not existing_agent:
+                            notification_repo.create(
+                                {
+                                    "user_id": business.agent_id,
+                                    "notification_type": NotificationType.SAVINGS_PAYMENT_OVERDUE,
+                                    "title": "Customer Savings Payment Overdue",
+                                    "message": (
+                                        f"Savings account {row.tracking_number} has overdue payments. "
+                                        "Kindly follow up with the customer."
+                                    ),
+                                    "priority": NotificationPriority.HIGH,
+                                    "related_entity_id": row.account_id,
+                                    "related_entity_type": "savings_account",
+                                    "created_by": business.agent_id,
+                                    "created_at": datetime.now(timezone.utc),
+                                }
+                            )
 
         session.commit()
         logger.info("Completed overdue savings payments check")
@@ -935,29 +938,32 @@ async def check_business_without_admin(
                     )
 
             if business.agent_id:
-                existing_agent = notification_repo.find_recent(
-                    user_id=business.agent_id,
-                    notification_type=NotificationType.BUSINESS_WITHOUT_ADMIN,
-                    since=since,
-                    related_entity_id=business.id,
-                )
-                if not existing_agent:
-                    notification_repo.create(
-                        {
-                            "user_id": business.agent_id,
-                            "notification_type": NotificationType.BUSINESS_WITHOUT_ADMIN,
-                            "title": "Assign a Business Admin",
-                            "message": (
-                                f"Business '{business.name}' has been without an admin for over 7 days. "
-                                "Please complete the assignment."
-                            ),
-                            "priority": NotificationPriority.HIGH,
-                            "related_entity_id": business.id,
-                            "related_entity_type": "business",
-                            "created_by": business.agent_id,
-                            "created_at": datetime.now(timezone.utc),
-                        }
+                # Verify the agent_id is actually an agent, not a super admin
+                agent = session.query(User).filter(User.id == business.agent_id).first()
+                if agent and agent.role in [Role.AGENT, Role.SUB_AGENT]:
+                    existing_agent = notification_repo.find_recent(
+                        user_id=business.agent_id,
+                        notification_type=NotificationType.BUSINESS_WITHOUT_ADMIN,
+                        since=since,
+                        related_entity_id=business.id,
                     )
+                    if not existing_agent:
+                        notification_repo.create(
+                            {
+                                "user_id": business.agent_id,
+                                "notification_type": NotificationType.BUSINESS_WITHOUT_ADMIN,
+                                "title": "Assign a Business Admin",
+                                "message": (
+                                    f"Business '{business.name}' has been without an admin for over 7 days. "
+                                    "Please complete the assignment."
+                                ),
+                                "priority": NotificationPriority.HIGH,
+                                "related_entity_id": business.id,
+                                "related_entity_type": "business",
+                                "created_by": business.agent_id,
+                                "created_at": datetime.now(timezone.utc),
+                            }
+                        )
 
         session.commit()
         logger.info("Completed business-without-admin check")

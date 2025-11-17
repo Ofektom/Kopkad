@@ -203,30 +203,33 @@ async def send_savings_payment_overdue_notifications(db: Session) -> int:
             if success:
                 sent += 1
 
-        # Notify agent / business owner
+        # Notify agent / business owner (only if they are actually an agent, not super admin)
         business = db.query(Business).filter(Business.id == account.business_id).first()
         if business and business.agent_id:
-            existing_agent = notification_repo.find_recent(
-                user_id=business.agent_id,
-                notification_type=NotificationType.SAVINGS_PAYMENT_OVERDUE,
-                since=overdue_date,
-                related_entity_id=account.id,
-            )
-            if not existing_agent:
-                await notify_user(
+            # Verify the agent_id is actually an agent, not a super admin
+            agent = db.query(User).filter(User.id == business.agent_id).first()
+            if agent and agent.role in [Role.AGENT, Role.SUB_AGENT]:
+                existing_agent = notification_repo.find_recent(
                     user_id=business.agent_id,
                     notification_type=NotificationType.SAVINGS_PAYMENT_OVERDUE,
-                    title="Customer Savings Payment Overdue",
-                    message=(
-                        f"Savings account {account.tracking_number} has overdue payments. "
-                        "Kindly follow up with the customer."
-                    ),
-                    priority=NotificationPriority.HIGH,
-                    db=db,
-                    notification_repo=notification_repo,
+                    since=overdue_date,
                     related_entity_id=account.id,
-                    related_entity_type="savings_account",
                 )
+                if not existing_agent:
+                    await notify_user(
+                        user_id=business.agent_id,
+                        notification_type=NotificationType.SAVINGS_PAYMENT_OVERDUE,
+                        title="Customer Savings Payment Overdue",
+                        message=(
+                            f"Savings account {account.tracking_number} has overdue payments. "
+                            "Kindly follow up with the customer."
+                        ),
+                        priority=NotificationPriority.HIGH,
+                        db=db,
+                        notification_repo=notification_repo,
+                        related_entity_id=account.id,
+                        related_entity_type="savings_account",
+                    )
 
     logger.info("Sent %s savings payment overdue notifications", sent)
     return sent
@@ -308,19 +311,21 @@ async def send_business_without_admin_alerts(db: Session) -> int:
             related_entity_id=business.id,
             related_entity_type="business",
         )
-        # Notify agent
+        # Notify agent (only if they are actually an agent, not super admin)
         if business.agent_id:
-            await notify_user(
-                user_id=business.agent_id,
-                notification_type=NotificationType.BUSINESS_WITHOUT_ADMIN,
-                title="Assign Business Admin",
-                message=message,
-                priority=NotificationPriority.HIGH,
-                db=db,
-                notification_repo=notification_repo,
-                related_entity_id=business.id,
-                related_entity_type="business",
-            )
+            agent = db.query(User).filter(User.id == business.agent_id).first()
+            if agent and agent.role in [Role.AGENT, Role.SUB_AGENT]:
+                await notify_user(
+                    user_id=business.agent_id,
+                    notification_type=NotificationType.BUSINESS_WITHOUT_ADMIN,
+                    title="Assign Business Admin",
+                    message=message,
+                    priority=NotificationPriority.HIGH,
+                    db=db,
+                    notification_repo=notification_repo,
+                    related_entity_id=business.id,
+                    related_entity_type="business",
+                )
         sent += 1
 
     logger.info("Sent %s business without admin alerts", sent)
@@ -451,4 +456,87 @@ async def send_weekly_analytics_report(db: Session) -> int:
 
     logger.info("Sent weekly analytics report")
     return 1
+
+
+async def notify_legacy_pending_payment_requests(db: Session) -> int:
+    """Notify business admins about legacy pending payment requests that don't have notifications yet.
+    
+    This function handles payment requests that existed before the notification system was implemented.
+    It checks for pending payment requests and sends notifications to business admins if they don't
+    already have a notification for that request.
+    
+    Runs daily at 12am to catch any legacy data.
+    """
+    pending_requests = (
+        db.query(PaymentRequest)
+        .filter(PaymentRequest.status == PaymentRequestStatus.PENDING)
+        .all()
+    )
+
+    if not pending_requests:
+        logger.info("No pending payment requests found")
+        return 0
+
+    notification_repo = UserNotificationRepository(db)
+    sent = 0
+
+    for request in pending_requests:
+        if not request.savings_account or not request.savings_account.business_id:
+            continue
+
+        business = db.query(Business).filter(Business.id == request.savings_account.business_id).first()
+        if not business or not business.admin_id:
+            continue
+
+        # Check if notification already exists for this payment request
+        # Use request_date as the 'since' parameter to check for notifications created after the request
+        request_date = request.request_date
+        if isinstance(request_date, datetime):
+            since_date = request_date
+        else:
+            # If it's a date, convert to datetime at start of day
+            since_date = datetime.combine(request_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+
+        existing = notification_repo.find_recent(
+            user_id=business.admin_id,
+            notification_type=NotificationType.PAYMENT_REQUEST_PENDING,
+            since=since_date,
+            related_entity_id=request.id,
+        )
+
+        if not existing:
+            # Get customer name for the message
+            customer_name = "Customer"
+            if request.payment_account and request.payment_account.customer_id:
+                customer = db.query(User).filter(User.id == request.payment_account.customer_id).first()
+                if customer:
+                    customer_name = customer.full_name or customer.email or "Customer"
+
+            # Get savings account tracking number
+            tracking_number = request.savings_account.tracking_number if request.savings_account else "N/A"
+
+            success = await notify_business_admin(
+                business_id=business.id,
+                notification_type=NotificationType.PAYMENT_REQUEST_PENDING,
+                title="Pending Payment Request",
+                message=(
+                    f"Payment request of {request.amount:.2f} from {customer_name} "
+                    f"for savings account {tracking_number} is pending approval. "
+                    f"Reference: {request.reference}"
+                ),
+                priority=NotificationPriority.HIGH,
+                db=db,
+                notification_repo=notification_repo,
+                related_entity_id=request.id,
+                related_entity_type="payment_request",
+            )
+            if success:
+                sent += 1
+                logger.info(
+                    f"Sent legacy payment request notification for request {request.id} "
+                    f"to business admin {business.admin_id}"
+                )
+
+    logger.info(f"Sent {sent} legacy payment request notifications")
+    return sent
 
