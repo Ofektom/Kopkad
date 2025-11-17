@@ -9,7 +9,6 @@ from service.proactive_advisor import (
     check_savings_opportunities,
     generate_periodic_reports,
     update_financial_health_scores,
-    check_overdue_savings_payments,
 )
 from service.cron_notifications import (
     send_business_without_admin_alerts,
@@ -113,9 +112,10 @@ def init_scheduler():
         replace_existing=True,
     )
 
-    # Overdue savings payments (every 5 minutes) - using proactive_advisor version with deduplication
+    # Overdue savings payments (every 5 minutes) - uses direct source from cron_notifications
+    # Queries savings_markings directly where marked_date < today() AND status = PENDING
     scheduler.add_job(
-        run_overdue_savings_payments_check,
+        run_overdue_savings_payments,
         IntervalTrigger(minutes=5),
         id="overdue_savings_payments",
         name="Overdue savings payments",
@@ -279,22 +279,15 @@ async def run_savings_completion_reminders():
 
 
 async def run_overdue_savings_payments():
-    """Wrapper to check overdue savings payments (legacy - kept for compatibility)."""
+    """Wrapper to check overdue savings payments.
+    
+    Uses direct source from cron_notifications which queries savings_markings table directly
+    for entries where marked_date < today() AND status = PENDING.
+    """
     try:
         logger.info("Running scheduled overdue savings payment check")
         db = next(get_db())
         await send_savings_payment_overdue_notifications(db)
-        db.close()
-    except Exception as e:
-        logger.error(f"Error in overdue savings payment check: {str(e)}")
-
-
-async def run_overdue_savings_payments_check():
-    """Wrapper to check overdue savings payments using proactive_advisor with deduplication."""
-    try:
-        logger.info("Running scheduled overdue savings payment check (with deduplication)")
-        db = next(get_db())
-        await check_overdue_savings_payments(db)
         db.close()
     except Exception as e:
         logger.error(f"Error in overdue savings payment check: {str(e)}")

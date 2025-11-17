@@ -144,7 +144,12 @@ async def send_payment_request_reminders(db: Session) -> int:
 
 
 async def send_savings_payment_overdue_notifications(db: Session) -> int:
-    """Notify customers and agents about overdue savings markings."""
+    """Notify customers and agents about overdue savings markings.
+    
+    Queries savings_markings table directly for entries where:
+    - marked_date < today() (payment date is behind current date)
+    - status = PENDING (payment not yet marked as paid)
+    """
     overdue_markings = (
         db.query(SavingsMarking)
         .filter(
@@ -155,6 +160,7 @@ async def send_savings_payment_overdue_notifications(db: Session) -> int:
     )
 
     if not overdue_markings:
+        logger.info("No overdue savings payments found")
         return 0
 
     notification_repo = UserNotificationRepository(db)
@@ -168,32 +174,25 @@ async def send_savings_payment_overdue_notifications(db: Session) -> int:
 
         processed_accounts.add(account.id)
 
-        # Notify customer
-        await notify_user(
+        # Check if notification already exists (prevent duplicates)
+        # Check for notifications created after the payment became overdue
+        overdue_date = datetime.combine(marking.marked_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+        existing = notification_repo.find_recent(
             user_id=account.customer_id,
             notification_type=NotificationType.SAVINGS_PAYMENT_OVERDUE,
-            title="Savings Payment Overdue",
-            message=(
-                f"You have overdue payments for savings account "
-                f"{account.tracking_number}."
-            ),
-            priority=NotificationPriority.HIGH,
-            db=db,
-            notification_repo=notification_repo,
+            since=overdue_date,
             related_entity_id=account.id,
-            related_entity_type="savings_account",
         )
-        sent += 1
 
-        # Notify agent / business owner
-        business = db.query(Business).filter(Business.id == account.business_id).first()
-        if business and business.agent_id:
-            await notify_user(
-                user_id=business.agent_id,
+        if not existing:
+            # Notify customer
+            success = await notify_user(
+                user_id=account.customer_id,
                 notification_type=NotificationType.SAVINGS_PAYMENT_OVERDUE,
-                title="Customer Payment Overdue",
+                title="Savings Payment Overdue",
                 message=(
-                    f"Savings account {account.tracking_number} has overdue payments."
+                    f"You have overdue payments for savings account "
+                    f"{account.tracking_number}. Please mark the pending payments to stay on track."
                 ),
                 priority=NotificationPriority.HIGH,
                 db=db,
@@ -201,6 +200,33 @@ async def send_savings_payment_overdue_notifications(db: Session) -> int:
                 related_entity_id=account.id,
                 related_entity_type="savings_account",
             )
+            if success:
+                sent += 1
+
+        # Notify agent / business owner
+        business = db.query(Business).filter(Business.id == account.business_id).first()
+        if business and business.agent_id:
+            existing_agent = notification_repo.find_recent(
+                user_id=business.agent_id,
+                notification_type=NotificationType.SAVINGS_PAYMENT_OVERDUE,
+                since=overdue_date,
+                related_entity_id=account.id,
+            )
+            if not existing_agent:
+                await notify_user(
+                    user_id=business.agent_id,
+                    notification_type=NotificationType.SAVINGS_PAYMENT_OVERDUE,
+                    title="Customer Savings Payment Overdue",
+                    message=(
+                        f"Savings account {account.tracking_number} has overdue payments. "
+                        "Kindly follow up with the customer."
+                    ),
+                    priority=NotificationPriority.HIGH,
+                    db=db,
+                    notification_repo=notification_repo,
+                    related_entity_id=account.id,
+                    related_entity_type="savings_account",
+                )
 
     logger.info("Sent %s savings payment overdue notifications", sent)
     return sent
