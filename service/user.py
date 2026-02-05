@@ -43,6 +43,7 @@ from utils.auth import hash_password, verify_password, create_access_token, refr
 from utils.email_service import send_welcome_email
 from utils.password_utils import decrypt_password
 from utils.permissions import grant_admin_permissions, revoke_admin_permissions
+from utils.permissions import grant_admin_permissions, revoke_admin_permissions
 from config.settings import settings
 
 logging.basicConfig(level=logging.INFO)
