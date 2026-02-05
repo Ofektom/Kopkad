@@ -712,7 +712,11 @@ async def create_payment_request(
         
         # Notify business admin about new payment request
         if savings_account.business_id:
-            await notify_business_admin(
+            logger.info(
+                f"Attempting to notify business admin for payment request {payment_request.id}, "
+                f"business_id: {savings_account.business_id}"
+            )
+            success = await notify_business_admin(
                 business_id=savings_account.business_id,
                 notification_type=NotificationType.PAYMENT_REQUEST_PENDING,
                 title="New Payment Request",
@@ -724,6 +728,16 @@ async def create_payment_request(
                 related_entity_id=payment_request.id,
                 related_entity_type="payment_request",
             )
+            if success:
+                logger.info(
+                    f"Successfully notified business admin for payment request {payment_request.id}, "
+                    f"business_id: {savings_account.business_id}"
+                )
+            else:
+                logger.warning(
+                    f"Failed to notify business admin for payment request {payment_request.id}. "
+                    f"Business {savings_account.business_id} may not have an admin assigned."
+                )
         
         return success_response(
             status_code=201,

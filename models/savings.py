@@ -17,6 +17,7 @@ from enum import Enum as PyEnum
 class SavingsType(PyEnum):
     DAILY = "daily"
     TARGET = "target"
+    COOPERATIVE = "cooperative"
 
 class SavingsStatus(PyEnum):
     PENDING = "pending"

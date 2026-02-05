@@ -123,11 +123,20 @@ async def notify_business_admin(
             business_repo = BusinessRepository(db)
         
         business = business_repo.get_by_id(business_id)
-        if not business or not business.admin_id:
-            logger.warning(f"Business {business_id} not found or has no admin")
+        if not business:
+            logger.warning(f"Business {business_id} not found")
             return False
         
-        return await notify_user(
+        if not business.admin_id:
+            logger.warning(f"Business {business_id} has no admin assigned (admin_id is None)")
+            return False
+        
+        logger.info(
+            f"Notifying business admin {business.admin_id} for business {business_id} "
+            f"about {notification_type.value}"
+        )
+        
+        result = await notify_user(
             user_id=business.admin_id,
             notification_type=notification_type,
             title=title,
@@ -138,8 +147,22 @@ async def notify_business_admin(
             related_entity_id=related_entity_id,
             related_entity_type=related_entity_type,
         )
+        
+        if result:
+            logger.info(
+                f"Successfully notified business admin {business.admin_id} for business {business_id}"
+            )
+        else:
+            logger.warning(
+                f"Failed to notify business admin {business.admin_id} for business {business_id}"
+            )
+        
+        return result
     except Exception as e:
-        logger.error(f"Error notifying business admin for business {business_id}: {str(e)}")
+        logger.error(
+            f"Error notifying business admin for business {business_id}: {str(e)}",
+            exc_info=True
+        )
         return False
 
 

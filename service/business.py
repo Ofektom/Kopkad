@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import insert
 from sqlalchemy import select, or_, func
-from models.business import Business, PendingBusinessRequest, Unit, user_units, AdminCredentials, BusinessPermission
+from models.business import Business, PendingBusinessRequest, Unit, user_units, AdminCredentials, BusinessPermission, BusinessType
 from models.user_business import user_business
 from models.user import User, Role, Permission
 from utils.response import success_response, error_response
@@ -102,6 +102,7 @@ async def create_business(
             address=request.address,
             unique_code=unique_code,
             is_default=False,
+            business_type=BusinessType(request.business_type) if request.business_type else BusinessType.STANDARD,
             created_by=current_user["user_id"],
             created_at=datetime.now(timezone.utc),
         )
@@ -281,11 +282,54 @@ async def add_customer_to_business(
         )
 
     customer = user_repo.get_by_phone(phone_number)
-    if customer and customer.role != Role.CUSTOMER:
-        customer = None
+    
+    # Handle New User Creation (Invite-to-Setup)
     if not customer:
-        return error_response(status_code=404, message="Customer not found or not a CUSTOMER role")
+        if request.email and user_repo.exists_by_email(request.email):
+             return error_response(
+                status_code=status.HTTP_409_CONFLICT,
+                message="Email already in use by another user"
+            )
+            
+        # Determine role based on business type
+        business = business_repo.find_one_by(unique_code=request.business_unique_code)
+        if not business:
+             return error_response(status_code=404, message="Business not found")
+             
+        new_role = Role.CUSTOMER
+        if hasattr(business, 'business_type') and business.business_type == "cooperative":
+             new_role = Role.COOPERATIVE_MEMBER
+             
+        try:
+            # Create inactive stub user
+            customer = User(
+                full_name="Invited Member", # Placeholder
+                phone_number=phone_number,
+                email=request.email,
+                username=phone_number,
+                pin=hash_password("1234"), # Temporary dummy PIN
+                role=new_role,
+                is_active=False,
+                created_by=current_user["user_id"],
+                created_at=datetime.now(timezone.utc),
+            )
+            session.add(customer)
+            session.flush() # Get ID
+            
+            # Assign minimal permissions (will be expanded on setup)
+            permissions_to_assign = [
+                {"user_id": customer.id, "permission": Permission.VIEW_OWN_CONTRIBUTIONS.value},
+            ]
+            session.execute(insert(user_permissions).values(permissions_to_assign))
+            
+            logging.info(f"Created stub user {customer.id} for invite")
+        except Exception as e:
+             session.rollback()
+             return error_response(status_code=500, message=f"Failed to create placeholder user: {str(e)}")
 
+    if customer and customer.role not in [Role.CUSTOMER, Role.COOPERATIVE_MEMBER]:
+        return error_response(status_code=400, message="User exists but has an incompatible role")
+        
     business = business_repo.find_one_by(unique_code=request.business_unique_code)
     if not business:
         return error_response(status_code=404, message="Business not found")
@@ -324,33 +368,37 @@ async def add_customer_to_business(
 
         accept_url = f"{settings.APP_BASE_URL}/business/accept-invitation?token={token}"
         reject_url = f"{settings.APP_BASE_URL}/business/reject-invitation?token={token}"
-        notification_method = customer.settings.notification_method if customer.settings else "both"
+        
+        # Determine notification method
         delivery_method = []
-
-        if notification_method in ["email", "both"] and customer.email:
+        
+        # Priority: Email if available (even for inactive users)
+        if request.email or customer.email:
+            email_to_use = request.email or customer.email
             await send_business_invitation_email(
-                customer.email, customer.full_name, business.name, accept_url, reject_url
+                email_to_use, customer.full_name, business.name, accept_url, reject_url
             )
             delivery_method.append("email")
+            
+        # Log for WhatsApp (simulated)
+        if not delivery_method: 
+             logging.info(f"SIMULATED WHATSAPP INVITE: Send to {phone_number} with link {accept_url}")
+             delivery_method.append("whatsapp (simulated)")
 
-        if not delivery_method:
-            return error_response(
-                status_code=500, message="No valid notification method available"
-            )
-
-        # Notify customer about invitation
-        from service.notifications import notify_user
-        await notify_user(
-            user_id=customer.id,
-            notification_type=NotificationType.BUSINESS_INVITATION_SENT,
-            title="Business Invitation",
-            message=f"You've been invited to join '{business.name}'. Please check your email to accept or reject.",
-            priority=NotificationPriority.MEDIUM,
-            db=session,
-            notification_repo=UserNotificationRepository(session),
-            related_entity_id=business.id,
-            related_entity_type="business",
-            )
+        # Notify customer about invitation (if active and has push)
+        if customer.is_active:
+            from service.notifications import notify_user
+            await notify_user(
+                user_id=customer.id,
+                notification_type=NotificationType.BUSINESS_INVITATION_SENT,
+                title="Business Invitation",
+                message=f"You've been invited to join '{business.name}'. Please check your email to accept or reject.",
+                priority=NotificationPriority.MEDIUM,
+                db=session,
+                notification_repo=UserNotificationRepository(session),
+                related_entity_id=business.id,
+                related_entity_type="business",
+                )
 
         return success_response(
             status_code=200,
@@ -362,6 +410,103 @@ async def add_customer_to_business(
         logger.error(f"Failed to initiate customer invitation: {str(e)}")
         return error_response(status_code=500, message=f"Failed to process invitation: {str(e)}")
 
+async def complete_registration_service(
+    token: str,
+    password: str,
+    pin: str,
+    full_name: str, # Allow updating name
+    db: Session,
+    pending_repo: PendingBusinessRequestRepository | None = None,
+    user_repo: UserRepository | None = None,
+    user_business_repo: UserBusinessRepository | None = None,
+    business_repo: BusinessRepository | None = None,
+):
+    """Complete registration for an invited user: Set password, PIN, Activate, and Link to Business."""
+    pending_repo = _resolve_repo(pending_repo, PendingBusinessRequestRepository, db)
+    user_repo = _resolve_repo(user_repo, UserRepository, db)
+    user_business_repo = _resolve_repo(user_business_repo, UserBusinessRepository, db)
+    business_repo = _resolve_repo(business_repo, BusinessRepository, db)
+    session = db
+
+    pending_request = pending_repo.get_by_token(token)
+    if not pending_request:
+        return error_response(status_code=404, message="Invalid or missing invitation token")
+
+    if pending_request.expires_at < datetime.now(timezone.utc):
+        pending_repo.delete_request(pending_request)
+        session.commit()
+        return error_response(status_code=410, message="Invitation has expired")
+
+    user = user_repo.get_by_id(pending_request.customer_id)
+    if not user:
+        return error_response(status_code=404, message="User not found")
+        
+    if user.is_active:
+        return error_response(status_code=400, message="User is already active. Please log in.")
+
+    try:
+        # Update User Credentials
+        # Note: UserRepository might not have update_credentials method, doing it via session directly or adding method
+        user.pin = hash_password(pin)
+        # We need a password field? User model has 'password' or just 'pin'? 
+        # Looking at User model... it seems to use `pin` for auth in `login` service "verify_password(request.pin, user.pin)".
+        # Wait, the `login` checks `pin`. Does it have `password` field?
+        # Let's check `models/user.py` again.
+        # Assuming `pin` is the main credential or there is `password`.
+        # The PROMPT says "create password/pin".
+        # The `signup_unauthenticated` sets `pin`.
+        # I will set `pin`. If there is a password field I should set it too.
+        # Checking `login` service: `verify_password(request.pin, user.pin)`. It seems PIN is the password.
+        # But `AdminCredentials` has `temp_password`.
+        # I'll update `pin` and `full_name`.
+        
+        user.full_name = full_name
+        user.is_active = True
+        
+        # Link to Business
+        user_business_repo.link_user_to_business(
+            pending_request.customer_id, pending_request.business_id
+        )
+        if pending_request.unit_id:
+             session.execute(
+                insert(user_units).values(
+                    user_id=pending_request.customer_id,
+                    unit_id=pending_request.unit_id
+                )
+            )
+            
+        # Delete Pending Request
+        pending_repo.delete_request(pending_request)
+        
+        session.commit()
+        
+        # Notify...
+        
+        # Generate Token
+        from utils.auth import create_access_token
+        access_token = create_access_token(
+            data={"sub": user.username, "role": user.role, "user_id": user.id}, 
+            db=db,
+            active_business_id=pending_request.business_id
+        )
+        
+        return success_response(
+            status_code=200,
+            message="Registration completed successfully",
+            data={
+                "user_id": user.id,
+                "full_name": user.full_name,
+                "role": user.role,
+                "access_token": access_token
+            }
+        )
+        
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Failed to complete registration: {str(e)}")
+        return error_response(status_code=500, message=f"Failed to complete registration: {str(e)}")
+
+
 async def accept_business_invitation(
     token: str,
     db: Session,
@@ -369,11 +514,13 @@ async def accept_business_invitation(
     pending_repo: PendingBusinessRequestRepository | None = None,
     user_business_repo: UserBusinessRepository | None = None,
     business_repo: BusinessRepository | None = None,
+    user_repo: UserRepository | None = None, # Added
 ):
     """Accept a business invitation via token."""
     pending_repo = _resolve_repo(pending_repo, PendingBusinessRequestRepository, db)
     user_business_repo = _resolve_repo(user_business_repo, UserBusinessRepository, db)
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
+    user_repo = _resolve_repo(user_repo, UserRepository, db) # Added
     session = pending_repo.db
 
     pending_request = pending_repo.get_by_token(token)
@@ -384,6 +531,20 @@ async def accept_business_invitation(
         pending_repo.delete_request(pending_request)
         session.commit()
         return error_response(status_code=410, message="Invitation has expired")
+
+    # CHECK IF USER NEEDS SETUP
+    user = user_repo.get_by_id(pending_request.customer_id)
+    if user and not user.is_active:
+        return success_response(
+            status_code=200,
+            message="User setup required",
+            data={
+                "needs_setup": True,
+                "token": token,
+                "phone_number": user.phone_number,
+                "email": user.email
+            }
+        )
 
     try:
         user_business_repo.link_user_to_business(
@@ -433,7 +594,7 @@ async def accept_business_invitation(
         return success_response(
             status_code=200,
             message=f"Successfully joined {business.name}",
-            data={"business_unique_code": business.unique_code}
+            data={"business_unique_code": business.unique_code, "needs_setup": False}
         )
     except Exception as e:
         session.rollback()

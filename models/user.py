@@ -11,6 +11,7 @@ class Role:
     AGENT = "agent"
     SUB_AGENT = "sub_agent"
     CUSTOMER = "customer"
+    COOPERATIVE_MEMBER = "cooperative_member"
 
 class Permission:
     # Super Admin Permissions (User Management Only)
@@ -40,6 +41,9 @@ class Permission:
     UPDATE_SAVINGS = "update_savings"
     MARK_SAVINGS = "mark_savings"
     MARK_SAVINGS_BULK = "mark_savings_bulk"
+    
+    # Cooperative and Member Permissions
+    VIEW_OWN_CONTRIBUTIONS = "view_own_contributions"
 
 user_permissions = Table(
     "user_permissions",
@@ -81,7 +85,9 @@ class User(AuditMixin, Base):
             Role.ADMIN,
             Role.AGENT,
             Role.SUB_AGENT,
+            Role.SUB_AGENT,
             Role.CUSTOMER,
+            Role.COOPERATIVE_MEMBER,
             name="role",
         ),
         nullable=False,

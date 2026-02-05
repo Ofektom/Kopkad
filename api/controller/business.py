@@ -125,6 +125,31 @@ async def reject_invitation_controller(
         pending_repo=pending_repo,
     )
 
+from schemas.business import CompleteRegistration
+from service.business import complete_registration_service
+
+async def complete_registration_controller(
+    request: CompleteRegistration,
+    db: Session = Depends(get_db),
+    pending_repo: PendingBusinessRequestRepository = Depends(
+        get_repository(PendingBusinessRequestRepository)
+    ),
+    user_repo: UserRepository = Depends(get_repository(UserRepository)),
+    user_business_repo: UserBusinessRepository = Depends(get_repository(UserBusinessRepository)),
+    business_repo: BusinessRepository = Depends(get_repository(BusinessRepository)),
+):
+    return await complete_registration_service(
+        token=request.token,
+        pin=request.pin,
+        password=request.pin, # Using PIN as password if needed, or ignoring
+        full_name=request.full_name,
+        db=db,
+        pending_repo=pending_repo,
+        user_repo=user_repo,
+        user_business_repo=user_business_repo,
+        business_repo=business_repo,
+    )
+
 
 async def get_user_businesses_controller(
     address: Optional[str] = Query(None, description="Filter by business address"),

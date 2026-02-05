@@ -13,6 +13,10 @@ user_units = Table(
     Column("unit_id", Integer, ForeignKey("units.id"), primary_key=True),
 )
 
+class BusinessType(PyEnum):
+    STANDARD = "standard"
+    COOPERATIVE = "cooperative"
+
 class Business(AuditMixin, Base):
     __tablename__ = "businesses"
     id = Column(Integer, primary_key=True)
@@ -22,6 +26,12 @@ class Business(AuditMixin, Base):
     address = Column(String(255), nullable=True)
     unique_code = Column(String(10), unique=True, nullable=False)
     is_default = Column(Boolean, default=False, nullable=True)
+    business_type = Column(
+        Enum(BusinessType, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+        default=BusinessType.STANDARD,
+        server_default=BusinessType.STANDARD.value
+    )
     users = relationship("User", secondary="user_business", back_populates="businesses")
     units = relationship("Unit", back_populates="business")
     agent = relationship("User", foreign_keys=[agent_id], backref="owned_businesses")

@@ -19,7 +19,9 @@ from api.controller.business import (
     get_user_units_controller,
     reject_invitation_controller,
     update_business_controller,
+    update_business_controller,
     update_business_unit_controller,
+    complete_registration_controller,
 )
 from schemas.business import (
     BusinessCreate,
@@ -62,6 +64,13 @@ business_router.add_api_route(
     endpoint=reject_invitation_controller,
     methods=["GET"],
     summary="Reject business invitation via token",
+)
+
+business_router.add_api_route(
+    "/complete-registration",
+    endpoint=complete_registration_controller,
+    methods=["POST"],
+    summary="Complete registration for invited user (Set PIN/Name)",
 )
 
 business_router.add_api_route(

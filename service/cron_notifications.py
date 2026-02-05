@@ -459,13 +459,14 @@ async def send_weekly_analytics_report(db: Session) -> int:
 
 
 async def notify_legacy_pending_payment_requests(db: Session) -> int:
-    """Notify business admins about legacy pending payment requests that don't have notifications yet.
+    """Notify business admins about all pending payment requests.
     
-    This function handles payment requests that existed before the notification system was implemented.
+    This function runs daily at 12am to ensure business admins are notified about:
+    1. Legacy payment requests that existed before the notification system was implemented
+    2. Any pending payment requests that may have been missed
+    
     It checks for pending payment requests and sends notifications to business admins if they don't
-    already have a notification for that request.
-    
-    Runs daily at 12am to catch any legacy data.
+    already have a notification for that request created today.
     """
     pending_requests = (
         db.query(PaymentRequest)
@@ -479,6 +480,7 @@ async def notify_legacy_pending_payment_requests(db: Session) -> int:
 
     notification_repo = UserNotificationRepository(db)
     sent = 0
+    today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
 
     for request in pending_requests:
         if not request.savings_account or not request.savings_account.business_id:
@@ -486,21 +488,18 @@ async def notify_legacy_pending_payment_requests(db: Session) -> int:
 
         business = db.query(Business).filter(Business.id == request.savings_account.business_id).first()
         if not business or not business.admin_id:
+            logger.debug(
+                f"Skipping payment request {request.id}: business {request.savings_account.business_id} "
+                f"has no admin assigned"
+            )
             continue
 
-        # Check if notification already exists for this payment request
-        # Use request_date as the 'since' parameter to check for notifications created after the request
-        request_date = request.request_date
-        if isinstance(request_date, datetime):
-            since_date = request_date
-        else:
-            # If it's a date, convert to datetime at start of day
-            since_date = datetime.combine(request_date, datetime.min.time()).replace(tzinfo=timezone.utc)
-
+        # Check if notification already exists for this payment request today
+        # This prevents duplicate notifications if the cron runs multiple times
         existing = notification_repo.find_recent(
             user_id=business.admin_id,
             notification_type=NotificationType.PAYMENT_REQUEST_PENDING,
-            since=since_date,
+            since=today_start,
             related_entity_id=request.id,
         )
 
@@ -533,10 +532,15 @@ async def notify_legacy_pending_payment_requests(db: Session) -> int:
             if success:
                 sent += 1
                 logger.info(
-                    f"Sent legacy payment request notification for request {request.id} "
+                    f"Sent payment request notification for request {request.id} "
+                    f"to business admin {business.admin_id}"
+                )
+            else:
+                logger.warning(
+                    f"Failed to send payment request notification for request {request.id} "
                     f"to business admin {business.admin_id}"
                 )
 
-    logger.info(f"Sent {sent} legacy payment request notifications")
+    logger.info(f"Sent {sent} pending payment request notifications")
     return sent
 
