@@ -1,10 +1,12 @@
-from sqlalchemy import Column, Integer, String, Table, ForeignKey, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Table, ForeignKey, DateTime, Boolean, Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.schema import UniqueConstraint
 from database.postgres_optimized import Base
 from models.audit import AuditMixin
 from datetime import datetime, timezone
+from enum import Enum as PyEnum
+from sqlalchemy import Enum
 
 user_units = Table(
     "user_units",
