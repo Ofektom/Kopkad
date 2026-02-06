@@ -3,7 +3,7 @@ from sqlalchemy.sql import insert
 from sqlalchemy import select, or_, func
 from models.business import Business, PendingBusinessRequest, Unit, user_units, AdminCredentials, BusinessPermission, BusinessType
 from models.user_business import user_business
-from models.user import User
+from models.user import User, user_permissions
 from store.enums.enums import Role, Permission
 from utils.response import success_response, error_response
 from utils.password_utils import generate_admin_credentials, encrypt_password
@@ -72,6 +72,8 @@ async def create_business(
     unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
     user_business_repo = _resolve_repo(user_business_repo, UserBusinessRepository, db)
     session = business_repo.db
+
+    logger.info(f"Initiating business creation for agent_id: {current_user['user_id']}")
 
     current_user_obj = user_repo.get_by_id(current_user["user_id"])
     if not current_user_obj:
@@ -218,6 +220,7 @@ async def create_business(
         business_response = BusinessResponse.model_validate(business)
         
         # Return with admin credentials for super_admin to view
+        logger.info(f"Business '{business.name}' created successfully with code: {unique_code}")
         return success_response(
             status_code=201,
             message=f"Business and admin account created successfully. Unique code: {unique_code}",
@@ -237,7 +240,8 @@ async def create_business(
         )
     except Exception as e:
         session.rollback()
-        logger.error(f"Failed to create business: {str(e)}")
+        session.rollback()
+        logger.exception("Full traceback for create_business failure:")
         return error_response(status_code=500, message=f"Failed to create business: {str(e)}")
 
 async def add_customer_to_business(
@@ -433,6 +437,8 @@ async def complete_registration_service(
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
     session = db
 
+    logger.info(f"Processing complete_registration for token: {token}")
+
     pending_request = pending_repo.get_by_token(token)
     if not pending_request:
         return error_response(status_code=404, message="Invalid or missing invitation token")
@@ -495,6 +501,7 @@ async def complete_registration_service(
             active_business_id=pending_request.business_id
         )
         
+        logger.info(f"Registration completed for user_id: {user.id}")
         return success_response(
             status_code=200,
             message="Registration completed successfully",
@@ -508,7 +515,8 @@ async def complete_registration_service(
         
     except Exception as e:
         session.rollback()
-        logger.error(f"Failed to complete registration: {str(e)}")
+        session.rollback()
+        logger.exception("Full traceback for complete_registration failure:")
         return error_response(status_code=500, message=f"Failed to complete registration: {str(e)}")
 
 
@@ -527,6 +535,8 @@ async def accept_business_invitation(
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
     user_repo = _resolve_repo(user_repo, UserRepository, db) # Added
     session = pending_repo.db
+
+    logger.info(f"Processing accept_business_invitation for token: {token}")
 
     pending_request = pending_repo.get_by_token(token)
     if not pending_request:
@@ -596,6 +606,8 @@ async def accept_business_invitation(
             related_entity_type="user",
         )
         
+        
+        logger.info(f"Invitation accepted by customer_id: {pending_request.customer_id} for business_id: {business.id}")
         return success_response(
             status_code=200,
             message=f"Successfully joined {business.name}",
@@ -603,7 +615,8 @@ async def accept_business_invitation(
         )
     except Exception as e:
         session.rollback()
-        logger.error(f"Failed to accept invitation: {str(e)}")
+        session.rollback()
+        logger.exception("Full traceback for accept_business_invitation failure:")
         return error_response(status_code=500, message=f"Failed to accept invitation: {str(e)}")
 
 async def reject_business_invitation(
@@ -615,6 +628,8 @@ async def reject_business_invitation(
     """Reject a business invitation via token."""
     pending_repo = _resolve_repo(pending_repo, PendingBusinessRequestRepository, db)
     session = pending_repo.db
+
+    logger.info(f"Processing reject_business_invitation for token: {token}")
 
     pending_request = pending_repo.get_by_token(token)
     if not pending_request:
@@ -662,10 +677,12 @@ async def reject_business_invitation(
             related_entity_type="user",
         )
         
+        
+        logger.info(f"Invitation rejected by customer_id: {pending_request.customer_id} for business_id: {business.id}")
         return success_response(status_code=200, message="Invitation rejected", data={})
     except Exception as e:
         session.rollback()
-        logger.error(f"Failed to reject invitation: {str(e)}")
+        logger.exception("Full traceback for reject_business_invitation failure:")
         return error_response(
             status_code=500, message=f"Failed to reject invitation: {str(e)}"
         )
