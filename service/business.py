@@ -303,6 +303,7 @@ async def add_customer_to_business(
              
         try:
             # Create inactive stub user
+            logger.info(f"Attempting to create placeholder user for phone: {phone_number}")
             customer = User(
                 full_name="Invited Member", # Placeholder
                 phone_number=phone_number,
@@ -316,8 +317,10 @@ async def add_customer_to_business(
             )
             session.add(customer)
             session.flush() # Get ID
+            logger.info(f"Placeholder user created with ID: {customer.id}")
             
             # Assign minimal permissions (will be expanded on setup)
+            logger.info(f"Assigning permissions. Permission value being used: {Permission.VIEW_OWN_CONTRIBUTIONS}")
             permissions_to_assign = [
                 {"user_id": customer.id, "permission": Permission.VIEW_OWN_CONTRIBUTIONS.value},
             ]
@@ -325,8 +328,9 @@ async def add_customer_to_business(
             
             logging.info(f"Created stub user {customer.id} for invite")
         except Exception as e:
-             session.rollback()
-             return error_response(status_code=500, message=f"Failed to create placeholder user: {str(e)}")
+            session.rollback()
+            logger.exception("Full traceback for placeholder user creation failure:") # Log full stack trace
+            return error_response(status_code=500, message=f"Failed to create placeholder user: {str(e)}")
 
     if customer and customer.role not in [Role.CUSTOMER, Role.COOPERATIVE_MEMBER]:
         return error_response(status_code=400, message="User exists but has an incompatible role")
