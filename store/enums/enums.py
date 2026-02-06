@@ -16,6 +16,7 @@ class Role(str, Enum):
     AGENT = "agent"
     SUB_AGENT = "sub_agent"
     CUSTOMER = "customer"
+    COOPERATIVE_MEMBER = "cooperative_member"
 
 
 class Permission(str, Enum):
@@ -47,6 +48,9 @@ class Permission(str, Enum):
     UPDATE_SAVINGS = "update_savings"
     MARK_SAVINGS = "mark_savings"
     MARK_SAVINGS_BULK = "mark_savings_bulk"
+    
+    # User Permissions
+    VIEW_OWN_CONTRIBUTIONS = "view_own_contributions"
     
     # Wildcard
     ALL = "*"
