@@ -72,8 +72,12 @@ async def send_email_async(to_email: str, subject: str, body: str):
     message["Subject"] = subject
     message.set_content(body, subtype="html")
 
-    logger.info(f"Sending email to {to_email}")
+    logger.info(f"Preparing to send email to {to_email}")
+    logger.debug(f"SMTP Config: Host={SMTP_HOST}, Port={SMTP_PORT}, User={SMTP_USERNAME}, Timeout=10s")
+    
     try:
+        import asyncio
+        logger.info("Initiating SMTP connection...")
         response = await aiosmtplib.send(
             message,
             hostname=SMTP_HOST,
@@ -84,13 +88,20 @@ async def send_email_async(to_email: str, subject: str, body: str):
             start_tls=True,
             timeout=10,
         )
-        logger.info(f"Email sent to {to_email}. Result: {response}")
+        logger.info(f"Email sent successfully to {to_email}. Response: {response}")
         return {
             "status": "success",
             "message": f"Email sent successfully to {to_email}.",
         }
+    except asyncio.TimeoutError:
+        error_msg = f"Timeout connecting to SMTP server {SMTP_HOST}:{SMTP_PORT}. Check network/firewall."
+        logger.error(error_msg)
+        return {
+            "status": "error",
+            "message": error_msg,
+        }
     except Exception as e:
-        logger.error(f"Failed to send email to {to_email}. Error: {str(e)}")
+        logger.exception(f"Failed to send email to {to_email}. ExceptionType: {type(e).__name__}")
         return {
             "status": "error",
             "message": f"Failed to send email to {to_email}. Error: {str(e)}",
