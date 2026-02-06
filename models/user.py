@@ -63,6 +63,7 @@ user_permissions = Table(
             Permission.UPDATE_SAVINGS,
             Permission.MARK_SAVINGS,
             Permission.MARK_SAVINGS_BULK,
+            Permission.VIEW_OWN_CONTRIBUTIONS,
             name="permission",
         ),
         nullable=False,

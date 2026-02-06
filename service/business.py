@@ -3,7 +3,8 @@ from sqlalchemy.sql import insert
 from sqlalchemy import select, or_, func
 from models.business import Business, PendingBusinessRequest, Unit, user_units, AdminCredentials, BusinessPermission, BusinessType
 from models.user_business import user_business
-from models.user import User, Role, Permission
+from models.user import User
+from store.enums.enums import Role, Permission
 from utils.response import success_response, error_response
 from utils.password_utils import generate_admin_credentials, encrypt_password
 from utils.permissions import grant_admin_permissions
