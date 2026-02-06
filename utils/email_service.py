@@ -73,7 +73,8 @@ async def send_email_async(to_email: str, subject: str, body: str):
     message.set_content(body, subtype="html")
 
     logger.info(f"Preparing to send email to {to_email}")
-    logger.debug(f"SMTP Config: Host={SMTP_HOST}, Port={SMTP_PORT}, User={SMTP_USERNAME}, Timeout=10s")
+    # Log config at INFO level to verify in production (masking password)
+    logger.info(f"SMTP Config: Host={SMTP_HOST}, Port={SMTP_PORT}, User={SMTP_USERNAME}, Timeout=60s")
     
     try:
         import asyncio
@@ -86,7 +87,7 @@ async def send_email_async(to_email: str, subject: str, body: str):
             password=SMTP_PASSWORD,
             use_tls=False,
             start_tls=True,
-            timeout=10,
+            timeout=60,
         )
         logger.info(f"Email sent successfully to {to_email}. Response: {response}")
         return {
@@ -185,6 +186,36 @@ async def send_business_invitation_email(
         }
 
 
+async def send_setup_account_email(
+    to_email: str,
+    user_name: str,
+    business_name: str,
+    setup_url: str,
+):
+    """Send a setup account email to a new cooperative member."""
+    if env is None:
+        logger.error("Template environment not initialized. Cannot send setup account email.")
+        return {
+            "status": "error",
+            "message": "Email template system not available.",
+        }
+    try:
+        template = env.get_template("setup_account_email.html")
+        body = template.render(
+            user_name=user_name,
+            business_name=business_name,
+            setup_url=setup_url,
+            app_name="Kopkad",
+        )
+        return await send_email_async(to_email, f"Welcome to {business_name} - Set Up Your Account", body)
+    except Exception as e:
+        logger.error(f"Failed to send setup account email: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Failed to send setup account email: {str(e)}",
+        }
+
+
 async def send_email(to_email: str, subject: str, html_content: str):
     """
     Backwards-compatible helper to send arbitrary HTML emails.
@@ -200,4 +231,5 @@ __all__ = [
     "send_welcome_email",
     "send_business_created_email",
     "send_business_invitation_email",
+    "send_setup_account_email",
 ]

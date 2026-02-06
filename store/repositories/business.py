@@ -277,6 +277,39 @@ class UnitRepository(BaseRepository[Unit]):
             for row in rows
         ]
 
+    def add_member(self, unit_id: int, user_id: int) -> bool:
+        """
+        Add a user to a unit safely.
+        Returns True if added, False if already a member or failed.
+        """
+        try:
+            from models.business import user_units
+            from sqlalchemy import select, insert
+
+            # Check if exists
+            exists = self.db.execute(
+                select(user_units.c.user_id).where(
+                    user_units.c.unit_id == unit_id,
+                    user_units.c.user_id == user_id
+                )
+            ).first()
+
+            if exists:
+                return False
+
+            # Add
+            self.db.execute(
+                insert(user_units).values(
+                    unit_id=unit_id,
+                    user_id=user_id
+                )
+            )
+            self.db.flush()
+            return True
+        except Exception:
+            return False
+
+
 
 class BusinessPermissionRepository(BaseRepository[BusinessPermission]):
     """Repository for BusinessPermission model"""
