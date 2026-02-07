@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import insert
 from sqlalchemy import select, or_, func
 import urllib.parse
+from fastapi import BackgroundTasks
 from models.business import Business, PendingBusinessRequest, Unit, user_units, AdminCredentials, BusinessPermission, BusinessType
 from models.user_business import user_business
 from models.user import User, user_permissions
@@ -414,8 +415,13 @@ async def add_customer_to_business(
             # Send Notification
             if request.email or customer.email:
                 email_to_use = request.email or customer.email
-                await send_setup_account_email(
-                    email_to_use, customer.full_name, business.name, setup_url
+                # Use background task for email
+                background_tasks.add_task(
+                    send_setup_account_email,
+                    email_to_use, 
+                    customer.full_name, 
+                    business.name, 
+                    setup_url
                 )
             
             message = "Member added successfully. Setup email sent."
@@ -474,8 +480,14 @@ async def add_customer_to_business(
         # Priority: Email if available (even for inactive users)
         if request.email or customer.email:
             email_to_use = request.email or customer.email
-            await send_business_invitation_email(
-                email_to_use, customer.full_name, business.name, accept_url, reject_url
+            # Use background task for email
+            background_tasks.add_task(
+                send_business_invitation_email,
+                email_to_use, 
+                customer.full_name, 
+                business.name, 
+                accept_url, 
+                reject_url
             )
             delivery_method.append("email")
             

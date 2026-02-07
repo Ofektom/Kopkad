@@ -4,74 +4,13 @@ Business controller - exposes business endpoints with repository injection.
 from datetime import date
 from typing import Optional
 
-from fastapi import Depends, Query
-from sqlalchemy.orm import Session
+from fastapi import Depends, Query, BackgroundTasks
 
-from database.postgres_optimized import get_db
-from schemas.business import (
-    BusinessCreate,
-    BusinessResponse,
-    BusinessUpdate,
-    CustomerInvite,
-    UnitCreate,
-    UnitResponse,
-    UnitUpdate,
-)
-from service.business import (
-    accept_business_invitation,
-    add_customer_to_business,
-    create_business,
-    create_unit,
-    delete_business,
-    delete_unit,
-    get_all_unit_summary,
-    get_all_units,
-    get_business_unit_summary,
-    get_business_units,
-    get_business_summary,
-    get_single_business,
-    get_single_unit,
-    get_unassigned_admin_businesses,
-    get_user_businesses,
-    get_user_units,
-    reject_business_invitation,
-    update_business,
-    update_business_unit,
-)
-from store.repositories import (
-    BusinessPermissionRepository,
-    BusinessRepository,
-    PendingBusinessRequestRepository,
-    UnitRepository,
-    UserBusinessRepository,
-    UserRepository,
-)
-from utils.auth import get_current_user
-from utils.dependencies import get_repository
-
-
-async def create_business_controller(
-    request: BusinessCreate,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    business_repo: BusinessRepository = Depends(get_repository(BusinessRepository)),
-    user_repo: UserRepository = Depends(get_repository(UserRepository)),
-    unit_repo: UnitRepository = Depends(get_repository(UnitRepository)),
-    user_business_repo: UserBusinessRepository = Depends(get_repository(UserBusinessRepository)),
-):
-    return await create_business(
-        request=request,
-        current_user=current_user,
-        db=db,
-        business_repo=business_repo,
-        user_repo=user_repo,
-        unit_repo=unit_repo,
-        user_business_repo=user_business_repo,
-    )
-
+# ... (imports)
 
 async def add_customer_controller(
     request: CustomerInvite,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
     user_repo: UserRepository = Depends(get_repository(UserRepository)),
@@ -84,6 +23,7 @@ async def add_customer_controller(
 ):
     return await add_customer_to_business(
         request=request,
+        background_tasks=background_tasks,
         current_user=current_user,
         db=db,
         user_repo=user_repo,
