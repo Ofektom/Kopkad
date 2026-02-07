@@ -5,6 +5,7 @@ from datetime import date
 from typing import Optional
 
 from fastapi import Depends, Query, BackgroundTasks
+from utils.auth import get_current_user
 
 # ... (imports)
 

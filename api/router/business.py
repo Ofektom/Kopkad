@@ -19,7 +19,7 @@ from api.controller.business import (
     get_user_units_controller,
     reject_invitation_controller,
     update_business_controller,
-    update_business_controller,
+
     update_business_unit_controller,
     complete_registration_controller,
 )
