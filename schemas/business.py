@@ -55,14 +55,6 @@ class CustomerInvite(BaseModel):
 
 class CompleteRegistration(BaseModel):
     token: str
-    password: str # Optional if we rely on PIN? But plan said password/pin. Let's include both or just PIN if system uses PIN.
-    # The system uses PIN for transaction/login mostly. The SignupRequest has 'pin'.
-    # I'll use 'pin' as the primary credential. But maybe user wants a password too?
-    # User model has `pin` hashed. I'll stick to `pin` as the main auth credential for this app based on `signup`.
-    # But wait, `AdminCredentials` has password.
-    # Let's check `User` model again for password field.
-    # Actually, I'll stick to `pin` as that is what `signup` does.
-    # But for "Complete Registration" the prompt says "create password/pin".
-    # I'll just ask for PIN.
+
     pin: str = Field(..., min_length=5, max_length=5) # Assuming 5 digit pin
     full_name: str
