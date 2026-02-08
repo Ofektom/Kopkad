@@ -27,6 +27,7 @@ from store.repositories import (
     UnitRepository,
     UserBusinessRepository,
     UserRepository,
+    UserNotificationRepository,
 )
 from service.business import (
     accept_business_invitation,
@@ -50,6 +51,31 @@ from service.business import (
     update_business,
     update_business_unit,
 )
+
+
+async def create_business_controller(
+    request: BusinessCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    business_repo: BusinessRepository = Depends(get_repository(BusinessRepository)),
+    user_repo: UserRepository = Depends(get_repository(UserRepository)),
+    unit_repo: UnitRepository = Depends(get_repository(UnitRepository)),
+    user_business_repo: UserBusinessRepository = Depends(get_repository(UserBusinessRepository)),
+    notification_repo: UserNotificationRepository = Depends(
+        get_repository(UserNotificationRepository)
+    ),
+):
+    return await create_business(
+        request=request,
+        current_user=current_user,
+        db=db,
+        business_repo=business_repo,
+        user_repo=user_repo,
+        unit_repo=unit_repo,
+        user_business_repo=user_business_repo,
+        notification_repo=notification_repo,
+    )
+
 
 async def add_customer_controller(
     request: CustomerInvite,
