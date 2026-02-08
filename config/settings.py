@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     ENV: str
     REDIS_URL: str | None = None  # Optional Redis cache URL
     ENCRYPTION_KEY: str | None = None  # For encrypting admin credentials (set in production)
+    WHATSAPP_SENDER_NUMBER: str | None = None # WhatsApp Number to display or use for links
     
     # Financial Advisor ML Parameters
     ANOMALY_DETECTION_CONTAMINATION: float = 0.1

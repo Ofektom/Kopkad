@@ -318,7 +318,7 @@ async def add_customer_to_business(
                 phone_number=phone_number,
                 email=request.email,
                 username=phone_number,
-                pin=hash_password("1234"), # Temporary dummy PIN
+                pin=hash_password("12345"), # Temporary dummy PIN
                 role=new_role,
                 is_active=False,
                 created_by=current_user["user_id"],

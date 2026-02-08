@@ -64,5 +64,5 @@ class CompleteRegistration(BaseModel):
     # Actually, I'll stick to `pin` as that is what `signup` does.
     # But for "Complete Registration" the prompt says "create password/pin".
     # I'll just ask for PIN.
-    pin: str = Field(..., min_length=4, max_length=4) # Assuming 4 digit pin
+    pin: str = Field(..., min_length=5, max_length=5) # Assuming 5 digit pin
     full_name: str
