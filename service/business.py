@@ -527,7 +527,6 @@ async def add_customer_to_business(
 
 async def complete_registration_service(
     token: str,
-    password: str,
     pin: str,
     full_name: str, # Allow updating name
     db: Session,
@@ -535,12 +534,14 @@ async def complete_registration_service(
     user_repo: UserRepository | None = None,
     user_business_repo: UserBusinessRepository | None = None,
     business_repo: BusinessRepository | None = None,
+    unit_repo: UnitRepository | None = None,
 ):
     """Complete registration for an invited user: Set password, PIN, Activate, and Link to Business."""
     pending_repo = _resolve_repo(pending_repo, PendingBusinessRequestRepository, db)
     user_repo = _resolve_repo(user_repo, UserRepository, db)
     user_business_repo = _resolve_repo(user_business_repo, UserBusinessRepository, db)
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
+    unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
     session = db
 
     logger.info(f"Processing complete_registration for token: {token}")

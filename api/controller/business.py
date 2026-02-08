@@ -146,17 +146,18 @@ async def complete_registration_controller(
     user_repo: UserRepository = Depends(get_repository(UserRepository)),
     user_business_repo: UserBusinessRepository = Depends(get_repository(UserBusinessRepository)),
     business_repo: BusinessRepository = Depends(get_repository(BusinessRepository)),
+    unit_repo: UnitRepository = Depends(get_repository(UnitRepository)),
 ):
     return await complete_registration_service(
         token=request.token,
         pin=request.pin,
-        password=request.pin, # Using PIN as password if needed, or ignoring
         full_name=request.full_name,
         db=db,
         pending_repo=pending_repo,
         user_repo=user_repo,
         user_business_repo=user_business_repo,
         business_repo=business_repo,
+        unit_repo=unit_repo,
     )
 
 
