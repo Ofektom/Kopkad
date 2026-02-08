@@ -250,6 +250,7 @@ async def add_customer_to_business(
     request: CustomerInvite,
     current_user: dict,
     db: Session,
+    background_tasks: BackgroundTasks,
     *,
     user_repo: UserRepository | None = None,
     business_repo: BusinessRepository | None = None,
