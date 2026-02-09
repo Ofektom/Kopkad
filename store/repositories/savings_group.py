@@ -2,7 +2,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from models.savings_group import SavingsGroup
 from models.savings import SavingsAccount, SavingsType
-from store.repositories.base import BaseRepository, ModelType
+from store.repositories.base import BaseRepository
 from datetime import datetime, timezone
 
 class SavingsGroupRepository(BaseRepository[SavingsGroup]):
