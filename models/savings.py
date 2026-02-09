@@ -62,6 +62,10 @@ class SavingsAccount(AuditMixin, Base):
     commissions = relationship("Commission", back_populates="savings_account", cascade="all, delete")
     expense_cards = relationship("ExpenseCard", back_populates="savings_account", cascade="all, delete")
 
+    # Cooperative Group Link
+    group_id = Column(Integer, ForeignKey("savings_groups.id"), nullable=True)
+    group = relationship("SavingsGroup", back_populates="savings_accounts")
+
 class SavingsMarking(AuditMixin, Base):
     __tablename__ = "savings_markings"
     

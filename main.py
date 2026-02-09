@@ -29,6 +29,7 @@ from api.router.expenses import expenses_router as expenses_router_new
 from api.router.expenses import expenses_router as expenses_router_new
 from api.router.financial_advisor import financial_advisor_router as financial_advisor_router_new
 from api.router.cooperative import cooperative_router
+from api.router.savings_group import router as savings_group_router
 
 # Import scripts
 from scripts.bootstrap_super_admin import bootstrap_super_admin
@@ -116,6 +117,7 @@ app.include_router(payments_router_new, prefix="/api/v1")
 app.include_router(expenses_router_new, prefix="/api/v1")
 app.include_router(financial_advisor_router_new, prefix="/api/v1")
 app.include_router(cooperative_router, prefix="/api/v1")
+app.include_router(savings_group_router, prefix="/api/v1")
 
 @app.on_event("startup")
 async def on_startup():
