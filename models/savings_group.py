@@ -16,6 +16,7 @@ from enum import Enum as PyEnum
 
 class GroupFrequency(PyEnum):
     WEEKLY = "weekly"
+    BI_WEEKLY = "bi-weekly"
     MONTHLY = "monthly"
     QUARTERLY = "quarterly"
 

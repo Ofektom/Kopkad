@@ -13,7 +13,8 @@ class SavingsGroupBase(BaseModel):
     end_date: Optional[date] = None
 
 class SavingsGroupCreate(SavingsGroupBase):
-    pass
+    member_ids: Optional[List[int]] = []
+    duration_months: Optional[int] = None
 
 class SavingsGroupUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=100)

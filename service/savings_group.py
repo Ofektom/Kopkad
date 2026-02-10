@@ -38,11 +38,34 @@ class SavingsGroupService:
              # So likely strict.
              raise HTTPException(status_code=400, detail="Business is not a Cooperative")
 
-        group_data = data.model_dump()
+        member_ids = data.member_ids # Extract before dump as it's not in the model
+        duration_months = data.duration_months # Extract duration
+        
+        group_data = data.model_dump(exclude={'member_ids', 'duration_months'})
         group_data["business_id"] = business.id
         group_data["created_by_id"] = user_id
         
-        return self.repo.create_group(group_data)
+        # Calculate end_date based on duration_months if provided and end_date is missing
+        if duration_months and not group_data.get('end_date'):
+            from dateutil.relativedelta import relativedelta
+            group_data['end_date'] = group_data['start_date'] + relativedelta(months=duration_months)
+        
+        group = self.repo.create_group(group_data)
+        
+        # Add members
+        if member_ids:
+            for member_id in member_ids:
+                try:
+                    # Construct request object for add_member
+                    req = AddGroupMemberRequest(user_id=member_id, start_date=group.start_date)
+                    self.add_member(group.id, req, user_id)
+                except Exception as e:
+                    # Log error but continue? Or fail all? 
+                    # For now, let's log and continue, or raise if critical. 
+                    # If any member fails, the group is still created. Ideally should be atomic but let's stick to simple implementation first.
+                    print(f"Failed to add member {member_id}: {str(e)}")
+                    
+        return group
 
     def get_group(self, group_id: int, user_id: int, user_role: Role) -> SavingsGroup:
         group = self.repo.get_by_id(group_id)
