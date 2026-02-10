@@ -10,6 +10,7 @@ from store.repositories.business import BusinessRepository
 from store.repositories.user import UserRepository
 from store.repositories.savings import SavingsRepository
 from datetime import datetime, timezone
+from dateutil.relativedelta import relativedelta
 
 class SavingsGroupService:
     def __init__(self, db: Session):
@@ -50,7 +51,6 @@ class SavingsGroupService:
         
         # Calculate end_date based on duration_months if provided and end_date is missing
         if duration_months and not group_data.get('end_date'):
-            from dateutil.relativedelta import relativedelta
             group_data['end_date'] = group_data['start_date'] + relativedelta(months=duration_months)
         
         group = self.repo.create_group(group_data)

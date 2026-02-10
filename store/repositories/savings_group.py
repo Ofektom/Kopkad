@@ -7,7 +7,8 @@ from datetime import datetime, timezone
 
 class SavingsGroupRepository(BaseRepository[SavingsGroup]):
     def __init__(self, db: Session):
-        super().__init__(db, SavingsGroup)
+        # BaseRepository expects (model, db)
+        super().__init__(SavingsGroup, db)
 
     def create_group(self, group_data: dict) -> SavingsGroup:
         group = SavingsGroup(**group_data)
