@@ -26,11 +26,14 @@ class SavingsGroupService:
         # This logic might need refinement depending on how admins are linked to businesses (Owner? Admin?).
         
         business_repo = self.business_repo
-        business = business_repo.get_by_admin_id(user_id) # Assuming this method exists or similar
-        
+        # Try to find the business associated with this user. Agents are assigned via agent_id,
+        # admins via admin_id. Support both so agents (not just central admins) can create groups.
+        business = business_repo.get_by_admin_id(user_id)
         if not business:
-            # Fallback: Check if user is super admin? Or maybe user passed business_id?
-            # For now, require business context.
+            business = business_repo.get_by_agent_id(user_id)
+
+        if not business:
+            # Fallback: user is not associated with any business for group creation
             raise HTTPException(status_code=400, detail="User is not associated with a business")
             
         if business.business_type != BusinessType.COOPERATIVE:
@@ -88,11 +91,14 @@ class SavingsGroupService:
         group = self.repo.get_active_group(group_id)
         if not group:
             raise HTTPException(status_code=404, detail="Group not found")
-            
-        # Check if admin owns the group's business
+
+        # Check if the requesting user (admin or agent) is associated with the group's business
         business = self.business_repo.get_by_admin_id(admin_id)
+        if not business:
+            business = self.business_repo.get_by_agent_id(admin_id)
+
         if not business or business.id != group.business_id:
-             raise HTTPException(status_code=403, detail="Not authorized to add members to this group")
+            raise HTTPException(status_code=403, detail="Not authorized to add members to this group")
 
         # Check if user exists
         user = self.user_repo.get_by_id(request.user_id)
