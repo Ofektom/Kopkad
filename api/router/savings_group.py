@@ -27,10 +27,11 @@ async def create_group(
     service: SavingsGroupService = Depends(get_service)
 ):
     """Create a new savings group (Business Admin only)."""
-    if current_user["role"] not in [Role.ADMIN, Role.SUPER_ADMIN]:
+    # Allow business-level actors: central Admins and on-business Agents
+    if current_user["role"] not in [Role.ADMIN, Role.SUPER_ADMIN, Role.AGENT]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Only Admins can create groups"
+            detail="Only Admins or Agents assigned to a business can create groups"
         )
         
     try:
@@ -73,10 +74,11 @@ async def add_member(
     service: SavingsGroupService = Depends(get_service)
 ):
     """Add a member to the savings group (Business Admin only)."""
-    if current_user["role"] not in [Role.ADMIN, Role.SUPER_ADMIN]:
+    # Allow both Admins and Agents to add members for their business' groups
+    if current_user["role"] not in [Role.ADMIN, Role.SUPER_ADMIN, Role.AGENT]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Admins can add members"
+            detail="Only Admins or Agents assigned to a business can add members"
         )
         
     account = service.add_member(group_id, request, current_user["user_id"])
