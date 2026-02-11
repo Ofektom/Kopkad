@@ -24,7 +24,7 @@ savings_group_router.add_api_route(
     "/",
     endpoint=create_group_controller,
     methods=["POST"],
-    response_model=CreateSavingsGroupResponse,  # ← Changed to the new model
+    response_model=CreateSavingsGroupResponse,
     summary="Create a new savings group (Business Admin only)",
 )
 
@@ -32,7 +32,7 @@ savings_group_router.add_api_route(
     "/",
     endpoint=list_groups_controller,
     methods=["GET"],
-    response_model=PaginatedSavingsGroupsResponse,  # ← better than List[...]
+    response_model=PaginatedSavingsGroupsResponse,
     summary="List all savings groups for the current user's business",
 )
 
@@ -48,7 +48,7 @@ savings_group_router.add_api_route(
     "/{group_id}/members",
     endpoint=add_member_controller,
     methods=["POST"],
-    response_model=dict,  # or create a specific model later
+    response_model=dict,
     summary="Add a member to a specific savings group (Business Admin only)",
 )
 

@@ -38,6 +38,34 @@ from store.repositories.user import (
 from utils.auth import get_current_user
 from utils.dependencies import get_repository
 
+"""
+Savings Group controller - provides FastAPI endpoints with repository injection.
+"""
+from typing import Optional
+
+from fastapi import Depends, Query
+from sqlalchemy.orm import Session
+
+from database.postgres_optimized import get_db
+from schemas.savings_group import (
+    SavingsGroupCreate,
+    SavingsGroupResponse,
+    AddGroupMemberRequest,
+    PaginatedSavingsGroupsResponse,
+)
+from service.savings_group import (
+    create_group,
+    list_groups,
+    get_group,
+    add_member_to_group,
+    get_group_members,
+)
+
+
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 async def create_group_controller(
     request: SavingsGroupCreate,
@@ -48,15 +76,24 @@ async def create_group_controller(
     user_repo: UserRepository = Depends(get_repository(UserRepository)),
     savings_repo: SavingsRepository = Depends(get_repository(SavingsRepository)),
 ):
-    return await create_group(
-        request=request,
-        current_user=current_user,
-        db=db,
-        group_repo=group_repo,
-        business_repo=business_repo,
-        user_repo=user_repo,
-        savings_repo=savings_repo,
-    )
+    logger.info("[CONTROLLER] create_group_controller - request received")
+    logger.info(f"[CONTROLLER] Incoming payload: {request.model_dump_json(indent=2)}")
+
+    try:
+        result = await create_group(
+            request=request,
+            current_user=current_user,
+            db=db,
+            group_repo=group_repo,
+            business_repo=business_repo,
+            user_repo=user_repo,
+            savings_repo=savings_repo,
+        )
+        logger.info("[CONTROLLER] Group creation successful")
+        return result
+    except Exception as e:
+        logger.error(f"[CONTROLLER] Error in create_group_controller: {str(e)}", exc_info=True)
+        raise
 
 
 async def list_groups_controller(
@@ -71,6 +108,7 @@ async def list_groups_controller(
     group_repo: SavingsGroupRepository = Depends(get_repository(SavingsGroupRepository)),
     business_repo: BusinessRepository = Depends(get_repository(BusinessRepository)),
 ):
+    logger.info(f"[CONTROLLER] list_groups_controller - params: limit={limit}, offset={offset}, frequency={frequency}")
     return await list_groups(
         current_user=current_user,
         db=db,
@@ -91,6 +129,7 @@ async def get_group_controller(
     db: Session = Depends(get_db),
     group_repo: SavingsGroupRepository = Depends(get_repository(SavingsGroupRepository)),
 ):
+    logger.info(f"[CONTROLLER] get_group_controller - group_id: {group_id}")
     return await get_group(
         group_id=group_id,
         current_user=current_user,
@@ -109,6 +148,7 @@ async def add_member_controller(
     user_repo: UserRepository = Depends(get_repository(UserRepository)),
     savings_repo: SavingsRepository = Depends(get_repository(SavingsRepository)),
 ):
+    logger.info(f"[CONTROLLER] add_member_controller - group_id: {group_id}, user_id: {request.user_id}")
     account = await add_member_to_group(
         group_id=group_id,
         request=request,
@@ -132,6 +172,7 @@ async def get_members_controller(
     db: Session = Depends(get_db),
     group_repo: SavingsGroupRepository = Depends(get_repository(SavingsGroupRepository)),
 ):
+    logger.info(f"[CONTROLLER] get_members_controller - group_id: {group_id}")
     return await get_group_members(
         group_id=group_id,
         current_user=current_user,

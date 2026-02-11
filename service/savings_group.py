@@ -13,7 +13,7 @@ from schemas.savings_group import (
     SavingsGroupResponse,
     CreateSavingsGroupResponse,
 )
-from decimal import Decimal
+
 from store.repositories.savings_group import SavingsGroupRepository
 from store.repositories.savings import SavingsRepository
 from store.repositories.business import BusinessRepository
@@ -23,6 +23,7 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 import uuid
 import logging
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,10 @@ async def create_group(
     user_repo: Optional[UserRepository] = None,
     savings_repo: Optional[SavingsRepository] = None,
 ) -> CreateSavingsGroupResponse:
+    logger.info("[SERVICE] create_group called")
+    logger.info(f"[SERVICE] Received request data: {request.model_dump_json(indent=2)}")
+    logger.info(f"[SERVICE] Current user: role={current_user.get('role')}, id={current_user.get('user_id')}")
+
     group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
     user_repo = _resolve_repo(user_repo, UserRepository, db)
@@ -49,6 +54,7 @@ async def create_group(
     role = current_user["role"]
 
     if role not in ["admin", "super_admin", "agent"]:
+        logger.warning(f"[SERVICE] Unauthorized role attempt: {role}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admins, super admins or agents can create savings groups"
@@ -56,9 +62,11 @@ async def create_group(
 
     business = business_repo.get_by_admin_id(user_id) or business_repo.get_by_agent_id(user_id)
     if not business:
+        logger.warning(f"[SERVICE] No business found for user {user_id}")
         raise HTTPException(status_code=400, detail="User is not associated with any business")
 
     if business.business_type != BusinessType.COOPERATIVE:
+        logger.warning(f"[SERVICE] Business type is not COOPERATIVE: {business.business_type}")
         raise HTTPException(status_code=400, detail="Only cooperative businesses can create savings groups")
 
     member_ids = request.member_ids or []
@@ -71,12 +79,16 @@ async def create_group(
     if duration_months and "end_date" not in group_data:
         group_data["end_date"] = group_data["start_date"] + relativedelta(months=duration_months)
 
+    logger.info(f"[SERVICE] Creating group with data: {group_data}")
+
     group = group_repo.create_group(group_data)
+    logger.info(f"[SERVICE] Group created - ID: {group.id}, frequency: {group.frequency.value}")
 
     created_accounts = []
     for member_id in member_ids:
         try:
             req = AddGroupMemberRequest(user_id=member_id, start_date=group.start_date)
+            logger.info(f"[SERVICE] Attempting to add member {member_id} to group {group.id}")
             account = await add_member_to_group(
                 group_id=group.id,
                 request=req,
@@ -88,15 +100,19 @@ async def create_group(
                 savings_repo=savings_repo,
             )
             created_accounts.append(account)
+            logger.info(f"[SERVICE] Successfully added member {member_id}")
         except Exception as e:
-            logger.warning(f"Failed to auto-add member {member_id} to group {group.id}: {str(e)}")
+            logger.warning(f"[SERVICE] Failed to add member {member_id} to group {group.id}: {str(e)}")
             continue
 
-    return CreateSavingsGroupResponse(
+    response = CreateSavingsGroupResponse(
         message="Savings group created successfully",
         group=SavingsGroupResponse.from_orm(group),
         created_members_count=len(created_accounts)
     )
+    logger.info(f"[SERVICE] Returning response: {response.model_dump_json(indent=2)}")
+
+    return response
 
 
 async def list_groups(
@@ -112,6 +128,8 @@ async def list_groups(
     group_repo: Optional[SavingsGroupRepository] = None,
     business_repo: Optional[BusinessRepository] = None,
 ) -> dict:
+    logger.info(f"[SERVICE] list_groups called - params: limit={limit}, offset={offset}, frequency={frequency}")
+
     group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
 
@@ -119,10 +137,12 @@ async def list_groups(
     role = current_user["role"]
 
     if role not in ["admin", "super_admin", "agent"]:
+        logger.warning(f"[SERVICE] Unauthorized list attempt - role: {role}")
         raise HTTPException(status_code=403, detail="Not authorized to list savings groups")
 
     business = business_repo.get_by_admin_id(user_id) or business_repo.get_by_agent_id(user_id)
     if not business:
+        logger.info(f"[SERVICE] No business found for user {user_id}")
         return {
             "groups": [],
             "total_count": 0,
@@ -130,6 +150,8 @@ async def list_groups(
             "offset": offset,
             "message": "No business associated with user"
         }
+
+    logger.info(f"[SERVICE] Listing groups for business {business.id}")
 
     groups, total_count = group_repo.get_groups_by_business(
         business_id=business.id,
@@ -146,13 +168,15 @@ async def list_groups(
         for group in groups
     ]
 
-    return {
+    result = {
         "groups": response_data,
         "total_count": total_count,
         "limit": limit,
         "offset": offset,
         "message": f"Retrieved {len(response_data)} of {total_count} savings groups"
     }
+    logger.info(f"[SERVICE] Returning {len(response_data)} groups")
+    return result
 
 
 async def get_group(
@@ -162,13 +186,14 @@ async def get_group(
     *,
     group_repo: Optional[SavingsGroupRepository] = None,
 ) -> SavingsGroupResponse:
+    logger.info(f"[SERVICE] get_group - group_id: {group_id}")
+
     group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
 
     group = group_repo.get_active_group(group_id)
     if not group:
+        logger.warning(f"[SERVICE] Group {group_id} not found or inactive")
         raise HTTPException(status_code=404, detail="Group not found or inactive")
-
-    # Optional: add business authorization check here if needed
 
     return SavingsGroupResponse.from_orm(group)
 
@@ -184,6 +209,8 @@ async def add_member_to_group(
     user_repo: Optional[UserRepository] = None,
     savings_repo: Optional[SavingsRepository] = None,
 ) -> SavingsAccount:
+    logger.info(f"[SERVICE] add_member_to_group - group_id: {group_id}, user_id: {request.user_id}")
+
     group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
     user_repo = _resolve_repo(user_repo, UserRepository, db)
@@ -192,18 +219,22 @@ async def add_member_to_group(
     role = current_user["role"]
 
     if role not in ["admin", "super_admin", "agent"]:
+        logger.warning(f"[SERVICE] Unauthorized member add attempt - role: {role}")
         raise HTTPException(status_code=403, detail="Not authorized to add members")
 
     group = group_repo.get_active_group(group_id)
     if not group:
+        logger.warning(f"[SERVICE] Group {group_id} not found or inactive")
         raise HTTPException(status_code=404, detail="Group not found or inactive")
 
     business = business_repo.get_by_agent_id(user_id) or business_repo.get_by_admin_id(user_id)
     if not business or business.id != group.business_id:
+        logger.warning(f"[SERVICE] Unauthorized business access for group {group_id}")
         raise HTTPException(status_code=403, detail="Not authorized to manage this group")
 
     user = user_repo.get_by_id(request.user_id)
     if not user:
+        logger.warning(f"[SERVICE] User {request.user_id} not found")
         raise HTTPException(status_code=404, detail="User not found")
 
     existing = db.query(SavingsAccount).filter(
@@ -211,12 +242,14 @@ async def add_member_to_group(
         SavingsAccount.customer_id == request.user_id,
     ).first()
     if existing:
+        logger.warning(f"[SERVICE] User {request.user_id} already member of group {group_id}")
         raise HTTPException(status_code=400, detail="User is already a member of this group")
 
     tracking_number = str(uuid.uuid4())[:10].upper()
 
     start_date = request.start_date or group.start_date
 
+    logger.info(f"[SERVICE] Adding member {request.user_id} with tracking {tracking_number}")
     account = group_repo.add_member(
         group=group,
         user_id=request.user_id,
@@ -224,6 +257,7 @@ async def add_member_to_group(
         start_date=start_date,
     )
 
+    logger.info(f"[SERVICE] Member added successfully - account_id: {account.id}")
     return account
 
 
@@ -234,23 +268,27 @@ async def get_group_members(
     *,
     group_repo: Optional[SavingsGroupRepository] = None,
 ) -> List[dict]:
+    logger.info(f"[SERVICE] get_group_members - group_id: {group_id}")
+
     group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
 
     group = group_repo.get_active_group(group_id)
     if not group:
+        logger.warning(f"[SERVICE] Group {group_id} not found or inactive")
         raise HTTPException(status_code=404, detail="Group not found or inactive")
-
-    # Optional: add authorization check
 
     members = group_repo.get_members(group_id)
 
-    return [
+    result = [
         {
             "user_id": m.customer_id,
             "savings_account_id": m.id,
             "tracking_number": m.tracking_number,
             "joined_at": m.created_at,
-            "status": "active"  # can be enhanced later with proper status logic
+            "status": "active"
         }
         for m in members
     ]
+
+    logger.info(f"[SERVICE] Returning {len(result)} members for group {group_id}")
+    return result
