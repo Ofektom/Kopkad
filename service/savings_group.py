@@ -1,6 +1,6 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 
 from models.savings_group import SavingsGroup, GroupFrequency
 from models.savings import SavingsAccount, SavingsType
@@ -10,27 +10,20 @@ from schemas.savings_group import (
     SavingsGroupCreate,
     AddGroupMemberRequest,
     SavingsGroupResponse,
+    CreateSavingsGroupResponse,  # ← new import
     PaginatedSavingsGroupsResponse,
 )
-from store.repositories.savings_group import (
+from store.repositories import (
     SavingsGroupRepository,
-)
-
-from store.repositories.savings import (
-    SavingsRepository,
-)
-
-from store.repositories.business import (
     BusinessRepository,
-)
-
-from store.repositories.user import (
     UserRepository,
+    SavingsRepository,
 )
 from datetime import date
 from dateutil.relativedelta import relativedelta
 import uuid
 import logging
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +40,7 @@ async def create_group(
     business_repo: BusinessRepository | None = None,
     user_repo: UserRepository | None = None,
     savings_repo: SavingsRepository | None = None,
-) -> Dict[str, Any]:
+) -> CreateSavingsGroupResponse:  # ← updated return type
     group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
     user_repo = _resolve_repo(user_repo, UserRepository, db)
@@ -99,11 +92,12 @@ async def create_group(
             logger.warning(f"Failed to auto-add member {member_id} to group {group.id}: {str(e)}")
             continue
 
-    return {
-        "message": "Savings group created successfully",
-        "group": SavingsGroupResponse.from_orm(group).model_dump(),
-        "created_members_count": len(created_accounts)
-    }
+    # Return using the new response model
+    return CreateSavingsGroupResponse(
+        message="Savings group created successfully",
+        group=SavingsGroupResponse.from_orm(group),
+        created_members_count=len(created_accounts)
+    )
 
 
 async def list_groups(
@@ -118,7 +112,7 @@ async def list_groups(
     *,
     group_repo: SavingsGroupRepository | None = None,
     business_repo: BusinessRepository | None = None,
-) -> Dict[str, Any]:
+) -> PaginatedSavingsGroupsResponse:  # ← better return type
     group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
 
@@ -130,13 +124,13 @@ async def list_groups(
 
     business = business_repo.get_by_admin_id(user_id) or business_repo.get_by_agent_id(user_id)
     if not business:
-        return {
-            "groups": [],
-            "total_count": 0,
-            "limit": limit,
-            "offset": offset,
-            "message": "No business associated with user"
-        }
+        return PaginatedSavingsGroupsResponse(
+            groups=[],
+            total_count=0,
+            limit=limit,
+            offset=offset,
+            message="No business associated with user"
+        )
 
     groups, total_count = group_repo.get_groups_by_business(
         business_id=business.id,
@@ -149,17 +143,17 @@ async def list_groups(
     )
 
     response_data = [
-        SavingsGroupResponse.from_orm(group).model_dump()
+        SavingsGroupResponse.from_orm(group)
         for group in groups
     ]
 
-    return {
-        "groups": response_data,
-        "total_count": total_count,
-        "limit": limit,
-        "offset": offset,
-        "message": f"Retrieved {len(response_data)} of {total_count} savings groups"
-    }
+    return PaginatedSavingsGroupsResponse(
+        groups=response_data,
+        total_count=total_count,
+        limit=limit,
+        offset=offset,
+        message=f"Retrieved {len(response_data)} of {total_count} savings groups"
+    )
 
 
 async def get_group(

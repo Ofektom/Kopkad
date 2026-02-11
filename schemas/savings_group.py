@@ -46,6 +46,13 @@ class SavingsGroupResponse(SavingsGroupBase):
         }
 
 
+class CreateSavingsGroupResponse(BaseModel):
+    """Response model specifically for group creation"""
+    message: str
+    group: SavingsGroupResponse
+    created_members_count: int
+
+
 class PaginatedSavingsGroupsResponse(BaseModel):
     groups: List[SavingsGroupResponse]
     total_count: int

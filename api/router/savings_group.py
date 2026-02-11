@@ -2,7 +2,11 @@ from fastapi import APIRouter
 from typing import List
 
 from schemas.savings_group import (
+    SavingsGroupCreate,
     SavingsGroupResponse,
+    CreateSavingsGroupResponse,
+    PaginatedSavingsGroupsResponse,
+    AddGroupMemberRequest,
     GroupMemberResponse
 )
 from api.controller.savings_group import (
@@ -20,7 +24,7 @@ savings_group_router.add_api_route(
     "/",
     endpoint=create_group_controller,
     methods=["POST"],
-    response_model=SavingsGroupResponse,
+    response_model=CreateSavingsGroupResponse,  # ← Changed to the new model
     summary="Create a new savings group (Business Admin only)",
 )
 
@@ -28,7 +32,7 @@ savings_group_router.add_api_route(
     "/",
     endpoint=list_groups_controller,
     methods=["GET"],
-    response_model=List[SavingsGroupResponse],
+    response_model=PaginatedSavingsGroupsResponse,  # ← better than List[...]
     summary="List all savings groups for the current user's business",
 )
 
@@ -40,15 +44,13 @@ savings_group_router.add_api_route(
     summary="Get details of a specific savings group",
 )
 
-
 savings_group_router.add_api_route(
     "/{group_id}/members",
     endpoint=add_member_controller,
     methods=["POST"],
-    response_model=dict,
+    response_model=dict,  # or create a specific model later
     summary="Add a member to a specific savings group (Business Admin only)",
 )
-
 
 savings_group_router.add_api_route(
     "/{group_id}/members",
