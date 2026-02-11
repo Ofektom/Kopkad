@@ -13,11 +13,20 @@ from schemas.savings_group import (
     CreateSavingsGroupResponse,  # ← new import
     PaginatedSavingsGroupsResponse,
 )
-from store.repositories import (
+from store.repositories.savings_group import (
     SavingsGroupRepository,
-    BusinessRepository,
-    UserRepository,
+)
+
+from store.repositories.savings import (
     SavingsRepository,
+)
+
+from store.repositories.business import (
+    BusinessRepository,
+)
+
+from store.repositories.user import (
+    UserRepository,
 )
 from datetime import date
 from dateutil.relativedelta import relativedelta
