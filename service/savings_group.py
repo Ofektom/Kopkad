@@ -6,35 +6,26 @@ from models.savings_group import SavingsGroup, GroupFrequency
 from models.savings import SavingsAccount, SavingsType
 from models.user import User
 from models.business import Business, BusinessType
+
 from schemas.savings_group import (
     SavingsGroupCreate,
     AddGroupMemberRequest,
     SavingsGroupResponse,
-    CreateSavingsGroupResponse,  # ← new import
-    PaginatedSavingsGroupsResponse,
+    CreateSavingsGroupResponse,
 )
-from store.repositories.savings_group import (
-    SavingsGroupRepository,
-)
+from decimal import Decimal
+from store.repositories.savings_group import SavingsGroupRepository
+from store.repositories.savings import SavingsRepository
+from store.repositories.business import BusinessRepository
+from store.repositories.user import UserRepository
 
-from store.repositories.savings import (
-    SavingsRepository,
-)
-
-from store.repositories.business import (
-    BusinessRepository,
-)
-
-from store.repositories.user import (
-    UserRepository,
-)
 from datetime import date
 from dateutil.relativedelta import relativedelta
 import uuid
 import logging
-from decimal import Decimal
 
 logger = logging.getLogger(__name__)
+
 
 def _resolve_repo(repo, repo_cls, db: Session):
     return repo if repo is not None else repo_cls(db)
@@ -45,11 +36,11 @@ async def create_group(
     current_user: dict,
     db: Session,
     *,
-    group_repo: SavingsGroupRepository | None = None,
-    business_repo: BusinessRepository | None = None,
-    user_repo: UserRepository | None = None,
-    savings_repo: SavingsRepository | None = None,
-) -> CreateSavingsGroupResponse:  # ← updated return type
+    group_repo: Optional[SavingsGroupRepository] = None,
+    business_repo: Optional[BusinessRepository] = None,
+    user_repo: Optional[UserRepository] = None,
+    savings_repo: Optional[SavingsRepository] = None,
+) -> CreateSavingsGroupResponse:
     group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
     user_repo = _resolve_repo(user_repo, UserRepository, db)
@@ -77,7 +68,7 @@ async def create_group(
     group_data["business_id"] = business.id
     group_data["created_by_id"] = user_id
 
-    if duration_months and not group_data.get("end_date"):
+    if duration_months and "end_date" not in group_data:
         group_data["end_date"] = group_data["start_date"] + relativedelta(months=duration_months)
 
     group = group_repo.create_group(group_data)
@@ -101,7 +92,6 @@ async def create_group(
             logger.warning(f"Failed to auto-add member {member_id} to group {group.id}: {str(e)}")
             continue
 
-    # Return using the new response model
     return CreateSavingsGroupResponse(
         message="Savings group created successfully",
         group=SavingsGroupResponse.from_orm(group),
@@ -119,9 +109,9 @@ async def list_groups(
     limit: int = 10,
     offset: int = 0,
     *,
-    group_repo: SavingsGroupRepository | None = None,
-    business_repo: BusinessRepository | None = None,
-) -> PaginatedSavingsGroupsResponse:  # ← better return type
+    group_repo: Optional[SavingsGroupRepository] = None,
+    business_repo: Optional[BusinessRepository] = None,
+) -> dict:
     group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
 
@@ -133,13 +123,13 @@ async def list_groups(
 
     business = business_repo.get_by_admin_id(user_id) or business_repo.get_by_agent_id(user_id)
     if not business:
-        return PaginatedSavingsGroupsResponse(
-            groups=[],
-            total_count=0,
-            limit=limit,
-            offset=offset,
-            message="No business associated with user"
-        )
+        return {
+            "groups": [],
+            "total_count": 0,
+            "limit": limit,
+            "offset": offset,
+            "message": "No business associated with user"
+        }
 
     groups, total_count = group_repo.get_groups_by_business(
         business_id=business.id,
@@ -156,13 +146,13 @@ async def list_groups(
         for group in groups
     ]
 
-    return PaginatedSavingsGroupsResponse(
-        groups=response_data,
-        total_count=total_count,
-        limit=limit,
-        offset=offset,
-        message=f"Retrieved {len(response_data)} of {total_count} savings groups"
-    )
+    return {
+        "groups": response_data,
+        "total_count": total_count,
+        "limit": limit,
+        "offset": offset,
+        "message": f"Retrieved {len(response_data)} of {total_count} savings groups"
+    }
 
 
 async def get_group(
@@ -170,8 +160,8 @@ async def get_group(
     current_user: dict,
     db: Session,
     *,
-    group_repo: SavingsGroupRepository | None = None,
-) -> Dict[str, Any]:
+    group_repo: Optional[SavingsGroupRepository] = None,
+) -> SavingsGroupResponse:
     group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
 
     group = group_repo.get_active_group(group_id)
@@ -180,7 +170,7 @@ async def get_group(
 
     # Optional: add business authorization check here if needed
 
-    return SavingsGroupResponse.from_orm(group).model_dump()
+    return SavingsGroupResponse.from_orm(group)
 
 
 async def add_member_to_group(
@@ -189,10 +179,10 @@ async def add_member_to_group(
     current_user: dict,
     db: Session,
     *,
-    group_repo: SavingsGroupRepository | None = None,
-    business_repo: BusinessRepository | None = None,
-    user_repo: UserRepository | None = None,
-    savings_repo: SavingsRepository | None = None,
+    group_repo: Optional[SavingsGroupRepository] = None,
+    business_repo: Optional[BusinessRepository] = None,
+    user_repo: Optional[UserRepository] = None,
+    savings_repo: Optional[SavingsRepository] = None,
 ) -> SavingsAccount:
     group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
@@ -242,8 +232,8 @@ async def get_group_members(
     current_user: dict,
     db: Session,
     *,
-    group_repo: SavingsGroupRepository | None = None,
-) -> List[Dict[str, Any]]:
+    group_repo: Optional[SavingsGroupRepository] = None,
+) -> List[dict]:
     group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
 
     group = group_repo.get_active_group(group_id)
