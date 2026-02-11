@@ -209,8 +209,6 @@ async def add_member_to_group(
     user_repo: Optional[UserRepository] = None,
     savings_repo: Optional[SavingsRepository] = None,
 ) -> SavingsAccount:
-    logger.info(f"[SERVICE] add_member_to_group - group_id: {group_id}, user_id: {request.user_id}")
-
     group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
     user_repo = _resolve_repo(user_repo, UserRepository, db)
@@ -219,37 +217,45 @@ async def add_member_to_group(
     role = current_user["role"]
 
     if role not in ["admin", "super_admin", "agent"]:
-        logger.warning(f"[SERVICE] Unauthorized member add attempt - role: {role}")
         raise HTTPException(status_code=403, detail="Not authorized to add members")
 
     group = group_repo.get_active_group(group_id)
     if not group:
-        logger.warning(f"[SERVICE] Group {group_id} not found or inactive")
         raise HTTPException(status_code=404, detail="Group not found or inactive")
 
     business = business_repo.get_by_agent_id(user_id) or business_repo.get_by_admin_id(user_id)
     if not business or business.id != group.business_id:
-        logger.warning(f"[SERVICE] Unauthorized business access for group {group_id}")
         raise HTTPException(status_code=403, detail="Not authorized to manage this group")
 
     user = user_repo.get_by_id(request.user_id)
     if not user:
-        logger.warning(f"[SERVICE] User {request.user_id} not found")
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Allow both CUSTOMER and AGENT roles to join savings groups
+    allowed_roles = ["customer", "agent"]
+    if user.role.lower() not in allowed_roles:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only customers and agents can join savings groups (user role: {user.role})"
+        )
+
+    # Optional: ensure the user is associated with the same business (extra safety)
+    # If your user_business table or business.agent_id already enforces this, skip
+    user_businesses = business_repo.get_user_businesses_with_units(user.id)  # or your method
+    if not any(b.id == group.business_id for b in user_businesses):
+        raise HTTPException(status_code=403, detail="User does not belong to this cooperative")
 
     existing = db.query(SavingsAccount).filter(
         SavingsAccount.group_id == group_id,
         SavingsAccount.customer_id == request.user_id,
     ).first()
     if existing:
-        logger.warning(f"[SERVICE] User {request.user_id} already member of group {group_id}")
         raise HTTPException(status_code=400, detail="User is already a member of this group")
 
     tracking_number = str(uuid.uuid4())[:10].upper()
 
     start_date = request.start_date or group.start_date
 
-    logger.info(f"[SERVICE] Adding member {request.user_id} with tracking {tracking_number}")
     account = group_repo.add_member(
         group=group,
         user_id=request.user_id,
@@ -257,7 +263,6 @@ async def add_member_to_group(
         start_date=start_date,
     )
 
-    logger.info(f"[SERVICE] Member added successfully - account_id: {account.id}")
     return account
 
 

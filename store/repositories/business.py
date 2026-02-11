@@ -381,4 +381,48 @@ class BusinessPermissionRepository(BaseRepository[BusinessPermission]):
         )
         self.db.flush()
         return count
+    
+    
+    def get_cooperative_members(self, business_id: int) -> List[Dict[str, Any]]:
+        """
+        Get all users who can join savings groups in this cooperative business:
+        - Customers (via user_business table)
+        - Agents (via business.agent_id)
+        """
+        from models.user import User
+        from models.user_business import user_business
+        
+        # Customers via user_business
+        customer_query = (
+            self.db.query(User)
+            .join(user_business, User.id == user_business.c.user_id)
+            .filter(user_business.c.business_id == business_id)
+            .filter(User.role == "customer")
+        )
+        
+        # Agent (direct via agent_id)
+        agent_query = (
+            self.db.query(User)
+            .filter(User.id == Business.agent_id)
+            .filter(Business.id == business_id)
+        )
+        
+        # Combine both
+        members = (
+            customer_query.union(agent_query)
+            .options(joinedload(User.businesses))  # optional: eager load relations if needed
+            .all()
+        )
+        
+        return [
+            {
+                "id": m.id,
+                "user_id": m.id,
+                "full_name": m.full_name,
+                "phone_number": m.phone_number,
+                "email": m.email,
+                "role": m.role
+            }
+            for m in members
+        ]
 
