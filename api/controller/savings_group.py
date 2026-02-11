@@ -20,11 +20,20 @@ from service.savings_group import (
     add_member_to_group,
     get_group_members,
 )
-from store.repositories import (
+from store.repositories.savings_group import (
     SavingsGroupRepository,
-    BusinessRepository,
-    UserRepository,
+)
+
+from store.repositories.savings import (
     SavingsRepository,
+)
+
+from store.repositories.business import (
+    BusinessRepository,
+)
+
+from store.repositories.user import (
+    UserRepository,
 )
 from utils.auth import get_current_user
 from utils.dependencies import get_repository
