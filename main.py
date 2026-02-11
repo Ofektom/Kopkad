@@ -29,7 +29,7 @@ from api.router.expenses import expenses_router as expenses_router_new
 from api.router.expenses import expenses_router as expenses_router_new
 from api.router.financial_advisor import financial_advisor_router as financial_advisor_router_new
 from api.router.cooperative import cooperative_router
-from api.router.savings_group import router as savings_group_router
+from api.router.savings_group import savings_group_router
 
 # Import scripts
 from scripts.bootstrap_super_admin import bootstrap_super_admin
