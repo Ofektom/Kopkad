@@ -5,7 +5,7 @@ from schemas.savings_group import (
     SavingsGroupResponse,
     GroupMemberResponse
 )
-from controller.savings_group import (
+from api.controller.savings_group import (
     create_group_controller,
     list_groups_controller,
     get_group_controller,
