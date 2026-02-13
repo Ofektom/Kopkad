@@ -106,4 +106,43 @@ class SavingsGroupRepository(BaseRepository[SavingsGroup]):
         self.db.add(account)
         self.db.commit()
         self.db.refresh(account)
+
+        # Generate savings markings based on frequency
+        from dateutil.relativedelta import relativedelta
+        from models.savings import SavingsMarking, SavingsStatus
+        from models.savings_group import GroupFrequency
+
+        current_date = start_date
+        # If no end date, default to duration months
+        end_date = group.end_date
+        if not end_date:
+             end_date = start_date + relativedelta(months=duration_months)
+
+        markings = []
+        
+        while current_date <= end_date:
+            marking = SavingsMarking(
+                savings_account_id=account.id,
+                unit_id=None, 
+                marked_date=current_date,
+                amount=group.contribution_amount,
+                status=SavingsStatus.PENDING,
+            )
+            markings.append(marking)
+
+            if group.frequency == GroupFrequency.WEEKLY:
+                current_date += relativedelta(weeks=1)
+            elif group.frequency == GroupFrequency.BI_WEEKLY:
+                current_date += relativedelta(weeks=2)
+            elif group.frequency == GroupFrequency.MONTHLY:
+                current_date += relativedelta(months=1)
+            elif group.frequency == GroupFrequency.QUARTERLY:
+                current_date += relativedelta(months=3)
+            else:
+                current_date += relativedelta(months=1)
+        
+        if markings:
+            self.db.add_all(markings)
+            self.db.commit()
+
         return account

@@ -15,6 +15,7 @@ from api.controller.savings_group import (
     get_group_controller,
     add_member_controller,
     get_members_controller,
+    delete_group_controller,
 )
 
 savings_group_router = APIRouter(prefix="/savings-groups", tags=["Savings Groups"])
@@ -42,6 +43,14 @@ savings_group_router.add_api_route(
     methods=["GET"],
     response_model=SavingsGroupResponse,
     summary="Get details of a specific savings group",
+)
+    
+savings_group_router.add_api_route(
+    "/{group_id}",
+    endpoint=delete_group_controller,
+    methods=["DELETE"],
+    response_model=dict,
+    summary="Delete a savings group (only if no paid contributions)",
 )
 
 savings_group_router.add_api_route(
