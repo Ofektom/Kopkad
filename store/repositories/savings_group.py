@@ -5,6 +5,7 @@ from models.savings_group import SavingsGroup
 from models.savings import SavingsAccount, SavingsType
 from store.repositories.base import BaseRepository
 from datetime import date
+from decimal import Decimal
 
 
 class SavingsGroupRepository(BaseRepository[SavingsGroup]):
@@ -146,3 +147,32 @@ class SavingsGroupRepository(BaseRepository[SavingsGroup]):
             self.db.commit()
 
         return account
+
+    def delete_group(self, group_id: int) -> bool:
+        group = self.get_active_group(group_id)
+        if not group:
+            return False
+
+        # Check for any PAID markings in any account associated with this group
+        from models.savings import SavingsMarking, SavingsStatus
+        
+        has_paid_markings = (
+            self.db.query(SavingsMarking)
+            .join(SavingsAccount)
+            .filter(
+                SavingsAccount.group_id == group_id,
+                SavingsMarking.status == SavingsStatus.PAID
+            )
+            .first()
+        )
+
+        if has_paid_markings:
+            raise ValueError("Cannot delete group with active (PAID) contributions.")
+
+        accounts = self.db.query(SavingsAccount).filter(SavingsAccount.group_id == group_id).all()
+        for account in accounts:
+            self.db.delete(account) 
+            
+        self.db.delete(group)
+        self.db.commit()
+        return True
