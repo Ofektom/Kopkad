@@ -3,6 +3,7 @@ from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 from models.savings_group import SavingsGroup
 from models.savings import SavingsAccount, SavingsType
+from models.business import Unit
 from store.repositories.base import BaseRepository
 from datetime import date
 from decimal import Decimal
@@ -83,16 +84,24 @@ class SavingsGroupRepository(BaseRepository[SavingsGroup]):
         user_id: int,
         tracking_number: str,
         start_date: date,
+        unit_id: Optional[int] = None,
     ) -> SavingsAccount:
         duration_months = 12
         if group.end_date:
             delta = group.end_date - group.start_date
             duration_months = max(1, delta.days // 30)
 
+        # Ensure unit_id is set (Cooperative is not unit-based, but DB requires it)
+        if unit_id is None:
+            # Try to get first unit for business as default
+            unit = self.db.query(Unit).filter(Unit.business_id == group.business_id).first()
+            if unit:
+                unit_id = unit.id
+
         account = SavingsAccount(
             customer_id=user_id,
             business_id=group.business_id,
-            unit_id=None,
+            unit_id=unit_id,
             group_id=group.id,
             tracking_number=tracking_number,
             savings_type=SavingsType.COOPERATIVE,
@@ -124,7 +133,7 @@ class SavingsGroupRepository(BaseRepository[SavingsGroup]):
         while current_date <= end_date:
             marking = SavingsMarking(
                 savings_account_id=account.id,
-                unit_id=None, 
+                unit_id=unit_id, 
                 marked_date=current_date,
                 amount=group.contribution_amount,
                 status=SavingsStatus.PENDING,
