@@ -51,6 +51,9 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_total_commission(savings: SavingsAccount) -> Decimal:
+    if not savings.commission_days or savings.commission_days <= 0:
+        return Decimal("0.00")
+        
     total_days = _calculate_total_days(savings.start_date, savings.duration_months)
     commission_periods = math.ceil(total_days / savings.commission_days)
     total_commission = savings.commission_amount * Decimal(commission_periods)
