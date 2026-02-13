@@ -136,37 +136,72 @@ async def list_groups(
     user_id = current_user["user_id"]
     role = current_user["role"]
 
-    if role not in ["admin", "super_admin", "agent"]:
+    if role not in ["admin", "super_admin", "agent", "customer"]:
         logger.warning(f"[SERVICE] Unauthorized list attempt - role: {role}")
         raise HTTPException(status_code=403, detail="Not authorized to list savings groups")
 
-    business = business_repo.get_by_admin_id(user_id) or business_repo.get_by_agent_id(user_id)
-    if not business:
-        logger.info(f"[SERVICE] No business found for user {user_id}")
-        return {
-            "groups": [],
-            "total_count": 0,
-            "limit": limit,
-            "offset": offset,
-            "message": "No business associated with user"
-        }
+    if role == "customer":
+        # Customers can only see groups they are members of
+        groups, total_count = group_repo.get_groups_for_member(
+            member_id=user_id,
+            limit=limit,
+            skip=offset
+        )
+    else:
+        # Admins/Agents see all groups for the business
+        business = business_repo.get_by_admin_id(user_id) or business_repo.get_by_agent_id(user_id)
+        if not business:
+            logger.info(f"[SERVICE] No business found for user {user_id}")
+            return {
+                "groups": [],
+                "total_count": 0,
+                "limit": limit,
+                "offset": offset,
+                "message": "No business associated with user"
+            }
 
-    logger.info(f"[SERVICE] Listing groups for business {business.id}")
+        logger.info(f"[SERVICE] Listing groups for business {business.id}")
 
-    groups, total_count = group_repo.get_groups_by_business(
-        business_id=business.id,
-        name=name,
-        frequency=frequency,
-        is_active=is_active,
-        search=search,
-        skip=offset,
-        limit=limit,
-    )
+        groups, total_count = group_repo.get_groups_by_business(
+            business_id=business.id,
+            name=name,
+            frequency=frequency,
+            is_active=is_active,
+            search=search,
+            skip=offset,
+            limit=limit,
+        )
 
-    response_data = [
-        SavingsGroupResponse.from_orm(group)
-        for group in groups
-    ]
+    response_data = []
+    
+    # Pre-fetch membership info if needed (optimization)
+    # For now, we'll do it per group or assume get_groups_for_member attached it?
+    # SQLAlchemy might not attach it easily unless we select it.
+    # Let's check repository method or fetch manually.
+
+    for group in groups:
+        group_resp = SavingsGroupResponse.from_orm(group)
+        
+        # Determine relationship
+        # If customer, they are definitely a member (based on get_groups_for_member)
+        # We need their tracking number for this group.
+        
+        member_account = None
+        # We can optimize this by fetching all memberships for this user and these groups
+        # But for now, simple query:
+        member_account = db.query(SavingsAccount).filter(
+            SavingsAccount.group_id == group.id,
+            SavingsAccount.customer_id == user_id
+        ).first()
+
+        if member_account:
+            group_resp.user_relationship = {
+                "tracking_number": member_account.tracking_number,
+                "savings_account_id": member_account.id,
+                "status": "active" # or check account status
+            }
+            
+        response_data.append(group_resp)
 
     result = {
         "groups": response_data,

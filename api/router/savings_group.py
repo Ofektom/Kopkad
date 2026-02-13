@@ -59,3 +59,22 @@ savings_group_router.add_api_route(
     response_model=List[GroupMemberResponse],
     summary="List members of a specific savings group",
 )
+
+from api.controller.group_markings import (
+    get_group_markings_grid_controller,
+    toggle_group_marking_controller
+)
+
+savings_group_router.add_api_route(
+    "/{group_id}/grid",
+    endpoint=get_group_markings_grid_controller,
+    methods=["GET"],
+    summary="Get savings group markings grid",
+)
+
+savings_group_router.add_api_route(
+    "/{group_id}/markings",
+    endpoint=toggle_group_marking_controller,
+    methods=["POST"],
+    summary="Toggle a marking for a group member",
+)

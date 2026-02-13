@@ -36,6 +36,7 @@ class SavingsGroupResponse(SavingsGroupBase):
     is_active: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
+    user_relationship: Optional[dict] = Field(None, description="Current user's relationship with the group (if member)")
 
     class Config:
         from_attributes = True
