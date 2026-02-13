@@ -101,7 +101,7 @@ async def list_groups_controller(
     frequency: Optional[str] = Query(None, description="Filter by frequency (weekly, bi-weekly, monthly, quarterly)"),
     is_active: Optional[bool] = Query(True, description="Show only active groups"),
     search: Optional[str] = Query(None, description="Search in name or description"),
-    limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
+    limit: int = Query(6, ge=1, le=100, description="Number of records to return"),
     offset: int = Query(0, ge=0, description="Number of records to skip"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
