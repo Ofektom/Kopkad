@@ -332,3 +332,42 @@ async def get_group_members(
 
     logger.info(f"[SERVICE] Returning {len(result)} members for group {group_id}")
     return result
+
+
+async def delete_group_service(
+    group_id: int,
+    current_user: dict,
+    db: Session,
+    *,
+    group_repo: Optional[SavingsGroupRepository] = None,
+    business_repo: Optional[BusinessRepository] = None,
+) -> bool:
+    logger.info(f"[SERVICE] delete_group_service called for group {group_id}")
+    
+    group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
+    business_repo = _resolve_repo(business_repo, BusinessRepository, db)
+
+    # Check authorization
+    if current_user["role"] not in ["admin", "super_admin", "agent"]:
+        raise HTTPException(status_code=403, detail="Not authorized to delete groups")
+
+    group = group_repo.get_active_group(group_id)
+    if not group:
+         raise HTTPException(status_code=404, detail="Group not found")
+
+    # Verify ownership/business association
+    if current_user["role"] == "agent":
+         business = business_repo.get_by_agent_id(current_user["user_id"])
+         if not business or business.id != group.business_id:
+              raise HTTPException(status_code=403, detail="Group does not belong to your business")
+
+    try:
+        group_repo.delete_group(group_id)
+        logger.info(f"[SERVICE] Group {group_id} deleted successfully")
+        return True
+    except ValueError as e:
+        logger.warning(f"[SERVICE] Cannot delete group {group_id}: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[SERVICE] Error deleting group {group_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error during deletion")
