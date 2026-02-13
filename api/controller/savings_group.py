@@ -2,6 +2,7 @@
 Savings Group controller - provides FastAPI endpoints with repository injection.
 """
 from typing import Optional
+import logging
 
 from fastapi import Depends, Query
 from sqlalchemy.orm import Session
@@ -19,6 +20,7 @@ from service.savings_group import (
     get_group,
     add_member_to_group,
     get_group_members,
+    delete_group_service,
 )
 from store.repositories.savings_group import (
     SavingsGroupRepository,
@@ -37,32 +39,6 @@ from store.repositories.user import (
 )
 from utils.auth import get_current_user
 from utils.dependencies import get_repository
-
-"""
-Savings Group controller - provides FastAPI endpoints with repository injection.
-"""
-from typing import Optional
-
-from fastapi import Depends, Query
-from sqlalchemy.orm import Session
-
-from database.postgres_optimized import get_db
-from schemas.savings_group import (
-    SavingsGroupCreate,
-    SavingsGroupResponse,
-    AddGroupMemberRequest,
-    PaginatedSavingsGroupsResponse,
-)
-from service.savings_group import (
-    create_group,
-    list_groups,
-    get_group,
-    add_member_to_group,
-    get_group_members,
-)
-
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -179,3 +155,21 @@ async def get_members_controller(
         db=db,
         group_repo=group_repo,
     )
+
+
+async def delete_group_controller(
+    group_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    group_repo: SavingsGroupRepository = Depends(get_repository(SavingsGroupRepository)),
+    business_repo: BusinessRepository = Depends(get_repository(BusinessRepository)),
+):
+    logger.info(f"[CONTROLLER] delete_group_controller - group_id: {group_id}")
+    await delete_group_service(
+        group_id=group_id,
+        current_user=current_user,
+        db=db,
+        group_repo=group_repo,
+        business_repo=business_repo,
+    )
+    return {"message": "Group deleted successfully"}
