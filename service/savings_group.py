@@ -128,8 +128,9 @@ async def create_group(
     group_data["business_id"] = business.id
     group_data["created_by_id"] = user_id
 
-    if duration_months and "end_date" not in group_data:
+    if duration_months:
         group_data["end_date"] = group_data["start_date"] + relativedelta(months=duration_months)
+    # If no duration_months, end_date remains null (open-ended)
 
     logger.info(f"[SERVICE] Creating group with data: {group_data}")
 
@@ -226,21 +227,10 @@ async def list_groups(
 
     response_data = []
     
-    # Pre-fetch membership info if needed (optimization)
-    # For now, we'll do it per group or assume get_groups_for_member attached it?
-    # SQLAlchemy might not attach it easily unless we select it.
-    # Let's check repository method or fetch manually.
-
     for group in groups:
         group_resp = SavingsGroupResponse.from_orm(group)
         
-        # Determine relationship
-        # If customer, they are definitely a member (based on get_groups_for_member)
-        # We need their tracking number for this group.
-        
         member_account = None
-        # We can optimize this by fetching all memberships for this user and these groups
-        # But for now, simple query:
         member_account = db.query(SavingsAccount).filter(
             SavingsAccount.group_id == group.id,
             SavingsAccount.customer_id == user_id
@@ -437,13 +427,13 @@ async def get_group_grid_data(
     # 1. Get Group
     group = db.query(SavingsGroup).filter(SavingsGroup.id == group_id).first()
     if not group:
-        logger.warning(f"Group {group_id} not found")
         return None
 
     # 2. Determine Date Pagination
     offset = (date_page - 1) * date_limit
     
-    # Project reasonable end date if not set
+    # Ensure we have a reasonable end date for projection if not set
+    # Default to 1 year from start if no end_date
     projection_end_date = group.end_date or (group.start_date + relativedelta(years=1))
     
     dates = _generate_group_grid_dates(
@@ -454,7 +444,7 @@ async def get_group_grid_data(
         end_date=projection_end_date
     )
     
-    # Approximate total dates for pagination info
+    # Calculate total expected dates (approximate) to determine if there are more pages
     total_dates_approx = 0
     temp_date = group.start_date
     while temp_date <= projection_end_date:
@@ -470,18 +460,20 @@ async def get_group_grid_data(
             
     has_next_page = (offset + len(dates)) < total_dates_approx
 
-    # 3. Get Members (Savings Accounts in this group)
+    # 3. Get Members (Savings Accounts linked to this group)
     savings_accounts = db.query(SavingsAccount).join(User, SavingsAccount.customer_id == User.id)\
         .filter(SavingsAccount.group_id == group_id)\
         .all()
         
     members_data = []
-    markings_map = {}  # {tracking_number: {date_str: status}}
+    markings_map = {} # {tracking_number: {date_str: status}}
 
     if dates:
         start_range = dates[0]
         end_range = dates[-1]
 
+        # 4. Fetch Markings for all these accounts within the date range
+        # We can do a single query if we collect all account IDs
         account_ids = [acc.id for acc in savings_accounts]
         
         if account_ids:
@@ -492,6 +484,7 @@ async def get_group_grid_data(
                     SavingsMarking.marked_date <= end_range
                 ).all()
                 
+            # Populate markings map
             for marking in markings:
                 acc = next((a for a in savings_accounts if a.id == marking.savings_account_id), None)
                 if acc:
@@ -499,34 +492,17 @@ async def get_group_grid_data(
                         markings_map[acc.tracking_number] = {}
                     markings_map[acc.tracking_number][str(marking.marked_date)] = marking.status.value
 
-    # 5. Build Member List with SAFE full_name handling
+    # Build Member List
     for acc in savings_accounts:
         user = db.query(User).filter(User.id == acc.customer_id).first()
-        
-        # Safely determine full name based on actual User model fields
-        if user:
-            # Preferred: use full_name if it exists
-            if hasattr(user, 'full_name') and user.full_name and user.full_name.strip():
-                full_name = user.full_name.strip()
-            # Fallback 1: try first_name + last_name (only if both exist)
-            elif hasattr(user, 'first_name') and hasattr(user, 'last_name'):
-                first = user.first_name or ''
-                last = user.last_name or ''
-                full_name = f"{first} {last}".strip()
-            # Fallback 2: use username/email/id as last resort
-            else:
-                full_name = user.username or user.email or f"User {user.id}"
-        else:
-            full_name = "Unknown User (account exists but user missing)"
-
         members_data.append({
-            "user_id": acc.customer_id,
-            "full_name": full_name,
+            "user_id": user.id,
+            "full_name": f"{user.first_name} {user.last_name}",
             "tracking_number": acc.tracking_number,
             "savings_account_id": acc.id
         })
         
-        # Ensure map entry exists even if no markings
+        # Ensure map entry exists
         if acc.tracking_number not in markings_map:
             markings_map[acc.tracking_number] = {}
 
