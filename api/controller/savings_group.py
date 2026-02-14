@@ -25,7 +25,9 @@ from service.savings_group import (
     add_member_to_group,
     get_group_members,
     delete_group_service,
-    get_group_grid_data
+    get_group_grid_data,
+    initiate_group_marking_payment,
+    verify_group_marking_payment
 )
 from store.repositories.savings_group import SavingsGroupRepository
 from store.repositories.savings import SavingsRepository
@@ -36,6 +38,8 @@ from utils.auth import get_current_user
 from utils.dependencies import get_repository
 
 logger = logging.getLogger(__name__)
+
+from schemas.savings_group import SavingsGroupMarkingPaystackInit
 
 
 
@@ -308,4 +312,27 @@ async def get_members_controller(
         current_user=current_user,
         db=db,
         group_repo=group_repo,
+    )
+
+async def init_group_paystack(
+    group_id: int,
+    request: SavingsGroupMarkingPaystackInit,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return await initiate_group_marking_payment(
+        group_id, 
+        request, 
+        current_user, 
+        db
+    )
+
+
+async def verify_group_paystack(
+    reference: str,
+    db: Session = Depends(get_db)
+):
+    return await verify_group_marking_payment(
+        reference, 
+        db
     )

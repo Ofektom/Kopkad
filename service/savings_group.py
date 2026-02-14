@@ -3,12 +3,12 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Optional, Any
 from dateutil.relativedelta import relativedelta
 
-from datetime import date
+from datetime import date, datetime
 import uuid
 import logging
 
 from models.savings_group import SavingsGroup, GroupFrequency
-from models.savings import SavingsAccount, SavingsMarking
+from models.savings import SavingsAccount, SavingsMarking, SavingsStatus, PaymentMethod
 from models.user import User
 
 
@@ -19,15 +19,27 @@ from schemas.savings_group import (
     AddGroupMemberRequest,
     SavingsGroupResponse,
     CreateSavingsGroupResponse,
+    SavingsGroupMarkingPaystackInit,
 )
 
 from store.repositories.savings_group import SavingsGroupRepository
 from store.repositories.savings import SavingsRepository
 from store.repositories.business import BusinessRepository
 from store.repositories.user import UserRepository
-
+from utils.response import success_response, error_response
+import requests
 
 logger = logging.getLogger(__name__)
+
+from paystackapi.transaction import Transaction
+from paystackapi.paystack import Paystack
+import os
+from decimal import Decimal
+
+from schemas.savings import SavingsMarkingResponse
+
+
+paystack = Paystack(secret_key=os.getenv("PAYSTACK_SECRET_KEY"))
 
 
 def _resolve_repo(repo, repo_cls, db: Session):
@@ -82,6 +94,126 @@ def _generate_group_grid_dates(
         collected += 1
         
     return dates
+
+
+async def initiate_virtual_account_payment(amount: Decimal, email: str, customer_id: int, reference: str, db: Session):
+    try:
+        headers = {
+            "Authorization": f"Bearer {os.getenv('PAYSTACK_SECRET_KEY')}",
+            "Content-Type": "application/json",
+        }
+        user = db.query(User).filter(User.id == customer_id).first()
+        if not user:
+            logger.error(f"User {customer_id} not found in database")
+            return error_response(status_code=404, message="User not found")
+
+        payment_provider_customer_id = getattr(user, 'payment_provider_customer_id', None)
+        if not payment_provider_customer_id:
+            customer_payload = {
+                "email": email,
+                "first_name": "Customer",
+                "last_name": f"ID_{customer_id}",
+            }
+            customer_response = requests.post(
+                "https://api.paystack.co/customer",
+                headers=headers,
+                json=customer_payload,
+            )
+            customer_data = customer_response.json()
+            logger.info(f"Paystack customer creation response: {customer_data}")
+            if customer_response.status_code != 200 or not customer_data.get("status"):
+                logger.error(f"Failed to create Paystack customer: {customer_data}")
+                return error_response(
+                    status_code=customer_response.status_code,
+                    message=f"Failed to create customer: {customer_data.get('message', 'Unknown error')}",
+                )
+            payment_provider_customer_id = customer_data["data"]["customer_code"]
+            try:
+                user.payment_provider_customer_id = payment_provider_customer_id
+                db.commit()
+            except AttributeError:
+                logger.warning(f"User model lacks payment_provider_customer_id field; proceeding without storing")
+
+        is_test_mode = "test" in os.getenv("PAYSTACK_SECRET_KEY", "").lower() or os.getenv("PAYSTACK_ENV", "production") == "test"
+        if is_test_mode:
+            logger.info(f"Running in test mode; generating mock virtual account for customer {payment_provider_customer_id}")
+            virtual_account = {
+                "bank": "Test Bank",
+                "account_number": f"TEST{str(customer_id).zfill(10)}",
+                "account_name": f"Test Account - ID_{customer_id}",
+            }
+            logger.info(f"Generated mock virtual account: {virtual_account}")
+        else:
+            dedicated_response = requests.get(
+                f"https://api.paystack.co/dedicated_account?customer={payment_provider_customer_id}",
+                headers=headers,
+            )
+            dedicated_data = dedicated_response.json()
+            logger.info(f"Paystack dedicated account check response: {dedicated_data}")
+
+            if dedicated_response.status_code == 200 and dedicated_data.get("status") and dedicated_data["data"]:
+                account_data = dedicated_data["data"][0]
+                virtual_account = {
+                    "bank": account_data["bank"]["name"],
+                    "account_number": account_data["account_number"],
+                    "account_name": account_data["account_name"],
+                }
+                logger.info(f"Using existing dedicated account for customer {payment_provider_customer_id}: {virtual_account}")
+            else:
+                if dedicated_data.get("code") == "feature_unavailable":
+                    logger.error(f"Dedicated NUBAN not available: {dedicated_data}")
+                    return error_response(
+                        status_code=400,
+                        message="Virtual account payments are currently unavailable. Please contact support@paystack.com to enable this feature.",
+                    )
+                payload = {
+                    "customer": payment_provider_customer_id,
+                    "preferred_bank": "wema-bank",
+                }
+                response = requests.post(
+                    "https://api.paystack.co/dedicated_account",
+                    headers=headers,
+                    json=payload,
+                )
+                response_data = response.json()
+                logger.info(f"Paystack dedicated account creation response: {response_data}")
+                if response.status_code == 200 and response_data.get("status"):
+                    virtual_account = {
+                        "bank": response_data["data"]["bank"]["name"],
+                        "account_number": response_data["data"]["account_number"],
+                        "account_name": response_data["data"]["account_name"],
+                    }
+                else:
+                    if response_data.get("code") == "feature_unavailable":
+                        logger.error(f"Dedicated NUBAN not available: {response_data}")
+                        return error_response(
+                            status_code=400,
+                            message="Virtual account payments are currently unavailable. Please contact support@paystack.com to enable this feature.",
+                        )
+                    logger.error(f"Failed to create dedicated account: {response_data}")
+                    return error_response(
+                        status_code=response.status_code,
+                        message=f"Failed to initiate virtual account: {response_data.get('message', 'Dedicated NUBAN creation failed')}",
+                    )
+
+        transaction = Transaction.initialize(
+            reference=reference,
+            amount=int(amount * 100),
+            email=email,
+            callback_url="https://kopkad-frontend.vercel.app/payment-confirmation",
+        )
+        logger.info(f"Paystack transaction initialize response: {transaction}")
+        if not transaction["status"]:
+            logger.error(f"Failed to initialize transaction: {transaction}")
+            return error_response(
+                status_code=500,
+                message=f"Failed to initialize transaction: {transaction.get('message', 'Unknown error')}",
+            )
+
+        return virtual_account
+    except Exception as e:
+        logger.error(f"Error initiating virtual account: {str(e)}", exc_info=True)
+        return error_response(status_code=500, message=f"Error initiating virtual account: {str(e)}")
 
 
 async def create_group(
@@ -526,3 +658,162 @@ async def get_group_grid_data(
             "total_dates_approx": total_dates_approx
         }
     }
+
+
+async def initiate_group_marking_payment(
+    group_id: int,
+    request: SavingsGroupMarkingPaystackInit,
+    current_user: dict,
+    db: Session,
+):
+    """
+    Initiate Paystack payment for group markings (replicates mark_savings_payment logic)
+    """
+    # 1. Authorization
+    if current_user["role"] not in ["agent", "admin", "super_admin"]:
+        raise HTTPException(403, "Only agents/admins can mark group contributions")
+
+    # 2. Validate markings
+    if not request.markings:
+        raise HTTPException(400, "No markings provided")
+
+    total_amount = Decimal("0")
+    markings_to_update = []
+    affected_accounts = {}
+
+    for m in request.markings:
+        account = db.query(SavingsAccount).filter(
+            SavingsAccount.id == m.savings_account_id,
+            SavingsAccount.group_id == group_id
+        ).first()
+        if not account:
+            raise HTTPException(404, f"Savings account {m.savings_account_id} not in group")
+
+        marking = db.query(SavingsMarking).filter(
+            SavingsMarking.savings_account_id == account.id,
+            SavingsMarking.marked_date == m.date
+        ).first()
+        if not marking or marking.status != SavingsStatus.PENDING:
+            raise HTTPException(400, f"Date {m.date} invalid or already marked")
+
+        total_amount += marking.amount
+        affected_accounts[account.id] = account
+        markings_to_update.append(marking)
+
+    if total_amount <= 0:
+        raise HTTPException(400, "No amount to pay")
+
+    # 3. Payer info (agent/admin paying)
+    payer = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not payer or not payer.email:
+        raise HTTPException(400, "Payer email required for payment")
+
+    reference = f"grp_{group_id}_{uuid.uuid4().hex[:8]}"
+
+    # 4. Paystack initialization (exact same as savings.py)
+    if request.payment_method == PaymentMethod.CARD:
+        total_amount_kobo = int(total_amount * 100)
+        resp = Transaction.initialize(
+            reference=reference,
+            amount=total_amount_kobo,
+            email=payer.email,
+            callback_url="https://kopkad-frontend.vercel.app/payment-confirmation"
+        )
+        if not resp["status"]:
+            raise HTTPException(500, f"Paystack init failed: {resp.get('message')}")
+
+        # Store reference
+        for marking in markings_to_update:
+            marking.payment_reference = resp["data"]["reference"]
+            marking.payment_method = PaymentMethod.CARD
+            marking.status = SavingsStatus.PENDING
+        db.commit()
+
+        return success_response(
+            status_code=200,
+            message="Proceed to payment",
+            data=SavingsMarkingResponse(
+                tracking_number="group_" + str(group_id),  # placeholder, can be improved
+                unit_id=None,  # group-level, no unit
+                savings_schedule={},  # not returning full schedule here
+                total_amount=float(total_amount),
+                authorization_url=resp["data"]["authorization_url"],
+                payment_reference=resp["data"]["reference"],
+                virtual_account=None
+            ).model_dump()
+        )
+
+    elif request.payment_method == PaymentMethod.BANK_TRANSFER:
+        virtual_account = await initiate_virtual_account_payment(
+            amount=total_amount,
+            email=payer.email,
+            customer_id=payer.id,
+            reference=reference,
+            db=db
+        )
+        if isinstance(virtual_account, dict):
+            for marking in markings_to_update:
+                marking.payment_reference = reference
+                marking.payment_method = PaymentMethod.BANK_TRANSFER
+                marking.status = SavingsStatus.PENDING
+                # Optionally store virtual_account details
+            db.commit()
+
+            return success_response(
+                status_code=200,
+                message="Pay to the virtual account",
+                data=SavingsMarkingResponse(
+                    tracking_number="group_" + str(group_id),
+                    unit_id=None,
+                    savings_schedule={},
+                    total_amount=float(total_amount),
+                    authorization_url=None,
+                    payment_reference=reference,
+                    virtual_account=virtual_account
+                ).model_dump()
+            )
+        else:
+            raise HTTPException(500, "Failed to generate virtual account")
+
+    raise HTTPException(400, "Invalid payment method")
+
+
+async def verify_group_marking_payment(reference: str, db: Session):
+    """
+    Verify Paystack payment for group markings (replicates verify_savings_payment)
+    """
+    markings = db.query(SavingsMarking).filter(
+        SavingsMarking.payment_reference == reference
+    ).all()
+    if not markings:
+        raise HTTPException(404, "Payment reference not found")
+
+    # Assume all markings belong to same group
+    group_id = markings[0].savings_account.group_id
+
+    resp = Transaction.verify(reference=reference)
+    if not resp["status"] or resp["data"]["status"] != "success":
+        raise HTTPException(400, "Payment not successful")
+
+    paid_amount = Decimal(resp["data"]["amount"]) / 100
+    expected = sum(m.amount for m in markings)
+    if paid_amount < expected:
+        raise HTTPException(400, f"Underpayment: {paid_amount} < {expected}")
+
+    # Mark all as paid
+    for marking in markings:
+        marking.status = SavingsStatus.PAID
+        marking.marked_by_id = marking.updated_by
+        marking.updated_at = datetime.utcnow()
+
+    db.commit()
+
+    return success_response(
+        status_code=200,
+        message=f"Marked {len(markings)} contributions as paid",
+        data={
+            "reference": reference,
+            "status": "PAID",
+            "paid_amount": float(paid_amount)
+        }
+    )

@@ -3,6 +3,7 @@ from datetime import date, datetime
 from typing import Optional, List
 from decimal import Decimal
 from models.savings_group import GroupFrequency
+from models.savings import PaymentMethod
 
 
 class SavingsGroupBase(BaseModel):
@@ -79,3 +80,23 @@ class GroupMemberResponse(BaseModel):
         json_encoders = {
             datetime: lambda v: v.isoformat(),
         }
+
+class GroupMarkingItem(BaseModel):
+    savings_account_id: int
+    date: date               # renamed from 'marked_date' to match your toggle style
+
+class SavingsGroupMarkingPaystackInit(BaseModel):
+    payment_method: PaymentMethod
+    markings: List[GroupMarkingItem]
+
+    class Config:
+        arbitrary_types_allowed = True   # usually needed when using enums from SQLAlchemy
+
+class SavingsGroupMarkingVerifyResponse(BaseModel):
+    status: str                  # "success" / "pending" / etc.
+    message: str
+    reference: str
+    paid_amount: Optional[float] = None
+
+    class Config:
+        arbitrary_types_allowed = True
