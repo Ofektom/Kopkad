@@ -424,16 +424,12 @@ async def get_group_grid_data(
     """
     Fetch grid data: Members x Dates matrix.
     """
-    # 1. Get Group
     group = db.query(SavingsGroup).filter(SavingsGroup.id == group_id).first()
     if not group:
+        logger.warning(f"Group {group_id} not found")
         return None
 
-    # 2. Determine Date Pagination
     offset = (date_page - 1) * date_limit
-    
-    # Ensure we have a reasonable end date for projection if not set
-    # Default to 1 year from start if no end_date
     projection_end_date = group.end_date or (group.start_date + relativedelta(years=1))
     
     dates = _generate_group_grid_dates(
@@ -444,7 +440,6 @@ async def get_group_grid_data(
         end_date=projection_end_date
     )
     
-    # Calculate total expected dates (approximate) to determine if there are more pages
     total_dates_approx = 0
     temp_date = group.start_date
     while temp_date <= projection_end_date:
@@ -460,20 +455,17 @@ async def get_group_grid_data(
             
     has_next_page = (offset + len(dates)) < total_dates_approx
 
-    # 3. Get Members (Savings Accounts linked to this group)
     savings_accounts = db.query(SavingsAccount).join(User, SavingsAccount.customer_id == User.id)\
         .filter(SavingsAccount.group_id == group_id)\
         .all()
         
     members_data = []
-    markings_map = {} # {tracking_number: {date_str: status}}
+    markings_map = {}
 
     if dates:
         start_range = dates[0]
         end_range = dates[-1]
 
-        # 4. Fetch Markings for all these accounts within the date range
-        # We can do a single query if we collect all account IDs
         account_ids = [acc.id for acc in savings_accounts]
         
         if account_ids:
@@ -484,7 +476,6 @@ async def get_group_grid_data(
                     SavingsMarking.marked_date <= end_range
                 ).all()
                 
-            # Populate markings map
             for marking in markings:
                 acc = next((a for a in savings_accounts if a.id == marking.savings_account_id), None)
                 if acc:
@@ -492,17 +483,33 @@ async def get_group_grid_data(
                         markings_map[acc.tracking_number] = {}
                     markings_map[acc.tracking_number][str(marking.marked_date)] = marking.status.value
 
-    # Build Member List
+    # SAFE full_name handling - adapt to your actual User model
     for acc in savings_accounts:
         user = db.query(User).filter(User.id == acc.customer_id).first()
+        
+        full_name = "Unknown User"
+        if user:
+            # Option 1: most common - use full_name
+            if hasattr(user, 'full_name') and user.full_name and user.full_name.strip():
+                full_name = user.full_name.strip()
+            # Option 2: fallback to name if exists
+            elif hasattr(user, 'name') and user.name and user.name.strip():
+                full_name = user.name.strip()
+            # Option 3: username/email/id
+            else:
+                full_name = (
+                    user.username or
+                    user.email or
+                    f"User {user.id}"
+                )
+
         members_data.append({
-            "user_id": user.id,
-            "full_name": f"{user.first_name} {user.last_name}",
+            "user_id": acc.customer_id,
+            "full_name": full_name,
             "tracking_number": acc.tracking_number,
             "savings_account_id": acc.id
         })
         
-        # Ensure map entry exists
         if acc.tracking_number not in markings_map:
             markings_map[acc.tracking_number] = {}
 
