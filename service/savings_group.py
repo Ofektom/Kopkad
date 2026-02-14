@@ -1,11 +1,18 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Dict, Optional, Any
+from dateutil.relativedelta import relativedelta
+
+from datetime import date
+import uuid
+import logging
 
 from models.savings_group import SavingsGroup, GroupFrequency
-from models.savings import SavingsAccount, SavingsType
+from models.savings import SavingsAccount, SavingsMarking
 from models.user import User
-from models.business import Business, BusinessType
+
+
+from models.business import BusinessType
 
 from schemas.savings_group import (
     SavingsGroupCreate,
@@ -19,17 +26,62 @@ from store.repositories.savings import SavingsRepository
 from store.repositories.business import BusinessRepository
 from store.repositories.user import UserRepository
 
-from datetime import date
-from dateutil.relativedelta import relativedelta
-import uuid
-import logging
-from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
 
 def _resolve_repo(repo, repo_cls, db: Session):
     return repo if repo is not None else repo_cls(db)
+
+
+def _generate_group_grid_dates(
+    start_date: date,
+    frequency: GroupFrequency,
+    limit: int,
+    offset: int,
+    end_date: Optional[date] = None
+) -> List[date]:
+    """
+    Generate a list of dates based on frequency, handling pagination.
+    """
+    dates = []
+    current_date = start_date
+    
+    # Skip to offset
+    skipped = 0
+    while skipped < offset:
+        if end_date and current_date > end_date:
+            break
+            
+        if frequency == GroupFrequency.WEEKLY:
+            current_date += relativedelta(weeks=1)
+        elif frequency == GroupFrequency.BI_WEEKLY:
+            current_date += relativedelta(weeks=2)
+        elif frequency == GroupFrequency.MONTHLY:
+            current_date += relativedelta(months=1)
+        elif frequency == GroupFrequency.QUARTERLY:
+            current_date += relativedelta(months=3)
+        skipped += 1
+
+    # Collect dates up to limit
+    collected = 0
+    while collected < limit:
+        if end_date and current_date > end_date:
+            break
+            
+        dates.append(current_date)
+        
+        if frequency == GroupFrequency.WEEKLY:
+            current_date += relativedelta(weeks=1)
+        elif frequency == GroupFrequency.BI_WEEKLY:
+            current_date += relativedelta(weeks=2)
+        elif frequency == GroupFrequency.MONTHLY:
+            current_date += relativedelta(months=1)
+        elif frequency == GroupFrequency.QUARTERLY:
+            current_date += relativedelta(months=3)
+        collected += 1
+        
+    return dates
 
 
 async def create_group(
@@ -371,3 +423,123 @@ async def delete_group_service(
     except Exception as e:
         logger.error(f"[SERVICE] Error deleting group {group_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error during deletion")
+
+
+async def get_group_grid_data(
+    group_id: int,
+    db: Session,
+    date_page: int = 1,
+    date_limit: int = 10
+) -> Dict[str, Any]:
+    """
+    Fetch grid data: Members x Dates matrix.
+    """
+    # 1. Get Group
+    group = db.query(SavingsGroup).filter(SavingsGroup.id == group_id).first()
+    if not group:
+        logger.warning(f"Group {group_id} not found")
+        return None
+
+    # 2. Determine Date Pagination
+    offset = (date_page - 1) * date_limit
+    
+    # Project reasonable end date if not set
+    projection_end_date = group.end_date or (group.start_date + relativedelta(years=1))
+    
+    dates = _generate_group_grid_dates(
+        start_date=group.start_date,
+        frequency=group.frequency,
+        limit=date_limit,
+        offset=offset,
+        end_date=projection_end_date
+    )
+    
+    # Approximate total dates for pagination info
+    total_dates_approx = 0
+    temp_date = group.start_date
+    while temp_date <= projection_end_date:
+        total_dates_approx += 1
+        if group.frequency == GroupFrequency.WEEKLY:
+            temp_date += relativedelta(weeks=1)
+        elif group.frequency == GroupFrequency.BI_WEEKLY:
+            temp_date += relativedelta(weeks=2)
+        elif group.frequency == GroupFrequency.MONTHLY:
+            temp_date += relativedelta(months=1)
+        elif group.frequency == GroupFrequency.QUARTERLY:
+            temp_date += relativedelta(months=3)
+            
+    has_next_page = (offset + len(dates)) < total_dates_approx
+
+    # 3. Get Members (Savings Accounts in this group)
+    savings_accounts = db.query(SavingsAccount).join(User, SavingsAccount.customer_id == User.id)\
+        .filter(SavingsAccount.group_id == group_id)\
+        .all()
+        
+    members_data = []
+    markings_map = {}  # {tracking_number: {date_str: status}}
+
+    if dates:
+        start_range = dates[0]
+        end_range = dates[-1]
+
+        account_ids = [acc.id for acc in savings_accounts]
+        
+        if account_ids:
+            markings = db.query(SavingsMarking)\
+                .filter(
+                    SavingsMarking.savings_account_id.in_(account_ids),
+                    SavingsMarking.marked_date >= start_range,
+                    SavingsMarking.marked_date <= end_range
+                ).all()
+                
+            for marking in markings:
+                acc = next((a for a in savings_accounts if a.id == marking.savings_account_id), None)
+                if acc:
+                    if acc.tracking_number not in markings_map:
+                        markings_map[acc.tracking_number] = {}
+                    markings_map[acc.tracking_number][str(marking.marked_date)] = marking.status.value
+
+    # 5. Build Member List with SAFE full_name handling
+    for acc in savings_accounts:
+        user = db.query(User).filter(User.id == acc.customer_id).first()
+        
+        # Safely determine full name based on actual User model fields
+        if user:
+            # Preferred: use full_name if it exists
+            if hasattr(user, 'full_name') and user.full_name and user.full_name.strip():
+                full_name = user.full_name.strip()
+            # Fallback 1: try first_name + last_name (only if both exist)
+            elif hasattr(user, 'first_name') and hasattr(user, 'last_name'):
+                first = user.first_name or ''
+                last = user.last_name or ''
+                full_name = f"{first} {last}".strip()
+            # Fallback 2: use username/email/id as last resort
+            else:
+                full_name = user.username or user.email or f"User {user.id}"
+        else:
+            full_name = "Unknown User (account exists but user missing)"
+
+        members_data.append({
+            "user_id": acc.customer_id,
+            "full_name": full_name,
+            "tracking_number": acc.tracking_number,
+            "savings_account_id": acc.id
+        })
+        
+        # Ensure map entry exists even if no markings
+        if acc.tracking_number not in markings_map:
+            markings_map[acc.tracking_number] = {}
+
+    return {
+        "group_name": group.name,
+        "contribution_amount": group.contribution_amount,
+        "members": members_data,
+        "dates": [d.isoformat() for d in dates],
+        "markings": markings_map,
+        "pagination": {
+            "current_page": date_page,
+            "limit": date_limit,
+            "has_next": has_next_page,
+            "total_dates_approx": total_dates_approx
+        }
+    }
