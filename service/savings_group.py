@@ -660,6 +660,104 @@ async def get_group_grid_data(
     }
 
 
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List, Dict, Optional, Any
+from dateutil.relativedelta import relativedelta
+
+from datetime import date, datetime
+import uuid
+import logging
+
+from models.savings_group import SavingsGroup, GroupFrequency
+from models.savings import SavingsAccount, SavingsMarking, SavingsStatus, PaymentMethod
+from models.user import User
+from models.business import Business  # Added import for Business model
+
+from models.business import BusinessType
+
+from schemas.savings_group import (
+    SavingsGroupCreate,
+    AddGroupMemberRequest,
+    SavingsGroupResponse,
+    CreateSavingsGroupResponse,
+    SavingsGroupMarkingPaystackInit,
+)
+
+from store.repositories.savings_group import SavingsGroupRepository
+from store.repositories.savings import SavingsRepository
+from store.repositories.business import BusinessRepository
+from store.repositories.user import UserRepository
+from utils.response import success_response, error_response
+import requests
+
+logger = logging.getLogger(__name__)
+
+from paystackapi.transaction import Transaction
+from paystackapi.paystack import Paystack
+import os
+from decimal import Decimal
+
+from schemas.savings import SavingsMarkingResponse
+
+
+paystack = Paystack(secret_key=os.getenv("PAYSTACK_SECRET_KEY"))
+
+
+def _resolve_repo(repo, repo_cls, db: Session):
+    return repo if repo is not None else repo_cls(db)
+
+
+def _generate_group_grid_dates(
+    start_date: date,
+    frequency: GroupFrequency,
+    limit: int,
+    offset: int,
+    end_date: Optional[date] = None
+) -> List[date]:
+    """
+    Generate a list of dates based on frequency, handling pagination.
+    """
+    dates = []
+    current_date = start_date
+    
+    # Skip to offset
+    skipped = 0
+    while skipped < offset:
+        if end_date and current_date > end_date:
+            break
+            
+        if frequency == GroupFrequency.WEEKLY:
+            current_date += relativedelta(weeks=1)
+        elif frequency == GroupFrequency.BI_WEEKLY:
+            current_date += relativedelta(weeks=2)
+        elif frequency == GroupFrequency.MONTHLY:
+            current_date += relativedelta(months=1)
+        elif frequency == GroupFrequency.QUARTERLY:
+            current_date += relativedelta(months=3)
+        skipped += 1
+
+    # Collect dates up to limit
+    collected = 0
+    while collected < limit:
+        if end_date and current_date > end_date:
+            break
+            
+        dates.append(current_date)
+        
+        if frequency == GroupFrequency.WEEKLY:
+            current_date += relativedelta(weeks=1)
+        elif frequency == GroupFrequency.BI_WEEKLY:
+            current_date += relativedelta(weeks=2)
+        elif frequency == GroupFrequency.MONTHLY:
+            current_date += relativedelta(months=1)
+        elif frequency == GroupFrequency.QUARTERLY:
+            current_date += relativedelta(months=3)
+        collected += 1
+        
+    return dates
+
+
 async def initiate_group_marking_payment(
     group_id: int,
     request: SavingsGroupMarkingPaystackInit,
@@ -680,6 +778,10 @@ async def initiate_group_marking_payment(
     total_amount = Decimal("0")
     markings_to_update = []
     affected_accounts = {}
+
+    group = db.query(SavingsGroup).filter(SavingsGroup.id == group_id).first()
+    if not group:
+        raise HTTPException(404, "Group not found")
 
     for m in request.markings:
         account = db.query(SavingsAccount).filter(
@@ -703,20 +805,38 @@ async def initiate_group_marking_payment(
     if total_amount <= 0:
         raise HTTPException(400, "No amount to pay")
 
-    # 3. Payer info (agent/admin paying)
+    # 3. Payer info with business/group creator fallback
     payer = db.query(User).filter(User.id == current_user["user_id"]).first()
-    if not payer or not payer.email:
-        raise HTTPException(400, "Payer email required for payment")
+    if not payer:
+        raise HTTPException(404, "Payer user not found")
+
+    email = payer.email
+    if not email:
+        # Fallback 1: Business email
+        business = db.query(Business).filter(Business.id == group.business_id).first()
+        if business and business.email:
+            email = business.email
+            logger.info(f"[PAYMENT FALLBACK] Payer {payer.id} has no email; using business email: {email}")
+        else:
+            # Fallback 2: Group creator email
+            creator = db.query(User).filter(User.id == group.created_by_id).first()
+            if creator and creator.email:
+                email = creator.email
+                logger.info(f"[PAYMENT FALLBACK] Payer {payer.id} has no email; using group creator email: {email}")
+            else:
+                # Final fallback: raise error (can later change to structured error for modal)
+                logger.warning(f"[PAYMENT FALLBACK] No email found for payer {payer.id}, business, or creator")
+                raise HTTPException(400, "Payer email required for payment (no fallback available)")
 
     reference = f"grp_{group_id}_{uuid.uuid4().hex[:8]}"
 
-    # 4. Paystack initialization (exact same as savings.py)
+    # 4. Paystack initialization
     if request.payment_method == PaymentMethod.CARD:
         total_amount_kobo = int(total_amount * 100)
         resp = Transaction.initialize(
             reference=reference,
             amount=total_amount_kobo,
-            email=payer.email,
+            email=email,  # Now guaranteed to have email
             callback_url="https://kopkad-frontend.vercel.app/payment-confirmation"
         )
         if not resp["status"]:
@@ -733,9 +853,9 @@ async def initiate_group_marking_payment(
             status_code=200,
             message="Proceed to payment",
             data=SavingsMarkingResponse(
-                tracking_number="group_" + str(group_id),  # placeholder, can be improved
-                unit_id=None,  # group-level, no unit
-                savings_schedule={},  # not returning full schedule here
+                tracking_number="group_" + str(group_id),
+                unit_id=None,
+                savings_schedule={},
                 total_amount=float(total_amount),
                 authorization_url=resp["data"]["authorization_url"],
                 payment_reference=resp["data"]["reference"],
@@ -746,7 +866,7 @@ async def initiate_group_marking_payment(
     elif request.payment_method == PaymentMethod.BANK_TRANSFER:
         virtual_account = await initiate_virtual_account_payment(
             amount=total_amount,
-            email=payer.email,
+            email=email,  # Now guaranteed
             customer_id=payer.id,
             reference=reference,
             db=db
@@ -756,7 +876,6 @@ async def initiate_group_marking_payment(
                 marking.payment_reference = reference
                 marking.payment_method = PaymentMethod.BANK_TRANSFER
                 marking.status = SavingsStatus.PENDING
-                # Optionally store virtual_account details
             db.commit()
 
             return success_response(
