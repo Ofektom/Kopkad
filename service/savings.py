@@ -1513,7 +1513,13 @@ async def verify_savings_payment(reference: str, db: Session):
         for marking in markings:
             if marking.savings_account_id == savings_id:
                 days_since_start = (marking.marked_date - savings.start_date).days + 1
-                commission_periods = math.floor(days_since_start / savings.commission_days) + 1
+                # In service/savings.py or wherever verify_savings_payment lives
+
+                if savings.commission_days and savings.commission_days > 0:
+                    commission_periods = math.floor(days_since_start / savings.commission_days) + 1
+                else:
+                    commission_periods = 0  # or 1, depending on your business logic
+                    logger.warning(f"commission_days is 0 or unset for savings {savings.id} - skipping commission periods")
                 if days_since_start % savings.commission_days == 0 or (commission_periods == 1 and days_since_start <= savings.commission_days):
                     commission_due += savings.commission_amount
         commission_due_by_savings[savings_id] = commission_due
