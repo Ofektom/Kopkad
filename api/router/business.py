@@ -153,11 +153,11 @@ business_router.add_api_route(
 )
 
 business_router.add_api_route(
-    "/{unit_id}/units",
+    "/{business_id}/units/{unit_id}",
     endpoint=update_business_unit_controller,
     methods=["PUT"],
     response_model=UnitResponse,
-    summary="Update unit details",
+    summary="Update a specific unit within a business (agent/admin/super_admin only)"
 )
 
 business_router.add_api_route(
@@ -191,4 +191,3 @@ business_router.add_api_route(
     response_model=dict,
     summary="Get unit count for a specific business",
 )
-

@@ -34,6 +34,7 @@ from schemas.user import (
     LoginRequest,
     ChangePasswordRequest,
     AdminUpdateRequest,
+    UserUpdateRequest,
 )
 from schemas.business import BusinessResponse
 
@@ -1000,8 +1001,85 @@ async def delete_user(
         )
 
 
+async def update_current_user_profile(
+    request: UserUpdateRequest,
+    current_user: dict,
+    db: Session,
+    user_repo: UserRepository,
+):
+    """Update current authenticated user's own profile (PATCH /auth/me)."""
+    user = user_repo.get_by_id(current_user["user_id"])
+    if not user:
+        return error_response(status_code=404, message="User not found")
 
-# service/user.py
+    updated = False
+
+    if request.full_name is not None and request.full_name.strip():
+        user.full_name = request.full_name.strip()
+        updated = True
+
+    if request.email is not None:
+        email_lower = request.email.lower().strip()
+        if email_lower != (user.email or "").lower():
+            if user_repo.email_in_use(email_lower, exclude_user_id=user.id):
+                return error_response(status_code=409, message="Email already in use")
+            user.email = email_lower
+            updated = True
+
+    if request.phone_number is not None:
+        normalized_phone = _normalize_phone_number(request.phone_number)
+        if not normalized_phone:
+            return error_response(status_code=400, message="Invalid phone number format")
+        if normalized_phone != user.phone_number:
+            if user_repo.phone_in_use(normalized_phone, exclude_user_id=user.id):
+                return error_response(status_code=409, message="Phone number already in use")
+            if user_repo.username_in_use(normalized_phone, exclude_user_id=user.id):
+                return error_response(status_code=409, message="Username already in use")
+            user.phone_number = normalized_phone
+            user.username = normalized_phone  # keep username in sync
+            updated = True
+
+    if not updated:
+        return success_response(
+            status_code=200,
+            message="No changes to apply",
+            data=UserResponse.from_orm(user).model_dump()
+        )
+
+    user.updated_at = datetime.now(timezone.utc)
+    user.updated_by = current_user["user_id"]
+
+    try:
+        db.commit()
+        db.refresh(user)
+
+        # Return fresh token (phone/email may affect auth)
+        access_token = create_access_token(
+            data={"sub": user.username, "role": user.role, "user_id": user.id},
+            db=db,
+            active_business_id=user.active_business_id
+        )
+
+        return success_response(
+            status_code=200,
+            message="Profile updated successfully",
+            data=UserResponse(
+                user_id=user.id,
+                full_name=user.full_name,
+                email=user.email,
+                phone_number=user.phone_number,
+                role=user.role,
+                is_active=user.is_active,
+                created_at=user.created_at,
+                access_token=access_token,
+            ).model_dump()
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Profile update failed for user {user.id}: {str(e)}")
+        return error_response(status_code=500, message="Failed to update profile")
+
+
 async def logout(
     token: str,
     db: Session,

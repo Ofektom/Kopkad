@@ -3,6 +3,7 @@ from typing import Optional, List, Dict
 from datetime import datetime
 from schemas.business import BusinessResponse
 
+
 class SignupRequest(BaseModel):
     phone_number: str
     pin: str = Field(..., pattern=r"^\d{5}$")
@@ -51,3 +52,35 @@ class AdminUpdateRequest(BaseModel):
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     phone_number: Optional[str] = None
+
+
+class UserUpdateRequest(BaseModel):
+    """
+    Schema for partial self-update of the current user's profile (PATCH /auth/me).
+    Only fields that exist on the User model are allowed.
+    """
+    full_name: Optional[str] = Field(
+        None,
+        min_length=2,
+        max_length=100,
+        description="User's full name"
+    )
+    email: Optional[EmailStr] = Field(
+        None,
+        description="Email address (must be unique)"
+    )
+    phone_number: Optional[str] = Field(
+        None,
+        pattern=r"^\+?\d{10,14}$",
+        description="Phone number (will be normalized to Nigerian format)"
+    )
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "full_name": "John Doe Updated",
+                "email": "john.doe.updated@example.com",
+                "phone_number": "08012345678"
+            }
+        }

@@ -348,6 +348,25 @@ async def get_user_units_controller(
         unit_repo=unit_repo,
     )
 
+async def update_business_unit_controller(
+    business_id: int,
+    unit_id: int,
+    request: UnitUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    unit_repo: UnitRepository = Depends(get_repository(UnitRepository)),
+):
+
+    
+    return await update_business_unit(
+        business_id=business_id,
+        unit_id=unit_id,
+        request=request,
+        current_user=current_user,
+        db=db,
+        unit_repo=unit_repo,
+    )
+
 
 async def update_business_unit_controller(
     unit_id: int,

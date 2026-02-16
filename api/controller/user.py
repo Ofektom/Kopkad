@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from schemas.user import SignupRequest, LoginRequest, ChangePasswordRequest, AdminUpdateRequest
+from schemas.user import SignupRequest, LoginRequest, ChangePasswordRequest, AdminUpdateRequest, UserUpdateRequest
 from typing import List
 from service.user import (
     signup_unauthenticated,
@@ -28,6 +28,7 @@ from service.user import (
     get_business_admin_credentials,
     get_current_user_info_service,
     update_admin_details,
+    update_current_user_profile,
 )
 from database.postgres_optimized import get_db
 from utils.auth import get_current_user, oauth2_scheme
@@ -272,6 +273,20 @@ async def switch_business_controller(
         user_repo=user_repo,
         business_repo=business_repo,
         user_business_repo=user_business_repo,
+    )
+
+async def update_current_user_controller(
+    request: UserUpdateRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    user_repo: UserRepository = Depends(get_repository(UserRepository)),
+):
+    """Update the current authenticated user's own profile."""
+    return await update_current_user_profile(
+        request=request,
+        current_user=current_user,
+        db=db,
+        user_repo=user_repo,
     )
 
 

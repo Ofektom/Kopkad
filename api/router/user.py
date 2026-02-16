@@ -22,7 +22,9 @@ from api.controller.user import (
     get_admin_credentials_controller,
     get_current_user_info_controller,
     update_admin_details_controller,
+    update_current_user_controller,
 )
+
 
 user_router = APIRouter(prefix="/auth", tags=["Authentication & User Management"])
 
@@ -138,6 +140,15 @@ user_router.add_api_route(
     methods=["POST"],
     response_model=UserResponse,
     summary="Switch user's active business",
+)
+
+
+user_router.add_api_route(
+    "/me",
+    endpoint=update_current_user_controller,
+    methods=["PATCH"],
+    response_model=UserResponse,
+    summary="Update current authenticated user's profile (self-update)",
 )
 
 

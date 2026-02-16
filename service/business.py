@@ -1411,6 +1411,7 @@ async def get_user_units(
     )
 
 async def update_business_unit(
+    business_id: int,
     unit_id: int,
     request: UnitUpdate,
     current_user: dict,
@@ -1423,10 +1424,12 @@ async def update_business_unit(
     session = unit_repo.db
 
     unit = unit_repo.get_by_id(unit_id)
-    if not unit:
-        error_response(status_code=404, message="Unit Not Found")
+    if not unit or unit.business_id != business_id:
+        return error_response(status_code=404, message="Unit Not Found or does not belong to this business")
+
+
     if current_user["role"] != Role.SUPER_ADMIN and unit.created_by != current_user["user_id"]:
-        error_response(status_code=403, message="Only SUPER ADMIN and business owner can update this unit")
+        return error_response(status_code=403, message="Only SUPER ADMIN and business owner can update this unit")
 
     try:
         if request.name:
