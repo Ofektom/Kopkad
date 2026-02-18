@@ -765,13 +765,12 @@ async def initiate_group_marking_payment(
     db: Session,
 ):
     """
-    Initiate Paystack payment for group markings (replicates mark_savings_payment logic)
+    Initiate Paystack payment for group markings
     """
-    # 1. Authorization
+    # ────────────── Authorization & validation (unchanged) ──────────────
     if current_user["role"] not in ["agent", "admin", "super_admin"]:
         raise HTTPException(403, "Only agents/admins can mark group contributions")
 
-    # 2. Validate markings
     if not request.markings:
         raise HTTPException(400, "No markings provided")
 
@@ -805,44 +804,41 @@ async def initiate_group_marking_payment(
     if total_amount <= 0:
         raise HTTPException(400, "No amount to pay")
 
-    # 3. Payer info with business/group creator fallback
+    # Payer email resolution (unchanged logic)
     payer = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not payer:
         raise HTTPException(404, "Payer user not found")
 
     email = payer.email
     if not email:
-        # Fallback 1: Business email
         business = db.query(Business).filter(Business.id == group.business_id).first()
         if business and business.email:
             email = business.email
-            logger.info(f"[PAYMENT FALLBACK] Payer {payer.id} has no email; using business email: {email}")
         else:
-            # Fallback 2: Group creator email
             creator = db.query(User).filter(User.id == group.created_by_id).first()
             if creator and creator.email:
                 email = creator.email
-                logger.info(f"[PAYMENT FALLBACK] Payer {payer.id} has no email; using group creator email: {email}")
             else:
-                # Final fallback: raise error (can later change to structured error for modal)
-                logger.warning(f"[PAYMENT FALLBACK] No email found for payer {payer.id}, business, or creator")
-                raise HTTPException(400, "Payer email required for payment (no fallback available)")
+                raise HTTPException(400, "No valid email found for payment")
 
     reference = f"grp_{group_id}_{uuid.uuid4().hex[:8]}"
 
-    # 4. Paystack initialization
+    # ────────────── Important change: append groupId to callback ──────────────
+    base_callback = "https://kopkad-frontend.vercel.app/payment-confirmation"
+    callback_url = f"{base_callback}?groupId={group_id}"
+
+    # ────────────── Paystack init ──────────────
     if request.payment_method == PaymentMethod.CARD:
         total_amount_kobo = int(total_amount * 100)
         resp = Transaction.initialize(
             reference=reference,
             amount=total_amount_kobo,
-            email=email,  # Now guaranteed to have email
-            callback_url="https://kopkad-frontend.vercel.app/payment-confirmation"
+            email=email,
+            callback_url=callback_url,           # ← now includes ?groupId=...
         )
         if not resp["status"]:
             raise HTTPException(500, f"Paystack init failed: {resp.get('message')}")
 
-        # Store reference
         for marking in markings_to_update:
             marking.payment_reference = resp["data"]["reference"]
             marking.payment_method = PaymentMethod.CARD
@@ -853,7 +849,7 @@ async def initiate_group_marking_payment(
             status_code=200,
             message="Proceed to payment",
             data=SavingsMarkingResponse(
-                tracking_number="group_" + str(group_id),
+                tracking_number=f"group_{group_id}",
                 unit_id=None,
                 savings_schedule={},
                 total_amount=float(total_amount),
@@ -866,7 +862,7 @@ async def initiate_group_marking_payment(
     elif request.payment_method == PaymentMethod.BANK_TRANSFER:
         virtual_account = await initiate_virtual_account_payment(
             amount=total_amount,
-            email=email,  # Now guaranteed
+            email=email,
             customer_id=payer.id,
             reference=reference,
             db=db
@@ -882,7 +878,7 @@ async def initiate_group_marking_payment(
                 status_code=200,
                 message="Pay to the virtual account",
                 data=SavingsMarkingResponse(
-                    tracking_number="group_" + str(group_id),
+                    tracking_number=f"group_{group_id}",
                     unit_id=None,
                     savings_schedule={},
                     total_amount=float(total_amount),
