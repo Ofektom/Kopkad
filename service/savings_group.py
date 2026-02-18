@@ -834,7 +834,12 @@ async def initiate_group_marking_payment(
             reference=reference,
             amount=total_amount_kobo,
             email=email,
-            callback_url=callback_url,           # ← now includes ?groupId=...
+            # callback_url=callback_url,           # ← now includes ?groupId=...
+            metadata={
+                "source": "frontend_popup",
+                "group_id": group_id,
+                "markings_count": len(request.markings),
+            }
         )
         if not resp["status"]:
             raise HTTPException(500, f"Paystack init failed: {resp.get('message')}")
@@ -853,7 +858,7 @@ async def initiate_group_marking_payment(
                 unit_id=None,
                 savings_schedule={},
                 total_amount=float(total_amount),
-                authorization_url=resp["data"]["authorization_url"],
+                authorization_url=None,
                 payment_reference=resp["data"]["reference"],
                 virtual_account=None
             ).model_dump()

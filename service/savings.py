@@ -993,7 +993,12 @@ async def mark_savings_payment(
             reference=reference,
             amount=total_amount_kobo,
             email=customer.email,
-            callback_url="https://kopkad-frontend.vercel.app/payment-confirmation"
+            # callback_url="https://kopkad-frontend.vercel.app/payment-confirmation"
+            metadata={
+                "source": "frontend_popup",
+                "tracking_number": tracking_number,
+                "marked_date": str(request.marked_date),
+            }
         )
         logger.info(f"Paystack initialize response: {response}")
         if response["status"]:
@@ -1009,7 +1014,7 @@ async def mark_savings_payment(
                     unit_id=savings.unit_id,
                     savings_schedule={marking.marked_date.isoformat(): marking.status},
                     total_amount=total_amount,
-                    authorization_url=response["data"]["authorization_url"],
+                    authorization_url=None,
                     payment_reference=response["data"]["reference"],
                     virtual_account=None
                 ).model_dump()
@@ -1210,7 +1215,12 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
             reference=reference,
             amount=total_amount_kobo,
             email=customer.email,
-            callback_url="https://kopkad-frontend.vercel.app/payment-confirmation"
+            # callback_url="https://kopkad-frontend.vercel.app/payment-confirmation"
+            metadata={
+                "source": "frontend_popup",
+                "bulk": True,
+                "first_tracking_number": first_tracking_number,
+            }
         )
         logger.info(f"Paystack initialize response: {response}")
         if response["status"]:
@@ -1223,7 +1233,7 @@ async def mark_savings_bulk(request: BulkMarkSavingsRequest, current_user: dict,
                 status_code=200,
                 message="Proceed to payment for bulk marking",
                 data={
-                    "authorization_url": response["data"]["authorization_url"],
+                    "authorization_url": None,
                     "reference": response["data"]["reference"],
                     "total_amount": total_amount,
                     "savings_accounts": [
