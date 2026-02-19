@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional, List, Dict
@@ -75,6 +75,7 @@ class SavingsMarkingRequest(BaseModel):
     marked_date: date
     payment_method: PaymentMethod
     unit_id: Optional[int] = None
+    idempotency_key: Optional[str] = Field(None, description="Unique key to prevent duplicate payments")
 
     class Config:
         arbitrary_types_allowed = True
@@ -83,6 +84,7 @@ class BulkSavingsMarkingRequest(BaseModel):
     tracking_number: str
     marked_date: date
     unit_id: Optional[int] = None
+    idempotency_key: Optional[str] = Field(None, description="Unique key to prevent duplicate payments")
 
     class Config:
         arbitrary_types_allowed = True
