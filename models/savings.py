@@ -7,39 +7,44 @@ from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
     Enum,
-    JSON,
     DateTime,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from database.postgres_optimized import Base
 from models.audit import AuditMixin
 from enum import Enum as PyEnum
 from datetime import datetime
-from sqlalchemy.dialects.postgresql import JSONB
+
 
 class SavingsType(PyEnum):
     DAILY = "daily"
     TARGET = "target"
     COOPERATIVE = "cooperative"
 
+
 class SavingsStatus(PyEnum):
     PENDING = "pending"
     PAID = "paid"
 
+
 class PaymentMethod(PyEnum):
     CARD = "card"
     BANK_TRANSFER = "bank_transfer"
+
 
 class MarkingStatus(PyEnum):
     NOT_STARTED = "not_started"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
 
+
 class PaymentInitiationStatus(str, PyEnum):
     PENDING = "pending"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
 
 class SavingsAccount(AuditMixin, Base):
     __tablename__ = "savings_accounts"
@@ -71,11 +76,11 @@ class SavingsAccount(AuditMixin, Base):
     commissions = relationship("Commission", back_populates="savings_account", cascade="all, delete")
     expense_cards = relationship("ExpenseCard", back_populates="savings_account", cascade="all, delete")
 
-
     # Cooperative Group Link
     group_id = Column(Integer, ForeignKey("savings_groups.id"), nullable=True)
     group = relationship("SavingsGroup", back_populates="savings_accounts")
     payment_initiations = relationship("PaymentInitiation", back_populates="savings_account")
+
 
 class SavingsMarking(AuditMixin, Base):
     __tablename__ = "savings_markings"
@@ -99,7 +104,6 @@ class SavingsMarking(AuditMixin, Base):
     virtual_account_details = Column(JSON, nullable=True)
 
     savings_account = relationship("SavingsAccount", back_populates="markings")
-
     payment_initiations = relationship("PaymentInitiation", back_populates="savings_marking")
 
     __table_args__ = (
@@ -118,19 +122,30 @@ class PaymentInitiation(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Foreign keys for traceability
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Assuming your User table is "users"
-    savings_account_id = Column(Integer, ForeignKey("savings_accounts.id"), nullable=True)  # Optional for bulk/multi-account
-    payment_method = Column(String(50), nullable=True)  # e.g., "card", "bank_transfer"
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    savings_account_id = Column(Integer, ForeignKey("savings_accounts.id"), nullable=True)
+    savings_marking_id = Column(Integer, ForeignKey("savings_markings.id"), nullable=True)
+    payment_method = Column(String(50), nullable=True)
     
     # Store additional context (important for verify step)
     metadata = Column(JSONB, nullable=True)
 
-    # Relationships (optional but useful)
-    user = relationship("User", back_populates="payment_initiations")  # If User has backref
-    savings_account = relationship("SavingsAccount", back_populates="payment_initiations")  # If SavingsAccount has backref
-
-    savings_marking_id = Column(Integer, ForeignKey("savings_markings.id"), nullable=True)
+    # Relationships
+    user = relationship("User", back_populates="payment_initiations")
+    savings_account = relationship("SavingsAccount", back_populates="payment_initiations")
     savings_marking = relationship("SavingsMarking", back_populates="payment_initiations")
 
+    # String representation (as a proper method)
     def __repr__(self):
-        return f"<PaymentInitiation(id={self.id}, key={self.idempotency_key}, ref={self.reference}, status={self.status})>"
+        return (
+            f"<PaymentInitiation(id={self.id}, "
+            f"key={self.idempotency_key}, "
+            f"ref={self.reference}, "
+            f"status={self.status})>"
+        )
+
+
+# Optional: If you want a separate string property (extra safe against mapper confusion)
+    @property
+    def display(self):
+        return self.__repr__()
