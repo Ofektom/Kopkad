@@ -8,6 +8,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Enum,
     JSON,
+    JSONB,
     DateTime,
 )
 from sqlalchemy.orm import relationship
