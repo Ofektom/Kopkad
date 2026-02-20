@@ -1,9 +1,12 @@
 from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import time
 import logging
 import os
+import uvicorn
+import uuid
 
 # Import optimized components
 from database.postgres_optimized import (
@@ -40,6 +43,8 @@ from schemas.business import BusinessResponse, UnitResponse
 from utils.scheduler import init_scheduler, start_scheduler, shutdown_scheduler
 
 from sqlalchemy import text
+
+
 
 # Configure logging
 logging.basicConfig(
@@ -349,6 +354,28 @@ def metrics():
     
     return metrics_data
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    # Log full details
+    logger.exception(f"Unhandled exception on {request.url.path}: {str(exc)}")
+
+    # Return custom message for 500s
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+        )
+
+    # Custom 500 response
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error occurred. Our team has been notified.",
+            "error_id": f"err-{uuid.uuid4().hex[:8]}",  # optional unique ID for support
+            "path": request.url.path,
+        }
+    )
+
 
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
@@ -363,7 +390,6 @@ async def add_process_time_header(request: Request, call_next):
 
 
 if __name__ == "__main__":
-    import uvicorn
     port = int(os.getenv('PORT', 8001))
     uvicorn.run(
         "main:app",

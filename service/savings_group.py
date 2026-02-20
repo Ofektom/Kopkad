@@ -673,7 +673,11 @@ async def initiate_group_marking_payment(
     - Only initializes new transaction if needed
     - Defers marking status updates to verify step
     """
-    logger.info(f"[GROUP-PAY-INIT] Starting for group {group_id}, user {current_user['user_id']}")
+
+    # Unique deployment marker — change this string each time you deploy to confirm new version
+    DEPLOY_MARKER = "DEPLOY-v2025-02-20b --- idempotency uses .value"
+
+    logger.info(f"[GROUP-PAY-INIT-START] {DEPLOY_MARKER} | group={group_id} | user={current_user['user_id']} | idempotency_key={request.idempotency_key}")
 
     if current_user["role"] not in ["agent", "admin", "super_admin"]:
         logger.warning(f"[GROUP-PAY-INIT] Unauthorized role: {current_user['role']}")
@@ -729,19 +733,25 @@ async def initiate_group_marking_payment(
     existing_initiation = None
 
     if request.idempotency_key:
-        logger.info(f"[GROUP-PAY-INIT] Checking idempotency key: {request.idempotency_key}")
-        existing_initiation = db.query(PaymentInitiation).filter(
-            PaymentInitiation.idempotency_key == request.idempotency_key,
-            PaymentInitiation.status == PaymentInitiationStatus.PENDING.value   # Correct: lowercase "pending"
-        ).first()
+        logger.info(f"[GROUP-PAY-INIT] About to query PaymentInitiation with key: {request.idempotency_key}")
+        logger.debug(f"[GROUP-PAY-INIT-DEBUG] Using status filter: {PaymentInitiationStatus.PENDING.value!r} (should be 'pending')")
 
-        if existing_initiation:
-            logger.info(f"[GROUP-PAY-INIT] Idempotency hit - reusing reference {existing_initiation.reference}")
-            reference = existing_initiation.reference
-        else:
-            logger.info("[GROUP-PAY-INIT] No existing pending initiation found - proceeding to new transaction")
+        try:
+            existing_initiation = db.query(PaymentInitiation).filter(
+                PaymentInitiation.idempotency_key == request.idempotency_key,
+                PaymentInitiation.status == PaymentInitiationStatus.PENDING.value
+            ).first()
+
+            if existing_initiation:
+                logger.info(f"[GROUP-PAY-INIT] Idempotency HIT - found pending record (ref={existing_initiation.reference})")
+                reference = existing_initiation.reference
+            else:
+                logger.info("[GROUP-PAY-INIT] Idempotency MISS - no pending record found")
+        except Exception as db_exc:
+            logger.exception(f"[GROUP-PAY-INIT-DB-ERROR] Failed during idempotency query: {str(db_exc)}")
+            raise HTTPException(500, "Database error during payment initiation check")
     else:
-        logger.info("[GROUP-PAY-INIT] No idempotency_key provided - creating new transaction")
+        logger.info("[GROUP-PAY-INIT] No idempotency_key → new transaction")
 
     # ── New transaction if no reuse ──
     if not reference:
