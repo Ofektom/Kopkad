@@ -1010,12 +1010,6 @@ async def mark_savings_bulk(
     current_user: dict,
     db: Session,
 ):
-    """
-    Initiate bulk payment for multiple savings markings (idempotent).
-    - Groups by tracking_number
-    - Validates pending + sequential per account
-    - Defers marking to verify step
-    """
     if not request.markings:
         raise HTTPException(400, "No markings provided")
 
@@ -1024,37 +1018,33 @@ async def mark_savings_bulk(
     except ValueError:
         raise HTTPException(400, f"Invalid payment method: {request.payment_method}")
 
-    # Group markings by tracking_number
+    # Group by tracking_number
     markings_by_tracking = {}
     for item in request.markings:
         tn = item.tracking_number
         markings_by_tracking.setdefault(tn, []).append(item)
 
-    all_markings = []           # List of real SavingsMarking objects
+    all_markings = []           # real SavingsMarking objects
     total_amount = Decimal("0")
     tracking_numbers = set()
 
     for tn, items in markings_by_tracking.items():
-        # 1. Find the savings account
         savings = db.query(SavingsAccount).filter(
             SavingsAccount.tracking_number == tn
         ).first()
         if not savings:
-            raise HTTPException(404, f"Savings account {tn} not found")
+            raise HTTPException(404, f"Savings {tn} not found")
 
-        # 2. Authorization
         if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
-            raise HTTPException(403, f"Not your savings account: {tn}")
+            raise HTTPException(403, f"Not your savings: {tn}")
 
-        # 3. Get all markings for this account (ordered by date)
         account_markings = db.query(SavingsMarking).filter(
             SavingsMarking.savings_account_id == savings.id
         ).order_by(SavingsMarking.marked_date.asc()).all()
 
         if not account_markings:
-            raise HTTPException(400, f"No schedule found for {tn}")
+            raise HTTPException(400, f"No schedule for {tn}")
 
-        # 4. Find earliest pending date
         earliest_pending = next(
             (m.marked_date for m in account_markings if m.status == SavingsStatus.PENDING),
             None
@@ -1062,39 +1052,29 @@ async def mark_savings_bulk(
         if not earliest_pending:
             raise HTTPException(400, f"No pending markings for {tn}")
 
-        # 5. Validate requested dates: start from earliest + sequential
         requested_dates = sorted([item.marked_date for item in items])
         if requested_dates[0] != earliest_pending:
             raise HTTPException(
-                400,
-                f"Bulk must start with earliest pending date {earliest_pending} for {tn}"
+                400, f"Must start with earliest pending {earliest_pending} for {tn}"
             )
 
         current_expected = earliest_pending
         for req_date in requested_dates:
             marking = next((m for m in account_markings if m.marked_date == req_date), None)
             if not marking or marking.status != SavingsStatus.PENDING:
-                raise HTTPException(400, f"Invalid/already marked date {req_date} for {tn}")
+                raise HTTPException(400, f"Invalid/marked date {req_date} for {tn}")
 
-            # Check for gaps
             while current_expected < req_date:
                 inter = next((m for m in account_markings if m.marked_date == current_expected), None)
                 if inter and inter.status == SavingsStatus.PENDING:
-                    raise HTTPException(
-                        400,
-                        f"Gap detected: pending date {current_expected} before {req_date} for {tn}"
-                    )
+                    raise HTTPException(400, f"Gap: pending {current_expected} before {req_date} for {tn}")
                 current_expected += timedelta(days=1)
 
             if req_date != current_expected:
-                raise HTTPException(
-                    400,
-                    f"Non-sequential: {req_date} expected {current_expected} for {tn}"
-                )
+                raise HTTPException(400, f"Non-sequential: {req_date} expected {current_expected} for {tn}")
 
             current_expected += timedelta(days=1)
 
-            # Valid → collect real marking + amount
             all_markings.append(marking)
             total_amount += marking.amount
 
@@ -1103,7 +1083,7 @@ async def mark_savings_bulk(
     if total_amount <= 0:
         raise HTTPException(400, "Total amount must be positive")
 
-    # ── Idempotency check ──
+    # ── Idempotency (now correctly on request) ──
     reference = None
     if request.idempotency_key:
         existing = db.query(PaymentInitiation).filter(
@@ -1112,15 +1092,13 @@ async def mark_savings_bulk(
             PaymentInitiation.user_id == current_user["user_id"]
         ).first()
         if existing:
-            logger.info(f"Bulk idempotency hit - reusing ref {existing.reference}")
+            logger.info(f"Bulk idempotency hit - reusing {existing.reference}")
             reference = existing.reference
 
-    # ── New initiation if needed ──
     if not reference:
         ref_suffix = str(uuid.uuid4())[:8]
         reference = f"sv_bulk_{ref_suffix}"
 
-        # Customer from first savings account
         first_savings = db.query(SavingsAccount).filter(
             SavingsAccount.tracking_number == list(tracking_numbers)[0]
         ).first()
@@ -1143,7 +1121,7 @@ async def mark_savings_bulk(
         )
 
         if not resp["status"]:
-            raise HTTPException(500, f"Paystack init failed: {resp.get('message')}")
+            raise HTTPException(500, f"Paystack failed: {resp.get('message')}")
 
         reference = resp["data"]["reference"]
 
@@ -1152,7 +1130,7 @@ async def mark_savings_bulk(
             reference=reference,
             status=PaymentInitiationStatus.PENDING,
             user_id=current_user["user_id"],
-            savings_account_id=None,  # bulk
+            savings_account_id=None,
             savings_marking_id=None,
             payment_method=payment_method.value,
             payment_metadata={

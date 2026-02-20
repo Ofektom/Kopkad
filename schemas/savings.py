@@ -84,7 +84,6 @@ class BulkSavingsMarkingRequest(BaseModel):
     tracking_number: str
     marked_date: date
     unit_id: Optional[int] = None
-    idempotency_key: Optional[str] = Field(None, description="Unique key to prevent duplicate payments")
 
     class Config:
         arbitrary_types_allowed = True
@@ -92,6 +91,7 @@ class BulkSavingsMarkingRequest(BaseModel):
 class BulkMarkSavingsRequest(BaseModel):
     payment_method: PaymentMethod
     markings: List[BulkSavingsMarkingRequest]
+    idempotency_key: Optional[str] = Field(None, description="Unique key to prevent duplicate payments")
 
     class Config:
         arbitrary_types_allowed = True
