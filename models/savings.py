@@ -129,7 +129,7 @@ class PaymentInitiation(Base):
     payment_method = Column(String(50), nullable=True)
     
     # Store additional context (important for verify step)
-    metadata = Column(JSONB, nullable=True)
+    payment_metadata = Column(JSONB, nullable=True)
 
     # Relationships
     user = relationship("User", back_populates="payment_initiations")

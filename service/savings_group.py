@@ -806,7 +806,8 @@ async def initiate_group_marking_payment(
         affected_accounts.add(account.id)
 
     if total_amount <= 0:
-        raise HTTPException(400, "No amount to pay")
+        logger.warning(f"Zero or negative total amount prevented for group {group_id}")
+        raise HTTPException(400, "Total contribution amount must be positive")
 
     # ── Idempotency check ──
     reference = None
@@ -857,7 +858,7 @@ async def initiate_group_marking_payment(
             savings_account_id=None,  # group can span accounts
             savings_marking_id=None,  # bulk → NULL
             payment_method=request.payment_method.value,
-            metadata={
+            payment_metadata={
                 "type": "group_bulk",
                 "group_id": group_id,
                 "marking_ids": [m.id for m in markings_to_pay],
@@ -905,7 +906,7 @@ async def verify_group_marking_payment(reference: str, db: Session):
     paid_amount = Decimal(resp["data"]["amount"]) / 100
 
     # Get marking IDs from metadata
-    metadata = initiation.metadata or {}
+    metadata = initiation.payment_metadata or {}
     marking_ids = metadata.get("marking_ids", [])
     if not marking_ids:
         initiation.status = PaymentInitiationStatus.FAILED
