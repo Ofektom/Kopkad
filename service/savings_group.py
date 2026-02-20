@@ -660,102 +660,6 @@ async def get_group_grid_data(
     }
 
 
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
-from typing import List, Dict, Optional, Any
-from dateutil.relativedelta import relativedelta
-
-from datetime import date, datetime
-import uuid
-import logging
-
-from models.savings_group import SavingsGroup, GroupFrequency
-from models.savings import SavingsAccount, SavingsMarking, SavingsStatus, PaymentMethod
-from models.user import User
-from models.business import Business  # Added import for Business model
-
-from models.business import BusinessType
-
-from schemas.savings_group import (
-    SavingsGroupCreate,
-    AddGroupMemberRequest,
-    SavingsGroupResponse,
-    CreateSavingsGroupResponse,
-    SavingsGroupMarkingPaystackInit,
-)
-
-from store.repositories.savings_group import SavingsGroupRepository
-from store.repositories.savings import SavingsRepository
-from store.repositories.business import BusinessRepository
-from store.repositories.user import UserRepository
-from utils.response import success_response, error_response
-import requests
-
-logger = logging.getLogger(__name__)
-
-from paystackapi.transaction import Transaction
-from paystackapi.paystack import Paystack
-import os
-from decimal import Decimal
-
-from schemas.savings import SavingsMarkingResponse
-
-
-paystack = Paystack(secret_key=os.getenv("PAYSTACK_SECRET_KEY"))
-
-
-def _resolve_repo(repo, repo_cls, db: Session):
-    return repo if repo is not None else repo_cls(db)
-
-
-def _generate_group_grid_dates(
-    start_date: date,
-    frequency: GroupFrequency,
-    limit: int,
-    offset: int,
-    end_date: Optional[date] = None
-) -> List[date]:
-    """
-    Generate a list of dates based on frequency, handling pagination.
-    """
-    dates = []
-    current_date = start_date
-    
-    # Skip to offset
-    skipped = 0
-    while skipped < offset:
-        if end_date and current_date > end_date:
-            break
-            
-        if frequency == GroupFrequency.WEEKLY:
-            current_date += relativedelta(weeks=1)
-        elif frequency == GroupFrequency.BI_WEEKLY:
-            current_date += relativedelta(weeks=2)
-        elif frequency == GroupFrequency.MONTHLY:
-            current_date += relativedelta(months=1)
-        elif frequency == GroupFrequency.QUARTERLY:
-            current_date += relativedelta(months=3)
-        skipped += 1
-
-    # Collect dates up to limit
-    collected = 0
-    while collected < limit:
-        if end_date and current_date > end_date:
-            break
-            
-        dates.append(current_date)
-        
-        if frequency == GroupFrequency.WEEKLY:
-            current_date += relativedelta(weeks=1)
-        elif frequency == GroupFrequency.BI_WEEKLY:
-            current_date += relativedelta(weeks=2)
-        elif frequency == GroupFrequency.MONTHLY:
-            current_date += relativedelta(months=1)
-        elif frequency == GroupFrequency.QUARTERLY:
-            current_date += relativedelta(months=3)
-        collected += 1
-        
-    return dates
 
 async def initiate_group_marking_payment(
     group_id: int,
@@ -769,16 +673,23 @@ async def initiate_group_marking_payment(
     - Only initializes new transaction if needed
     - Defers marking status updates to verify step
     """
+    logger.info(f"[GROUP-PAY-INIT] Starting for group {group_id}, user {current_user['user_id']}")
+
     if current_user["role"] not in ["agent", "admin", "super_admin"]:
+        logger.warning(f"[GROUP-PAY-INIT] Unauthorized role: {current_user['role']}")
         raise HTTPException(403, "Only agents/admins can mark group contributions")
 
     if not request.markings:
+        logger.warning("[GROUP-PAY-INIT] No markings provided in request")
         raise HTTPException(400, "No markings provided")
 
     # ── Authorization & group validation ──
     group = db.query(SavingsGroup).filter(SavingsGroup.id == group_id).first()
     if not group:
+        logger.error(f"[GROUP-PAY-INIT] Group {group_id} not found")
         raise HTTPException(404, "Group not found")
+
+    logger.info(f"[GROUP-PAY-INIT] Group found: {group.name} (ID: {group_id})")
 
     # ── Collect markings & calculate total ──
     total_amount = Decimal("0")
@@ -791,6 +702,7 @@ async def initiate_group_marking_payment(
             SavingsAccount.group_id == group_id
         ).first()
         if not account:
+            logger.error(f"[GROUP-PAY-INIT] Savings account {m.savings_account_id} not in group {group_id}")
             raise HTTPException(404, f"Savings account {m.savings_account_id} not in group")
 
         marking = db.query(SavingsMarking).filter(
@@ -799,6 +711,7 @@ async def initiate_group_marking_payment(
             SavingsMarking.status == SavingsStatus.PENDING
         ).first()
         if not marking:
+            logger.warning(f"[GROUP-PAY-INIT] Invalid/already marked: account {m.savings_account_id}, date {m.date}")
             raise HTTPException(400, f"Date {m.date} invalid or already marked for account {m.savings_account_id}")
 
         total_amount += marking.amount
@@ -806,32 +719,43 @@ async def initiate_group_marking_payment(
         affected_accounts.add(account.id)
 
     if total_amount <= 0:
-        logger.warning(f"Zero or negative total amount prevented for group {group_id}")
+        logger.warning(f"[GROUP-PAY-INIT] Zero/negative total prevented for group {group_id}")
         raise HTTPException(400, "Total contribution amount must be positive")
+
+    logger.info(f"[GROUP-PAY-INIT] Total amount calculated: {total_amount} from {len(markings_to_pay)} markings")
 
     # ── Idempotency check ──
     reference = None
     existing_initiation = None
 
     if request.idempotency_key:
+        logger.info(f"[GROUP-PAY-INIT] Checking idempotency key: {request.idempotency_key}")
         existing_initiation = db.query(PaymentInitiation).filter(
             PaymentInitiation.idempotency_key == request.idempotency_key,
-            PaymentInitiation.status == PaymentInitiationStatus.PENDING.value
+            PaymentInitiation.status == PaymentInitiationStatus.PENDING.value   # Correct: lowercase "pending"
         ).first()
 
         if existing_initiation:
-            logger.info(f"[GROUP] Idempotency hit - reusing reference {existing_initiation.reference}")
+            logger.info(f"[GROUP-PAY-INIT] Idempotency hit - reusing reference {existing_initiation.reference}")
             reference = existing_initiation.reference
+        else:
+            logger.info("[GROUP-PAY-INIT] No existing pending initiation found - proceeding to new transaction")
+    else:
+        logger.info("[GROUP-PAY-INIT] No idempotency_key provided - creating new transaction")
 
     # ── New transaction if no reuse ──
     if not reference:
         ref_suffix = str(uuid.uuid4())[:8]
         reference = f"grp_{group_id}_{ref_suffix}"
+        logger.info(f"[GROUP-PAY-INIT] Generating new reference: {reference}")
 
         payer = db.query(User).filter(User.id == current_user["user_id"]).first()
-        email = payer.email or "fallback@kopkad.com"  # improve fallback as needed
+        email = payer.email if payer and payer.email else "fallback@kopkad.com"
+        logger.info(f"[GROUP-PAY-INIT] Using payer email: {email}")
 
         total_kobo = int(total_amount * 100)
+        logger.info(f"[GROUP-PAY-INIT] Initializing Paystack transaction: {total_kobo/100:.2f} NGN")
+
         resp = Transaction.initialize(
             reference=reference,
             amount=total_kobo,
@@ -845,18 +769,20 @@ async def initiate_group_marking_payment(
         )
 
         if not resp["status"]:
+            logger.error(f"[GROUP-PAY-INIT] Paystack init failed: {resp.get('message')}")
             raise HTTPException(500, f"Paystack init failed: {resp.get('message')}")
 
         reference = resp["data"]["reference"]
+        logger.info(f"[GROUP-PAY-INIT] Paystack returned reference: {reference}")
 
         # Save new initiation record
         initiation = PaymentInitiation(
             idempotency_key=request.idempotency_key,
             reference=reference,
-            status=PaymentInitiationStatus.PENDING,
+            status=PaymentInitiationStatus.PENDING,           # ← assignment is fine (SQLAlchemy uses .value)
             user_id=current_user["user_id"],
-            savings_account_id=None,  # group can span accounts
-            savings_marking_id=None,  # bulk → NULL
+            savings_account_id=None,
+            savings_marking_id=None,
             payment_method=request.payment_method.value,
             payment_metadata={
                 "type": "group_bulk",
@@ -866,9 +792,16 @@ async def initiate_group_marking_payment(
             }
         )
         db.add(initiation)
-        db.commit()
+        try:
+            db.commit()
+            logger.info(f"[GROUP-PAY-INIT] New PaymentInitiation saved (ID: {initiation.id})")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"[GROUP-PAY-INIT] Failed to commit new initiation: {str(e)}", exc_info=True)
+            raise HTTPException(500, "Failed to save payment initiation")
 
     # ── Return to frontend (NO marking update here) ──
+    logger.info(f"[GROUP-PAY-INIT] Success - reference: {reference}, total: {total_amount}")
     return success_response(
         status_code=200,
         message="Proceed to group payment",
@@ -879,37 +812,49 @@ async def initiate_group_marking_payment(
         }
     )
 
-
 async def verify_group_marking_payment(reference: str, db: Session):
     """
     Verify Paystack payment for group markings with idempotency safety.
     """
+    logger.info(f"[GROUP-VERIFY] Starting verification for reference: {reference}")
+
     initiation = db.query(PaymentInitiation).filter(
         PaymentInitiation.reference == reference
     ).first()
 
     if not initiation:
+        logger.error(f"[GROUP-VERIFY] Initiation not found for reference {reference}")
         raise HTTPException(404, "Payment initiation not found")
 
-    if initiation.status == PaymentInitiationStatus.COMPLETED:
+    logger.info(f"[GROUP-VERIFY] Found initiation (ID: {initiation.id}, status: {initiation.status})")
+
+    if initiation.status == PaymentInitiationStatus.COMPLETED.value:   # ← .value here too
+        logger.info(f"[GROUP-VERIFY] Already completed - idempotent success")
         return success_response(200, "Payment already verified")
 
-    if initiation.status != PaymentInitiationStatus.PENDING:
+    if initiation.status != PaymentInitiationStatus.PENDING.value:     # ← .value here
+        logger.warning(f"[GROUP-VERIFY] Invalid state: {initiation.status}")
         raise HTTPException(400, "Initiation not in pending state")
 
+    logger.info(f"[GROUP-VERIFY] Verifying with Paystack...")
     resp = Transaction.verify(reference=reference)
+    logger.info(f"[GROUP-VERIFY] Paystack verify response: {resp}")
+
     if not resp["status"] or resp["data"]["status"] != "success":
-        initiation.status = PaymentInitiationStatus.FAILED
+        logger.error(f"[GROUP-VERIFY] Paystack verification failed: {resp.get('message')}")
+        initiation.status = PaymentInitiationStatus.FAILED.value   # ← assignment fine
         db.commit()
         raise HTTPException(400, "Payment verification failed")
 
     paid_amount = Decimal(resp["data"]["amount"]) / 100
+    logger.info(f"[GROUP-VERIFY] Paid amount: {paid_amount}")
 
     # Get marking IDs from metadata
     metadata = initiation.payment_metadata or {}
     marking_ids = metadata.get("marking_ids", [])
     if not marking_ids:
-        initiation.status = PaymentInitiationStatus.FAILED
+        logger.error("[GROUP-VERIFY] No marking_ids in metadata")
+        initiation.status = PaymentInitiationStatus.FAILED.value
         db.commit()
         raise HTTPException(400, "No markings associated with this initiation")
 
@@ -919,22 +864,28 @@ async def verify_group_marking_payment(reference: str, db: Session):
     ).all()
 
     expected = sum(m.amount for m in markings)
+    logger.info(f"[GROUP-VERIFY] Expected: {expected}, Paid: {paid_amount}, Markings found: {len(markings)}")
+
     if paid_amount < expected:
-        initiation.status = PaymentInitiationStatus.FAILED
+        logger.error(f"[GROUP-VERIFY] Underpayment: {paid_amount} < {expected}")
+        initiation.status = PaymentInitiationStatus.FAILED.value
         db.commit()
         raise HTTPException(400, f"Underpayment: {paid_amount} < {expected}")
 
     for marking in markings:
         marking.status = SavingsStatus.PAID
-        marking.marked_by_id = initiation.user_id  # or current_user if passed
+        marking.marked_by_id = initiation.user_id
         marking.updated_at = datetime.utcnow()
         marking.payment_reference = reference
+        logger.debug(f"[GROUP-VERIFY] Marked marking {marking.id} as PAID")
 
     db.commit()
+    logger.info("[GROUP-VERIFY] Markings updated successfully")
 
     # Mark initiation done
-    initiation.status = PaymentInitiationStatus.COMPLETED
+    initiation.status = PaymentInitiationStatus.COMPLETED.value   # ← assignment fine
     db.commit()
+    logger.info(f"[GROUP-VERIFY] Initiation marked COMPLETED")
 
     return success_response(
         status_code=200,

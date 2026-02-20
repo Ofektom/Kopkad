@@ -988,7 +988,7 @@ async def mark_savings_payment(
     if request.idempotency_key:
         initiation = db.query(PaymentInitiation).filter(
             PaymentInitiation.idempotency_key == request.idempotency_key,
-            PaymentInitiation.status == PaymentInitiationStatus.PENDING,
+            PaymentInitiation.status == PaymentInitiationStatus.PENDING.value,
             PaymentInitiation.user_id == current_user["user_id"]
         ).first()
 
@@ -1169,7 +1169,7 @@ async def mark_savings_bulk(
             marking = db.query(SavingsMarking).filter(
                 SavingsMarking.savings_account_id == savings.id,
                 SavingsMarking.marked_date == mark_req.marked_date,
-                SavingsMarking.status == SavingsStatus.PENDING
+                SavingsMarking.status == SavingsStatus.PENDING.value
             ).first()
 
             marking.payment_method = payment_method
@@ -1205,7 +1205,7 @@ async def mark_savings_bulk(
     if request.idempotency_key:
         initiation = db.query(PaymentInitiation).filter(
             PaymentInitiation.idempotency_key == request.idempotency_key,
-            PaymentInitiation.status == PaymentInitiationStatus.PENDING,
+            PaymentInitiation.status == PaymentInitiationStatus.PENDING.value,
             PaymentInitiation.user_id == current_user["user_id"]
         ).first()
 
