@@ -1011,47 +1011,100 @@ async def mark_savings_bulk(
     db: Session,
 ):
     """
-    Initiate bulk payment for multiple savings markings.
-    - Idempotent
-    - Defers marking to verify
+    Initiate bulk payment for multiple savings markings (idempotent).
+    - Groups by tracking_number
+    - Validates pending + sequential per account
+    - Defers marking to verify step
     """
     if not request.markings:
         raise HTTPException(400, "No markings provided")
 
-    # Validate all markings belong to same user & are pending
-    savings_ids = set()
-    marking_ids = []
+    try:
+        payment_method = PaymentMethod(request.payment_method)
+    except ValueError:
+        raise HTTPException(400, f"Invalid payment method: {request.payment_method}")
+
+    # Group markings by tracking_number
+    markings_by_tracking = {}
+    for item in request.markings:
+        tn = item.tracking_number
+        markings_by_tracking.setdefault(tn, []).append(item)
+
+    all_markings = []           # List of real SavingsMarking objects
     total_amount = Decimal("0")
     tracking_numbers = set()
 
-    for m in request.markings:
-        marking = db.query(SavingsMarking).filter(
-            SavingsMarking.savings_account_id == m.savings_account_id,
-            SavingsMarking.marked_date == m.marked_date,
-            SavingsMarking.status == SavingsStatus.PENDING
+    for tn, items in markings_by_tracking.items():
+        # 1. Find the savings account
+        savings = db.query(SavingsAccount).filter(
+            SavingsAccount.tracking_number == tn
         ).first()
-        if not marking:
-            raise HTTPException(400, f"Invalid or already marked: {m.marked_date}")
-
-        savings = db.query(SavingsAccount).get(m.savings_account_id)
         if not savings:
-            raise HTTPException(404, f"Savings account {m.savings_account_id} not found")
+            raise HTTPException(404, f"Savings account {tn} not found")
 
+        # 2. Authorization
         if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
-            raise HTTPException(403, "Not your savings account")
+            raise HTTPException(403, f"Not your savings account: {tn}")
 
-        total_amount += marking.amount
-        marking_ids.append(marking.id)
-        savings_ids.add(savings.id)
-        tracking_numbers.add(savings.tracking_number)
+        # 3. Get all markings for this account (ordered by date)
+        account_markings = db.query(SavingsMarking).filter(
+            SavingsMarking.savings_account_id == savings.id
+        ).order_by(SavingsMarking.marked_date.asc()).all()
+
+        if not account_markings:
+            raise HTTPException(400, f"No schedule found for {tn}")
+
+        # 4. Find earliest pending date
+        earliest_pending = next(
+            (m.marked_date for m in account_markings if m.status == SavingsStatus.PENDING),
+            None
+        )
+        if not earliest_pending:
+            raise HTTPException(400, f"No pending markings for {tn}")
+
+        # 5. Validate requested dates: start from earliest + sequential
+        requested_dates = sorted([item.marked_date for item in items])
+        if requested_dates[0] != earliest_pending:
+            raise HTTPException(
+                400,
+                f"Bulk must start with earliest pending date {earliest_pending} for {tn}"
+            )
+
+        current_expected = earliest_pending
+        for req_date in requested_dates:
+            marking = next((m for m in account_markings if m.marked_date == req_date), None)
+            if not marking or marking.status != SavingsStatus.PENDING:
+                raise HTTPException(400, f"Invalid/already marked date {req_date} for {tn}")
+
+            # Check for gaps
+            while current_expected < req_date:
+                inter = next((m for m in account_markings if m.marked_date == current_expected), None)
+                if inter and inter.status == SavingsStatus.PENDING:
+                    raise HTTPException(
+                        400,
+                        f"Gap detected: pending date {current_expected} before {req_date} for {tn}"
+                    )
+                current_expected += timedelta(days=1)
+
+            if req_date != current_expected:
+                raise HTTPException(
+                    400,
+                    f"Non-sequential: {req_date} expected {current_expected} for {tn}"
+                )
+
+            current_expected += timedelta(days=1)
+
+            # Valid → collect real marking + amount
+            all_markings.append(marking)
+            total_amount += marking.amount
+
+        tracking_numbers.add(tn)
 
     if total_amount <= 0:
         raise HTTPException(400, "Total amount must be positive")
 
     # ── Idempotency check ──
     reference = None
-    existing = None
-
     if request.idempotency_key:
         existing = db.query(PaymentInitiation).filter(
             PaymentInitiation.idempotency_key == request.idempotency_key,
@@ -1067,9 +1120,11 @@ async def mark_savings_bulk(
         ref_suffix = str(uuid.uuid4())[:8]
         reference = f"sv_bulk_{ref_suffix}"
 
-        customer = db.query(User).filter(
-            User.id == current_user["user_id"]
+        # Customer from first savings account
+        first_savings = db.query(SavingsAccount).filter(
+            SavingsAccount.tracking_number == list(tracking_numbers)[0]
         ).first()
+        customer = db.query(User).filter(User.id == first_savings.customer_id).first()
         if not customer or not customer.email:
             raise HTTPException(400, "Customer email required")
 
@@ -1080,7 +1135,9 @@ async def mark_savings_bulk(
             email=customer.email,
             metadata={
                 "source": "bulk_marking",
-                "marking_ids": marking_ids,
+                "marking_ids": [m.id for m in all_markings],
+                "total_amount": float(total_amount),
+                "tracking_numbers": list(tracking_numbers),
                 "idempotency_key": request.idempotency_key,
             }
         )
@@ -1097,10 +1154,10 @@ async def mark_savings_bulk(
             user_id=current_user["user_id"],
             savings_account_id=None,  # bulk
             savings_marking_id=None,
-            payment_method=request.payment_method.value,
+            payment_method=payment_method.value,
             payment_metadata={
                 "type": "bulk",
-                "marking_ids": marking_ids,
+                "marking_ids": [m.id for m in all_markings],
                 "total_amount": float(total_amount),
                 "tracking_numbers": list(tracking_numbers),
             }
@@ -1114,6 +1171,7 @@ async def mark_savings_bulk(
         data={
             "payment_reference": reference,
             "total_amount": float(total_amount),
+            "tracking_numbers": list(tracking_numbers),
         }
     )
 
