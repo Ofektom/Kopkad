@@ -10,6 +10,8 @@ def get_db_models():
     from models.settings import Settings
     from models.user_business import user_business
     from models.token import TokenBlocklist
+    from models.savings_group import SavingsGroup
+    from models.savings import PaymentInitiation
 
 
     return [
@@ -23,4 +25,6 @@ def get_db_models():
         Settings,
         user_business,
         TokenBlocklist,
+        SavingsGroup,
+        PaymentInitiation,
     ]

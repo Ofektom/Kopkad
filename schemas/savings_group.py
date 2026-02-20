@@ -88,6 +88,7 @@ class GroupMarkingItem(BaseModel):
 class SavingsGroupMarkingPaystackInit(BaseModel):
     payment_method: PaymentMethod
     markings: List[GroupMarkingItem]
+    idempotency_key: Optional[str]
 
     class Config:
         arbitrary_types_allowed = True   # usually needed when using enums from SQLAlchemy

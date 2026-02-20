@@ -8,11 +8,13 @@ from sqlalchemy import (
     UniqueConstraint,
     Enum,
     JSON,
+    DateTime,
 )
 from sqlalchemy.orm import relationship
 from database.postgres_optimized import Base
 from models.audit import AuditMixin
 from enum import Enum as PyEnum
+from datetime import datetime
 
 class SavingsType(PyEnum):
     DAILY = "daily"
@@ -31,6 +33,12 @@ class MarkingStatus(PyEnum):
     NOT_STARTED = "not_started"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
+
+class PaymentInitiationStatus(str, PyEnum):
+    PENDING = "pending"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
 
 class SavingsAccount(AuditMixin, Base):
     __tablename__ = "savings_accounts"
@@ -62,9 +70,11 @@ class SavingsAccount(AuditMixin, Base):
     commissions = relationship("Commission", back_populates="savings_account", cascade="all, delete")
     expense_cards = relationship("ExpenseCard", back_populates="savings_account", cascade="all, delete")
 
+
     # Cooperative Group Link
     group_id = Column(Integer, ForeignKey("savings_groups.id"), nullable=True)
     group = relationship("SavingsGroup", back_populates="savings_accounts")
+    payment_initiations = relationship("PaymentInitiation", back_populates="savings_account")
 
 class SavingsMarking(AuditMixin, Base):
     __tablename__ = "savings_markings"
@@ -89,6 +99,37 @@ class SavingsMarking(AuditMixin, Base):
 
     savings_account = relationship("SavingsAccount", back_populates="markings")
 
+    payment_initiations = relationship("PaymentInitiation", back_populates="savings_marking")
+
     __table_args__ = (
         UniqueConstraint("savings_account_id", "marked_date", name="unique_marking"),
     )
+
+
+class PaymentInitiation(Base):
+    __tablename__ = "payment_initiations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    idempotency_key = Column(String(255), unique=True, nullable=False, index=True)
+    reference = Column(String(100), nullable=False, index=True)
+    status = Column(Enum(PaymentInitiationStatus), default=PaymentInitiationStatus.PENDING, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Foreign keys for traceability
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Assuming your User table is "users"
+    savings_account_id = Column(Integer, ForeignKey("savings_accounts.id"), nullable=True)  # Optional for bulk/multi-account
+    payment_method = Column(String(50), nullable=True)  # e.g., "card", "bank_transfer"
+    
+    # Store additional context (important for verify step)
+    metadata = Column(JSONB, nullable=True)
+
+    # Relationships (optional but useful)
+    user = relationship("User", back_populates="payment_initiations")  # If User has backref
+    savings_account = relationship("SavingsAccount", back_populates="payment_initiations")  # If SavingsAccount has backref
+
+    savings_marking_id = Column(Integer, ForeignKey("savings_markings.id"), nullable=True)
+    savings_marking = relationship("SavingsMarking", back_populates="payment_initiations")
+
+    def __repr__(self):
+        return f"<PaymentInitiation(id={self.id}, key={self.idempotency_key}, ref={self.reference}, status={self.status})>"

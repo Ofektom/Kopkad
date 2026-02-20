@@ -111,6 +111,7 @@ class User(AuditMixin, Base):
         back_populates="user",
         foreign_keys="Settings.user_id",
     )
+    payment_initiations = relationship("PaymentInitiation", back_populates="user")
 
     @property
     def permissions(self):
