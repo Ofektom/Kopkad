@@ -6,6 +6,7 @@ from sqlalchemy import (
     Numeric,
     ForeignKey,
     UniqueConstraint,
+    JSON,
     Enum,
     DateTime,
 )
