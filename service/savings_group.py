@@ -816,7 +816,7 @@ async def initiate_group_marking_payment(
     if request.idempotency_key:
         existing_initiation = db.query(PaymentInitiation).filter(
             PaymentInitiation.idempotency_key == request.idempotency_key,
-            PaymentInitiation.status == PaymentInitiationStatus.PENDING
+            PaymentInitiation.status == PaymentInitiationStatus.PENDING.value
         ).first()
 
         if existing_initiation:
