@@ -728,30 +728,36 @@ async def initiate_group_marking_payment(
 
     logger.info(f"[GROUP-PAY-INIT] Total amount calculated: {total_amount} from {len(markings_to_pay)} markings")
 
+    logger.info("*** FORCED-CHECK-2025-02-20 *** Using .value for PENDING status")
+
     # ── Idempotency check ──
     reference = None
     existing_initiation = None
 
-    if request.idempotency_key:
-        logger.info(f"[GROUP-PAY-INIT] About to query PaymentInitiation with key: {request.idempotency_key}")
-        logger.debug(f"[GROUP-PAY-INIT-DEBUG] Using status filter: {PaymentInitiationStatus.PENDING.value!r} (should be 'pending')")
+    logger.info("*** FORCED-CHECK-2025-02-20 *** About to check idempotency")
 
+    if request.idempotency_key:
+        logger.info(f"[GROUP-PAY-INIT] Idempotency key present: {request.idempotency_key}")
+        
+        status_filter = PaymentInitiationStatus.PENDING.value
+        logger.critical(f"*** CRITICAL-DEBUG *** status_filter = {status_filter!r} (must be 'pending')")
+        
         try:
             existing_initiation = db.query(PaymentInitiation).filter(
                 PaymentInitiation.idempotency_key == request.idempotency_key,
-                PaymentInitiation.status == PaymentInitiationStatus.PENDING.value
+                PaymentInitiation.status == status_filter
             ).first()
-
+            
             if existing_initiation:
-                logger.info(f"[GROUP-PAY-INIT] Idempotency HIT - found pending record (ref={existing_initiation.reference})")
+                logger.info(f"[GROUP-PAY-INIT] Idempotency HIT - ref={existing_initiation.reference}")
                 reference = existing_initiation.reference
             else:
-                logger.info("[GROUP-PAY-INIT] Idempotency MISS - no pending record found")
-        except Exception as db_exc:
-            logger.exception(f"[GROUP-PAY-INIT-DB-ERROR] Failed during idempotency query: {str(db_exc)}")
-            raise HTTPException(500, "Database error during payment initiation check")
+                logger.info("[GROUP-PAY-INIT] Idempotency MISS")
+        except Exception as exc:
+            logger.exception(f"[GROUP-PAY-INIT-DB-ERROR] Query failed: {exc}")
+            raise HTTPException(500, f"Database error during idempotency check: {str(exc)}")
     else:
-        logger.info("[GROUP-PAY-INIT] No idempotency_key → new transaction")
+        logger.info("[GROUP-PAY-INIT] No idempotency key - new transaction")
 
     # ── New transaction if no reuse ──
     if not reference:
