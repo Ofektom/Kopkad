@@ -8,7 +8,6 @@ from sqlalchemy import (
     UniqueConstraint,
     Enum,
     JSON,
-    JSONB,
     DateTime,
 )
 from sqlalchemy.orm import relationship
@@ -16,6 +15,7 @@ from database.postgres_optimized import Base
 from models.audit import AuditMixin
 from enum import Enum as PyEnum
 from datetime import datetime
+from sqlalchemy.dialects.postgresql import JSONB
 
 class SavingsType(PyEnum):
     DAILY = "daily"
