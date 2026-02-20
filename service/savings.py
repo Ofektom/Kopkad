@@ -1,4 +1,4 @@
-from fastapi import status
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from models.savings import SavingsAccount, SavingsMarking, SavingsType, SavingsStatus, PaymentMethod, MarkingStatus, PaymentInitiationStatus, PaymentInitiation
@@ -14,6 +14,8 @@ from schemas.savings import (
     SavingsTargetCalculationResponse,
     SavingsMetricsResponse,
 )
+from models.expenses import ExpenseCard, Expense
+from datetime import datetime
 from utils.response import success_response, error_response
 from models.user import User, Permission
 from datetime import timedelta, datetime, date
@@ -901,128 +903,77 @@ async def mark_savings_payment(
     request: SavingsMarkingRequest,
     current_user: dict,
     db: Session,
-    *,
-    notification_repo: UserNotificationRepository | None = None,
 ):
-    savings = db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tracking_number).first()
+    """
+    Initiate payment for a single savings marking.
+    - Idempotent via idempotency_key
+    - Defers actual marking to verify step
+    """
+    savings = db.query(SavingsAccount).filter(
+        SavingsAccount.tracking_number == tracking_number
+    ).first()
     if not savings:
-        logger.error(f"Savings account with tracking_number {tracking_number} not found")
-        return error_response(status_code=404, message=f"Savings {tracking_number} not found")
+        raise HTTPException(404, f"Savings {tracking_number} not found")
 
     if savings.marking_status == MarkingStatus.COMPLETED:
-        logger.warning(f"Attempt to mark savings {tracking_number} in COMPLETED status")
-        return error_response(status_code=400, message=f"Cannot mark savings in {savings.marking_status} status")
+        raise HTTPException(400, f"Cannot mark completed savings {tracking_number}")
 
     if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
-        logger.warning(f"User {current_user['user_id']} attempted to mark savings {tracking_number} not owned")
-        return error_response(status_code=403, message=f"Not your savings {tracking_number}")
+        raise HTTPException(403, "Not your savings account")
 
-    if current_user["role"] not in ["agent", "sub_agent", "admin", "customer"]:
-        logger.warning(f"Unauthorized role {current_user['role']} attempted to mark savings {tracking_number}")
-        return error_response(status_code=401, message="Unauthorized role")
-
-    if request.unit_id:
-        unit_exists = db.query(exists().where(
-            user_units.c.user_id == savings.customer_id
-        ).where(
-            user_units.c.unit_id == request.unit_id
-        ).where(
-            Unit.id == request.unit_id
-        ).where(
-            Unit.business_id == savings.business_id
-        )).scalar()
-        if not unit_exists:
-            logger.error(f"Customer {savings.customer_id} not associated with unit {request.unit_id} in business {savings.business_id}")
-            return error_response(status_code=400, message=f"Customer {savings.customer_id} is not associated with unit {request.unit_id} in business {savings.business_id}")
-
-    logger.info(f"Attempting to mark date {request.marked_date} for savings {tracking_number}")
     marking = db.query(SavingsMarking).filter(
         SavingsMarking.savings_account_id == savings.id,
         SavingsMarking.marked_date == request.marked_date,
         SavingsMarking.status == SavingsStatus.PENDING
     ).first()
-
     if not marking:
-        existing_marking = db.query(SavingsMarking).filter(
-            SavingsMarking.savings_account_id == savings.id,
-            SavingsMarking.marked_date == request.marked_date
-        ).first()
-        if not existing_marking:
-            logger.error(f"Date {request.marked_date} not found in savings schedule for {tracking_number}")
-            return error_response(status_code=400, message=f"Date {request.marked_date} is not in the savings schedule")
-        logger.error(f"Date {request.marked_date} for {tracking_number} is already marked, status: {existing_marking.status}")
-        return error_response(status_code=400, message=f"Date {request.marked_date} is already marked (status: {existing_marking.status})")
+        raise HTTPException(400, f"Date {request.marked_date} invalid or already marked")
+
+    total_amount = marking.amount
+    if total_amount <= 0:
+        raise HTTPException(400, "Contribution amount must be positive")
 
     customer = db.query(User).filter(User.id == savings.customer_id).first()
     if not customer or not customer.email:
-        logger.error(f"Customer {savings.customer_id} has no email for savings {tracking_number}")
-        return error_response(status_code=400, message="Customer email required")
-
-    try:
-        payment_method = PaymentMethod(request.payment_method)
-        if payment_method not in [PaymentMethod.CARD, PaymentMethod.BANK_TRANSFER]:
-            logger.error(f"Invalid payment method {request.payment_method} for savings {tracking_number}")
-            return error_response(status_code=400, message=f"Invalid payment method: {request.payment_method}")
-    except ValueError:
-        logger.error(f"Invalid payment method value {request.payment_method} for savings {tracking_number}")
-        return error_response(status_code=400, message=f"Invalid payment method: {request.payment_method}")
-
-    # Only the daily contribution amount is paid — no commission added here
-    total_amount = marking.amount
-
-    # STRICT CHECK: Reject if amount is zero or negative
-    if total_amount <= 0:
-        logger.warning(
-            f"Zero or negative amount prevented for savings {tracking_number} "
-            f"date {request.marked_date} (amount={marking.amount})"
-        )
-        return error_response(
-            status_code=400,
-            message="Contribution amount must be positive. Please check savings configuration or contact support."
-        )
+        raise HTTPException(400, "Customer email required for payment")
 
     # ── Idempotency check ──
     reference = None
-    initiation = None
+    existing = None
 
     if request.idempotency_key:
-        initiation = db.query(PaymentInitiation).filter(
+        existing = db.query(PaymentInitiation).filter(
             PaymentInitiation.idempotency_key == request.idempotency_key,
             PaymentInitiation.status == PaymentInitiationStatus.PENDING.value,
             PaymentInitiation.user_id == current_user["user_id"]
         ).first()
-
-        if initiation:
-            logger.info(f"Idempotency hit - reusing reference {initiation.reference}")
-            reference = initiation.reference
+        if existing:
+            logger.info(f"Single marking idempotency hit - reusing ref {existing.reference}")
+            reference = existing.reference
 
     # ── New initiation if needed ──
     if not reference:
-        short_uuid = str(uuid.uuid4())[:8]
-        reference = f"sv_{tracking_number}_{short_uuid}"[:100]
+        ref_suffix = str(uuid.uuid4())[:8]
+        reference = f"sv_{tracking_number}_{ref_suffix}"
 
         total_kobo = int(total_amount * 100)
-        tx_response = Transaction.initialize(
+        resp = Transaction.initialize(
             reference=reference,
             amount=total_kobo,
             email=customer.email,
             metadata={
-                "source": "frontend_popup",
+                "source": "single_marking",
                 "tracking_number": tracking_number,
                 "marked_date": str(request.marked_date),
-                "user_id": current_user["user_id"],
                 "idempotency_key": request.idempotency_key,
             }
         )
 
-        logger.info(f"Paystack initialize response: {tx_response}")
-        if not tx_response["status"]:
-            logger.error(f"Paystack initialization failed: {tx_response}")
-            return error_response(status_code=500, message=f"Failed to initiate card payment: {tx_response.get('message', 'Unknown error')}")
+        if not resp["status"]:
+            raise HTTPException(500, f"Paystack init failed: {resp.get('message')}")
 
-        reference = tx_response["data"]["reference"]
+        reference = resp["data"]["reference"]
 
-        # Create PaymentInitiation record
         initiation = PaymentInitiation(
             idempotency_key=request.idempotency_key,
             reference=reference,
@@ -1030,345 +981,214 @@ async def mark_savings_payment(
             user_id=current_user["user_id"],
             savings_account_id=savings.id,
             savings_marking_id=marking.id,
-            payment_method=payment_method.value,
+            payment_method=request.payment_method.value if request.payment_method else "card",
             payment_metadata={
+                "type": "single",
                 "marking_id": marking.id,
                 "tracking_number": tracking_number,
                 "marked_date": str(request.marked_date),
                 "amount": float(total_amount),
-                "type": "single"
             }
         )
         db.add(initiation)
-        db.commit()  # only initiation is committed — markings untouched
-
-    # ── Return reference to frontend (NO marking update here) ──
-    logger.info(f"Card payment initiated for {tracking_number}, date {request.marked_date}, reference {reference}")
+        db.commit()
 
     return success_response(
         status_code=200,
         message="Proceed to payment",
-        data=SavingsMarkingResponse(
-            tracking_number=savings.tracking_number,
-            unit_id=savings.unit_id,
-            savings_schedule={request.marked_date.isoformat(): "payment_initiated"},
-            total_amount=total_amount,
-            authorization_url=None,
-            payment_reference=reference,
-            virtual_account=None
-        ).model_dump()
+        data={
+            "payment_reference": reference,
+            "total_amount": float(total_amount),
+            "tracking_number": tracking_number,
+            "marked_date": str(request.marked_date),
+        }
     )
+
 
 async def mark_savings_bulk(
     request: BulkMarkSavingsRequest,
     current_user: dict,
     db: Session,
 ):
+    """
+    Initiate bulk payment for multiple savings markings.
+    - Idempotent
+    - Defers marking to verify
+    """
     if not request.markings:
-        logger.error("No markings provided in bulk request")
-        return error_response(status_code=400, message="No markings provided")
+        raise HTTPException(400, "No markings provided")
 
-    try:
-        payment_method = PaymentMethod(request.payment_method)
-    except ValueError:
-        logger.error(f"Invalid payment method {request.payment_method}")
-        return error_response(status_code=400, message=f"Invalid payment method: {request.payment_method}")
-
-    all_markings = []
+    # Validate all markings belong to same user & are pending
+    savings_ids = set()
+    marking_ids = []
     total_amount = Decimal("0")
-    savings_accounts = {}
-    marked_dates_by_tracking = {}
-    markings_by_tracking = {}
+    tracking_numbers = set()
 
-    for mark_request in request.markings:
-        tn = mark_request.tracking_number
-        markings_by_tracking.setdefault(tn, []).append(mark_request)
+    for m in request.markings:
+        marking = db.query(SavingsMarking).filter(
+            SavingsMarking.savings_account_id == m.savings_account_id,
+            SavingsMarking.marked_date == m.marked_date,
+            SavingsMarking.status == SavingsStatus.PENDING
+        ).first()
+        if not marking:
+            raise HTTPException(400, f"Invalid or already marked: {m.marked_date}")
 
-    for tn, mark_requests in markings_by_tracking.items():
-        savings = db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tn).first()
+        savings = db.query(SavingsAccount).get(m.savings_account_id)
         if not savings:
-            logger.error(f"Savings account {tn} not found")
-            return error_response(status_code=404, message=f"Savings {tn} not found")
-
-        if savings.marking_status == MarkingStatus.COMPLETED:
-            logger.warning(f"Attempt to mark {tn} in COMPLETED status")
-            return error_response(status_code=400, message=f"Cannot mark completed savings {tn}")
+            raise HTTPException(404, f"Savings account {m.savings_account_id} not found")
 
         if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
-            logger.warning(f"User {current_user['user_id']} not owner of {tn}")
-            return error_response(status_code=403, message=f"Not your savings {tn}")
+            raise HTTPException(403, "Not your savings account")
 
-        if current_user["role"] not in ["agent", "sub_agent", "admin", "customer"]:
-            logger.warning(f"Unauthorized role {current_user['role']} attempted to mark savings {tn}")
-            return error_response(status_code=401, message="Unauthorized role")
+        total_amount += marking.amount
+        marking_ids.append(marking.id)
+        savings_ids.add(savings.id)
+        tracking_numbers.add(savings.tracking_number)
 
-        # Unit association check
-        unit_id = mark_requests[0].unit_id
-        if unit_id:
-            unit_exists = db.query(exists().where(
-                user_units.c.user_id == savings.customer_id
-            ).where(
-                user_units.c.unit_id == unit_id
-            ).where(
-                Unit.id == unit_id
-            ).where(
-                Unit.business_id == savings.business_id
-            )).scalar()
-            if not unit_exists:
-                logger.error(f"Customer {savings.customer_id} not associated with unit {unit_id} in business {savings.business_id}")
-                return error_response(
-                    status_code=400,
-                    message=f"Customer {savings.customer_id} is not associated with unit {unit_id} in business {savings.business_id}"
-                )
-
-        # Sequential & earliest pending validation
-        all_account_markings = db.query(SavingsMarking).filter(
-            SavingsMarking.savings_account_id == savings.id
-        ).order_by(SavingsMarking.marked_date.asc()).all()
-        if not all_account_markings:
-            return error_response(status_code=400, message=f"No markings found for {tn}")
-
-        earliest_pending = next((m.marked_date for m in all_account_markings if m.status == SavingsStatus.PENDING), None)
-        if not earliest_pending:
-            return error_response(status_code=400, message=f"No pending markings for {tn}")
-
-        requested_dates = sorted([mr.marked_date for mr in mark_requests])
-        if not requested_dates:
-            return error_response(status_code=400, message="No valid dates provided")
-
-        if requested_dates[0] != earliest_pending:
-            return error_response(
-                status_code=400,
-                message=f"Dates must start with earliest pending date {earliest_pending} for {tn}"
-            )
-
-        current_expected = earliest_pending
-        for req_date in requested_dates:
-            marking = next((m for m in all_account_markings if m.marked_date == req_date), None)
-            if not marking or marking.status != SavingsStatus.PENDING:
-                return error_response(status_code=400, message=f"Invalid or already marked date {req_date} for {tn}")
-
-            while current_expected < req_date:
-                intermediate = next((m for m in all_account_markings if m.marked_date == current_expected), None)
-                if intermediate and intermediate.status == SavingsStatus.PENDING:
-                    return error_response(
-                        status_code=400,
-                        message=f"Non-sequential: earlier pending date {current_expected} for {tn}"
-                    )
-                current_expected += timedelta(days=1)
-
-            if req_date != current_expected:
-                return error_response(
-                    status_code=400,
-                    message=f"Non-sequential date {req_date}; expected {current_expected} for {tn}"
-                )
-            current_expected += timedelta(days=1)
-
-        # Only sum the contribution amounts — no commission
-        for mark_req in mark_requests:
-            marking = db.query(SavingsMarking).filter(
-                SavingsMarking.savings_account_id == savings.id,
-                SavingsMarking.marked_date == mark_req.marked_date,
-                SavingsMarking.status == SavingsStatus.PENDING.value
-            ).first()
-
-            marking.payment_method = payment_method
-            marking.unit_id = mark_req.unit_id or savings.unit_id
-            marking.marked_by_id = current_user["user_id"]
-            marking.updated_by = current_user["user_id"]
-
-            total_amount += marking.amount
-
-            all_markings.append(marking)
-            savings_accounts[savings.id] = savings
-            marked_dates_by_tracking.setdefault(tn, []).append(mark_req.marked_date.isoformat())
-
-    # STRICT CHECK: Reject zero or negative total
     if total_amount <= 0:
-        logger.warning(f"Zero or negative total amount prevented for bulk marking")
-        return error_response(
-            status_code=400,
-            message="Total contribution amount must be positive. Please check selected markings."
-        )
-
-    customer = db.query(User).filter(
-        User.id == list(savings_accounts.values())[0].customer_id
-    ).first()
-    if not customer or not customer.email:
-        logger.error("Customer email missing for bulk marking")
-        return error_response(status_code=400, message="Customer email required")
+        raise HTTPException(400, "Total amount must be positive")
 
     # ── Idempotency check ──
     reference = None
-    initiation = None
+    existing = None
 
     if request.idempotency_key:
-        initiation = db.query(PaymentInitiation).filter(
+        existing = db.query(PaymentInitiation).filter(
             PaymentInitiation.idempotency_key == request.idempotency_key,
             PaymentInitiation.status == PaymentInitiationStatus.PENDING.value,
             PaymentInitiation.user_id == current_user["user_id"]
         ).first()
-
-        if initiation:
-            logger.info(f"Bulk idempotency hit - reusing reference {initiation.reference}")
-            reference = initiation.reference
+        if existing:
+            logger.info(f"Bulk idempotency hit - reusing ref {existing.reference}")
+            reference = existing.reference
 
     # ── New initiation if needed ──
     if not reference:
-        first_tn = list(marked_dates_by_tracking.keys())[0]
-        short_uuid = str(uuid.uuid4())[:8]
-        reference = f"sv_bulk_{first_tn}_{short_uuid}"[:100]
+        ref_suffix = str(uuid.uuid4())[:8]
+        reference = f"sv_bulk_{ref_suffix}"
+
+        customer = db.query(User).filter(
+            User.id == current_user["user_id"]
+        ).first()
+        if not customer or not customer.email:
+            raise HTTPException(400, "Customer email required")
 
         total_kobo = int(total_amount * 100)
-        tx_response = Transaction.initialize(
+        resp = Transaction.initialize(
             reference=reference,
             amount=total_kobo,
             email=customer.email,
             metadata={
-                "source": "frontend_popup_bulk",
-                "bulk": True,
+                "source": "bulk_marking",
+                "marking_ids": marking_ids,
                 "idempotency_key": request.idempotency_key,
-                "user_id": current_user["user_id"],
             }
         )
 
-        if not tx_response["status"]:
-            logger.error(f"Bulk Paystack init failed: {tx_response}")
-            return error_response(
-                status_code=500,
-                message=f"Failed to initiate bulk payment: {tx_response.get('message', 'Unknown error')}"
-            )
+        if not resp["status"]:
+            raise HTTPException(500, f"Paystack init failed: {resp.get('message')}")
 
-        reference = tx_response["data"]["reference"]
+        reference = resp["data"]["reference"]
 
-        # Create PaymentInitiation record
         initiation = PaymentInitiation(
             idempotency_key=request.idempotency_key,
             reference=reference,
             status=PaymentInitiationStatus.PENDING,
             user_id=current_user["user_id"],
-            savings_account_id=None,  # bulk may span multiple
+            savings_account_id=None,  # bulk
             savings_marking_id=None,
-            payment_method=payment_method.value,
+            payment_method=request.payment_method.value,
             payment_metadata={
                 "type": "bulk",
-                "marking_ids": [m.id for m in all_markings],
+                "marking_ids": marking_ids,
                 "total_amount": float(total_amount),
-                "savings_accounts": [s.id for s in savings_accounts.values()],
-                "marked_dates_by_tracking": marked_dates_by_tracking
+                "tracking_numbers": list(tracking_numbers),
             }
         )
         db.add(initiation)
         db.commit()
 
-    # ── Return to frontend (NO marking status/reference update) ──
-    logger.info(
-        f"Bulk payment initiated - reference {reference}, "
-        f"total {total_amount}, dates across {len(savings_accounts)} accounts"
-    )
-
     return success_response(
         status_code=200,
-        message="Proceed to payment for bulk marking",
+        message="Proceed to bulk payment",
         data={
-            "authorization_url": None,
-            "reference": reference,
+            "payment_reference": reference,
             "total_amount": float(total_amount),
-            "savings_accounts": [
-                {
-                    "tracking_number": tn,
-                    "unit_id": db.query(SavingsAccount).filter(
-                        SavingsAccount.tracking_number == tn
-                    ).first().unit_id,
-                    "marked_dates": dates
-                }
-                for tn, dates in marked_dates_by_tracking.items()
-            ]
         }
     )
 
 
 async def verify_savings_payment(reference: str, db: Session):
     """
-    Verify Paystack payment for savings markings.
-    - Checks initiation record
-    - Verifies with Paystack
-    - Updates markings to PAID if successful
-    - Sets savings to COMPLETED if no pending markings remain
+    Verify Paystack payment for savings markings (single or bulk).
     - Idempotent: safe to call multiple times
+    - Updates markings to PAID if successful
+    - Marks initiation as COMPLETED
+    - Checks if any savings plans are now fully completed
     """
-    # Find the initiation record
+    logger.info(f"[SAVINGS-VERIFY] Starting verification for reference: {reference}")
+
     initiation = db.query(PaymentInitiation).filter(
         PaymentInitiation.reference == reference
     ).first()
 
     if not initiation:
-        logger.error(f"Payment initiation not found for reference {reference}")
-        return error_response(status_code=404, message="Payment reference not found")
+        logger.error(f"[SAVINGS-VERIFY] Initiation not found for reference {reference}")
+        raise HTTPException(404, "Payment initiation not found")
 
-    if initiation.status == PaymentInitiationStatus.COMPLETED:
-        logger.info(f"Reference {reference} already completed - idempotent success")
-        return success_response(status_code=200, message="Payment already verified")
+    # Idempotent: already completed → early return
+    if initiation.status == PaymentInitiationStatus.COMPLETED.value:
+        logger.info(f"[SAVINGS-VERIFY] Already completed - idempotent success")
+        return success_response(200, "Payment already verified")
 
-    if initiation.status != PaymentInitiationStatus.PENDING:
-        logger.warning(f"Invalid state for reference {reference}: {initiation.status}")
-        return error_response(status_code=400, message="Payment not in pending state")
-
-    # Extract expected amount from metadata
-    metadata = initiation.payment_metadata or {}
-    expected_amount = Decimal(metadata.get('total_amount', 0))
-    marking_ids = metadata.get('marking_ids', []) or [metadata.get('marking_id')]
-
-    if not marking_ids:
-        logger.error(f"No marking IDs found in metadata for reference {reference}")
-        initiation.status = PaymentInitiationStatus.FAILED
-        db.commit()
-        return error_response(status_code=400, message="No markings associated with this payment")
+    # Safety check: wrong state
+    if initiation.status != PaymentInitiationStatus.PENDING.value:
+        logger.warning(f"[SAVINGS-VERIFY] Invalid state for {reference}: {initiation.status}")
+        raise HTTPException(400, "Initiation not in pending state")
 
     # Verify with Paystack
-    response = Transaction.verify(reference=reference)
-    logger.info(f"Paystack verify response for {reference}: {response}")
-
-    if not response["status"] or response["data"]["status"] != "success":
-        logger.error(f"Paystack verification failed for {reference}: {response.get('message')}")
-        initiation.status = PaymentInitiationStatus.FAILED
+    resp = Transaction.verify(reference=reference)
+    if not resp["status"] or resp["data"]["status"] != "success":
+        logger.error(f"[SAVINGS-VERIFY] Paystack verification failed: {resp.get('message')}")
+        initiation.status = PaymentInitiationStatus.FAILED.value
         db.commit()
-        return error_response(status_code=400, message="Payment verification failed")
+        raise HTTPException(400, "Payment verification failed")
 
-    total_paid = Decimal(response["data"]["amount"]) / 100
+    paid_amount = Decimal(resp["data"]["amount"]) / 100
+    logger.info(f"[SAVINGS-VERIFY] Paid amount: {paid_amount}")
 
-    if total_paid < expected_amount:
-        logger.error(f"Underpayment for {reference}: paid {total_paid}, expected {expected_amount}")
-        initiation.status = PaymentInitiationStatus.FAILED
+    # Extract from metadata (supports both single and bulk)
+    metadata = initiation.payment_metadata or {}
+    marking_ids = metadata.get("marking_ids", []) or [metadata.get("marking_id")]
+    if not marking_ids:
+        logger.error("[SAVINGS-VERIFY] No marking_ids in metadata")
+        initiation.status = PaymentInitiationStatus.FAILED.value
         db.commit()
-        return error_response(
-            status_code=400,
-            message=f"Underpayment: paid {total_paid}, expected {expected_amount}"
-        )
+        raise HTTPException(400, "No markings associated with this initiation")
 
-    # Update markings to PAID
     markings = db.query(SavingsMarking).filter(
-        SavingsMarking.id.in_(marking_ids)
+        SavingsMarking.id.in_(marking_ids),
+        SavingsMarking.status == SavingsStatus.PENDING
     ).all()
 
-    if not markings:
-        logger.error(f"No markings found for IDs in metadata: {marking_ids}")
-        initiation.status = PaymentInitiationStatus.FAILED
+    expected = sum(m.amount for m in markings)
+    if paid_amount < expected:
+        logger.error(f"[SAVINGS-VERIFY] Underpayment: {paid_amount} < {expected}")
+        initiation.status = PaymentInitiationStatus.FAILED.value
         db.commit()
-        return error_response(status_code=404, message="No markings found for this payment")
+        raise HTTPException(400, f"Underpayment: {paid_amount} < {expected}")
 
+    # Update markings to PAID
     for marking in markings:
-        if marking.status == SavingsStatus.PAID:
-            logger.info(f"Skipping already PAID marking {marking.id} for idempotency")
-            continue
         marking.status = SavingsStatus.PAID
         marking.payment_reference = reference
         marking.updated_at = datetime.utcnow()
         # marked_by_id already set during initiation if needed
 
     db.commit()
+    logger.info(f"[SAVINGS-VERIFY] Updated {len(markings)} markings to PAID")
 
-    # Check if any savings accounts are now fully completed
+    # Check for completed savings plans
     savings_ids = {m.savings_account_id for m in markings}
     completion_messages = []
 
@@ -1384,29 +1204,31 @@ async def verify_savings_payment(reference: str, db: Session):
 
         if pending_count == 0 and savings.marking_status != MarkingStatus.COMPLETED:
             savings.marking_status = MarkingStatus.COMPLETED
+            total_commission = calculate_total_commission(savings)
             completion_messages.append(
-                f"Congratulations! You have successfully completed savings plan {savings.tracking_number}!"
+                f"Congratulations! You have successfully completed savings plan {savings.tracking_number}! "
+                f"Total commission: {total_commission}"
             )
 
     db.commit()
 
-    # Mark initiation as completed
-    initiation.status = PaymentInitiationStatus.COMPLETED
+    # Mark initiation completed
+    initiation.status = PaymentInitiationStatus.COMPLETED.value
     db.commit()
+    logger.info(f"[SAVINGS-VERIFY] Initiation marked COMPLETED")
 
     # Build response
     response_data = {
         "reference": reference,
-        "status": SavingsStatus.PAID.value,
-        "amount": str(expected_amount),
+        "status": "PAID",
+        "paid_amount": float(paid_amount),
+        "markings_updated": len(markings),
         "tracking_numbers": list({m.savings_account.tracking_number for m in markings if m.savings_account}),
         "marked_dates": [m.marked_date.isoformat() for m in markings],
     }
 
     if completion_messages:
         response_data["completion_message"] = " ".join(completion_messages)
-
-    logger.info(f"Payment verified successfully for reference {reference}")
 
     return success_response(
         status_code=200,
@@ -1729,9 +1551,6 @@ async def get_savings_metrics(
 
 async def get_monthly_summary(current_user: dict, db: Session, business_id: int | None = None):
     """Get monthly summary of savings and expenses for the current month, plus all-time totals"""
-    from models.expenses import ExpenseCard, Expense
-    from datetime import datetime
-    from dateutil.relativedelta import relativedelta
     
     # Get current month start and end dates
     now = datetime.now()
