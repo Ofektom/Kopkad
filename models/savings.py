@@ -118,7 +118,19 @@ class PaymentInitiation(Base):
     id = Column(Integer, primary_key=True, index=True)
     idempotency_key = Column(String(255), unique=True, nullable=False, index=True)
     reference = Column(String(100), nullable=False, index=True)
-    status = Column(Enum(PaymentInitiationStatus), default=PaymentInitiationStatus.PENDING, nullable=False)
+    
+    # FIXED: Use SQLEnum with values_callable to force .value usage
+    status = Column(
+        Enum(
+            PaymentInitiationStatus,
+            values_callable=lambda cls: [e.value for e in cls],   # ← This is the key fix
+            native_enum=False,                                     # Prevents native enum name confusion
+        ),
+        default=PaymentInitiationStatus.PENDING.value,             # Use .value for default
+        nullable=False,
+        index=True
+    )
+    
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
@@ -128,7 +140,7 @@ class PaymentInitiation(Base):
     savings_marking_id = Column(Integer, ForeignKey("savings_markings.id"), nullable=True)
     payment_method = Column(String(50), nullable=True)
     
-    # Store additional context (important for verify step)
+    # Store additional context
     payment_metadata = Column(JSONB, nullable=True)
 
     # Relationships
@@ -136,7 +148,6 @@ class PaymentInitiation(Base):
     savings_account = relationship("SavingsAccount", back_populates="payment_initiations")
     savings_marking = relationship("SavingsMarking", back_populates="payment_initiations")
 
-    # String representation (as a proper method)
     def __repr__(self):
         return (
             f"<PaymentInitiation(id={self.id}, "
@@ -145,8 +156,6 @@ class PaymentInitiation(Base):
             f"status={self.status})>"
         )
 
-
-# Optional: If you want a separate string property (extra safe against mapper confusion)
     @property
     def display(self):
         return self.__repr__()
