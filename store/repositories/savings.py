@@ -336,40 +336,47 @@ class SavingsRepository:
         return formatted
 
     # NEW: Group Metrics Helpers
-    def get_total_scheduled_dates_for_group(self, group_id: int) -> int:
-        """Count distinct scheduled dates across all group accounts."""
-        return (
-            self.db.query(func.count(distinct(SavingsMarking.marked_date)))
-            .filter(
-                SavingsMarking.savings_account_id.in_(
-                    self.db.subquery().select(SavingsAccount.id).filter(SavingsAccount.group_id == group_id)
-                )
-            )
-            .scalar() or 0
-        )
+  # 1. get_total_scheduled_dates_for_group
+def get_total_scheduled_dates_for_group(self, group_id: int) -> int:
+    subq = (
+        self.db.query(SavingsAccount.id)
+        .filter(SavingsAccount.group_id == group_id)
+        .subquery()
+    )
+    return (
+        self.db.query(func.count(distinct(SavingsMarking.marked_date)))
+        .filter(SavingsMarking.savings_account_id.in_(subq))
+        .scalar() or 0
+    )
 
-    def get_total_contributed_for_group(self, group_id: int) -> Decimal:
-        """Sum of PAID marking amounts across all group accounts."""
-        return (
-            self.db.query(func.coalesce(func.sum(SavingsMarking.amount), Decimal("0")))
-            .filter(
-                SavingsMarking.savings_account_id.in_(
-                    self.db.subquery().select(SavingsAccount.id).filter(SavingsAccount.group_id == group_id)
-                ),
-                SavingsMarking.status == SavingsStatus.PAID
-            )
-            .scalar() or Decimal("0")
+# 2. get_total_contributed_for_group
+def get_total_contributed_for_group(self, group_id: int) -> Decimal:
+    subq = (
+        self.db.query(SavingsAccount.id)
+        .filter(SavingsAccount.group_id == group_id)
+        .subquery()
+    )
+    return (
+        self.db.query(func.coalesce(func.sum(SavingsMarking.amount), Decimal("0")))
+        .filter(
+            SavingsMarking.savings_account_id.in_(subq),
+            SavingsMarking.status == SavingsStatus.PAID
         )
+        .scalar() or Decimal("0")
+    )
 
-    def get_unique_paid_dates_count_for_group(self, group_id: int) -> int:
-        """Count distinct paid dates across all group accounts."""
-        return (
-            self.db.query(func.count(distinct(SavingsMarking.marked_date)))
-            .filter(
-                SavingsMarking.savings_account_id.in_(
-                    self.db.subquery().select(SavingsAccount.id).filter(SavingsAccount.group_id == group_id)
-                ),
-                SavingsMarking.status == SavingsStatus.PAID
-            )
-            .scalar() or 0
+# 3. get_unique_paid_dates_count_for_group
+def get_unique_paid_dates_count_for_group(self, group_id: int) -> int:
+    subq = (
+        self.db.query(SavingsAccount.id)
+        .filter(SavingsAccount.group_id == group_id)
+        .subquery()
+    )
+    return (
+        self.db.query(func.count(distinct(SavingsMarking.marked_date)))
+        .filter(
+            SavingsMarking.savings_account_id.in_(subq),
+            SavingsMarking.status == SavingsStatus.PAID
         )
+        .scalar() or 0
+    )
