@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import insert
 from sqlalchemy import select, or_, func
 import urllib.parse
-from fastapi import BackgroundTasks
+from fastapi import BackgroundTasks, status
 from models.business import Business, PendingBusinessRequest, Unit, user_units, AdminCredentials, BusinessPermission, BusinessType
 from models.user_business import user_business
 from models.user import User, user_permissions
@@ -292,6 +292,7 @@ async def add_customer_to_business(
     customer = user_repo.get_by_phone(phone_number)
     
     # Handle New User Creation or Re-invitation
+        # Handle New User Creation or Re-invitation
     if not customer:
         if request.email and user_repo.exists_by_email(request.email):
              return error_response(
@@ -299,16 +300,15 @@ async def add_customer_to_business(
                 message="Email already in use by another user"
             )
             
-        # Determine role based on business type
+        # Load business early to determine type
         business = business_repo.find_one_by(unique_code=request.business_unique_code)
         if not business:
              return error_response(status_code=404, message="Business not found")
              
+        # Determine role based on business type (Enum comparison)
         new_role = Role.CUSTOMER
-        is_cooperative = False
-        if hasattr(business, 'business_type') and business.business_type == "cooperative":
+        if business.business_type == BusinessType.COOPERATIVE:
              new_role = Role.COOPERATIVE_MEMBER
-             is_cooperative = True
              
         try:
             # Create inactive stub user
@@ -326,7 +326,7 @@ async def add_customer_to_business(
             )
             session.add(customer)
             session.flush() # Get ID
-            logger.info(f"Placeholder user created with ID: {customer.id}")
+            logger.info(f"Placeholder user created with ID: {customer.id} and role: {new_role}")
             
             # Assign minimal permissions (will be expanded on setup)
             logger.info(f"Assigning permissions. Permission value being used: {Permission.VIEW_OWN_CONTRIBUTIONS}")
@@ -338,7 +338,7 @@ async def add_customer_to_business(
             logging.info(f"Created stub user {customer.id} for invite")
         except Exception as e:
             session.rollback()
-            logger.exception("Full traceback for placeholder user creation failure:") # Log full stack trace
+            logger.exception("Full traceback for placeholder user creation failure:")
             return error_response(status_code=500, message=f"Failed to create placeholder user: {str(e)}")
 
     if customer and customer.role not in [Role.CUSTOMER, Role.COOPERATIVE_MEMBER]:
@@ -359,7 +359,8 @@ async def add_customer_to_business(
             )
 
     # COOPERATIVE LOGIC: Auto-Add & Re-invite
-    if hasattr(business, 'business_type') and business.business_type == "cooperative":
+    # FIXED: Proper Enum comparison (business_type is Enum member)
+    if business.business_type == BusinessType.COOPERATIVE:
         # Check if already in business (Active or Inactive)
         is_already_linked = user_business_repo.is_user_in_business(customer.id, business.id)
         
@@ -369,9 +370,10 @@ async def add_customer_to_business(
                 status_code=409, message="Member already exists and is active in this cooperative"
             )
             
-        # If not linked -> Link them
+        # If not linked -> Link them immediately
         if not is_already_linked:
             user_business_repo.link_user_to_business(customer.id, business.id)
+            logger.info(f"[COOP AUTO-LINK] User {customer.id} linked to cooperative {business.id}")
             
         # Assign Unit (Safe Add)
         if request.unit_id:
@@ -380,22 +382,13 @@ async def add_customer_to_business(
                 return error_response(status_code=404, message="Unit not found in this business")
             unit_repo.add_member(request.unit_id, customer.id)
             
-        # Commit changes so far
+        # Commit changes so far (preserve the link)
         session.commit()
         
         # Generate/Update Pending Request (Token for Setup)
         try:
-            # Check for existing request to reuse/update? Or just create new?
-            # Creating new is safer for "Re-invite" flow.
-            # Delete old requests for this user/business to avoid clutter
-            # (Assuming pending_repo has method or we just create new)
-            
             token = str(uuid.uuid4())
             expires_at = datetime.now(timezone.utc) + timedelta(hours=24) # 24 hour token
-            
-            # Note: create_request might not check for existing. 
-            # Ideally we clear old ones. 
-            # pending_repo.delete_by_user_business(customer.id, business.id) # If method exists
             
             pending_request = pending_repo.create_request(
                 customer_id=customer.id,
@@ -408,15 +401,14 @@ async def add_customer_to_business(
             
             setup_url = f"{settings.APP_BASE_URL}/setup-account?token={token}"
             
-            # Generate WhatsApp Link
+            # Generate WhatsApp Link (setup-focused for cooperatives)
             wa_message = f"Hello {customer.full_name}, you have been added to {business.name}. Please set up your account here: {setup_url}"
             encoded_message = urllib.parse.quote(wa_message)
             whatsapp_link = f"https://wa.me/{phone_number}?text={encoded_message}"
             
-            # Send Notification
+            # Send Notification (email if available)
             if request.email or customer.email:
                 email_to_use = request.email or customer.email
-                # Use background task for email
                 background_tasks.add_task(
                     send_setup_account_email,
                     email_to_use, 
@@ -427,7 +419,7 @@ async def add_customer_to_business(
             
             message = "Member added successfully. Setup email sent."
             if is_already_linked: # Re-invite case
-                message = "Member re-invited successfully. setup email resent."
+                message = "Member re-invited successfully. Setup email resent."
                 
             return success_response(
                 status_code=200,
@@ -444,7 +436,7 @@ async def add_customer_to_business(
             return error_response(status_code=500, message=f"Failed to add member: {str(e)}")
 
 
-    # STANDARD (THRIFT) LOGIC: Invitation Flow
+    # STANDARD (THRIFT) LOGIC: Invitation Flow (requires acceptance)
     if user_business_repo.is_user_in_business(customer.id, business.id):
         return error_response(
             status_code=409, message="Customer already associated with this business"
@@ -470,18 +462,17 @@ async def add_customer_to_business(
         accept_url = f"{settings.APP_BASE_URL}/business/accept-invitation?token={token}"
         reject_url = f"{settings.APP_BASE_URL}/business/reject-invitation?token={token}"
         
-        # Generate WhatsApp Link
-        wa_message = f"Hello {customer.full_name}, {business.name} enters you to join their savings group. Click here to accept: {accept_url}"
+        # Generate WhatsApp Link (accept/reject focused for standard)
+        wa_message = f"Hello {customer.full_name}, {business.name} invites you to join their savings group. Click here to accept: {accept_url}\n\nOr reject: {reject_url}"
         encoded_message = urllib.parse.quote(wa_message)
         whatsapp_link = f"https://wa.me/{phone_number}?text={encoded_message}"
         
         # Determine notification method
         delivery_method = []
         
-        # Priority: Email if available (even for inactive users)
+        # Priority: Email if available
         if request.email or customer.email:
             email_to_use = request.email or customer.email
-            # Use background task for email
             background_tasks.add_task(
                 send_business_invitation_email,
                 email_to_use, 
@@ -492,12 +483,11 @@ async def add_customer_to_business(
             )
             delivery_method.append("email")
             
-        # Log for WhatsApp (simulated) - now real link available
-        if not delivery_method: 
+        if not delivery_method:
              logging.info(f"Generated WhatsApp Link for {phone_number}: {whatsapp_link}")
              delivery_method.append("whatsapp (manual)")
 
-        # Notify customer about invitation (if active and has push)
+        # Notify customer about invitation (if active)
         if customer.is_active:
             from service.notifications import notify_user
             await notify_user(
