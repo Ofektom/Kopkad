@@ -8,7 +8,7 @@ from datetime import date, datetime
 from decimal import Decimal
 import uuid
 import logging
-
+import requests
 from dateutil.relativedelta import relativedelta
 
 from models.savings_group import SavingsGroup, GroupFrequency
@@ -878,6 +878,8 @@ async def get_group_savings_metrics(
     remaining_days = max(0, total_scheduled_dates - unique_paid_dates)
 
     return success_response(
+        status_code=200,
+        message="Successfully retrieved group savings metrics",
         data={
             "group_name": group.name,
             "total_members": total_members,
