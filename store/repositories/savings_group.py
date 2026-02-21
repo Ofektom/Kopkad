@@ -1,12 +1,13 @@
 from typing import List, Optional, Tuple
 from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
-from models.savings_group import SavingsGroup
-from models.savings import SavingsAccount, SavingsType
+from models.savings_group import SavingsGroup, GroupFrequency
+from models.savings import SavingsAccount, SavingsType, SavingsMarking, SavingsStatus
 from models.business import Unit
 from store.repositories.base import BaseRepository
 from datetime import date
 from decimal import Decimal
+from dateutil.relativedelta import relativedelta
 
 
 class SavingsGroupRepository(BaseRepository[SavingsGroup]):
@@ -117,11 +118,6 @@ class SavingsGroupRepository(BaseRepository[SavingsGroup]):
         self.db.commit()
         self.db.refresh(account)
 
-        # Generate savings markings based on frequency
-        from dateutil.relativedelta import relativedelta
-        from models.savings import SavingsMarking, SavingsStatus
-        from models.savings_group import GroupFrequency
-
         current_date = start_date
         # If no end date, default to duration months
         end_date = group.end_date
@@ -185,3 +181,37 @@ class SavingsGroupRepository(BaseRepository[SavingsGroup]):
         self.db.delete(group)
         self.db.commit()
         return True
+    
+    def get_member_count(self, group_id: int) -> int:
+        return (
+            self.db.query(func.count(SavingsAccount.id.distinct()))
+            .filter(SavingsAccount.group_id == group_id)
+            .scalar() or 0
+        )
+
+    def get_groups_for_member(self, member_id: int, skip: int = 0, limit: int = 100) -> Tuple[List[SavingsGroup], int]:
+        query = self.db.query(SavingsGroup).join(SavingsAccount).filter(
+            SavingsAccount.customer_id == member_id,
+            SavingsGroup.is_active == True
+        )
+
+        total = query.count()
+        groups = query.order_by(SavingsGroup.created_at.desc()).offset(skip).limit(limit).all()
+        return groups, total
+    
+    def get_member_account_for_user(self, group_id: int, user_id: int) -> Optional[SavingsAccount]:
+        return self.db.query(SavingsAccount).filter(
+            SavingsAccount.group_id == group_id,
+            SavingsAccount.customer_id == user_id
+        ).first()
+    
+    def member_exists_in_group(self, group_id: int, user_id: int) -> bool:
+        return (
+            self.db.query(func.exists().where(
+                SavingsAccount.group_id == group_id,
+                SavingsAccount.customer_id == user_id
+            )).scalar() or False
+        )
+
+    def get_all_group_accounts(self, group_id: int) -> List[SavingsAccount]:
+        return self.db.query(SavingsAccount).filter(SavingsAccount.group_id == group_id).all()

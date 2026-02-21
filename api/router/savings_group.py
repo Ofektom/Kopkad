@@ -18,6 +18,7 @@ from api.controller.savings_group import (
     toggle_group_marking_controller,
     init_group_paystack,
     verify_group_paystack,
+    get_group_metrics,
 )
 
 savings_group_router = APIRouter(prefix="/savings-groups", tags=["Savings Groups"])
@@ -96,6 +97,13 @@ savings_group_router.add_api_route(
 savings_group_router.add_api_route(
     "/markings/paystack/verify/{reference}",
     endpoint=verify_group_paystack,
+    methods=["GET"],
+    summary="Verify Paystack payment for group markings"
+)
+
+savings_group_router.add_api_route(
+    "/{group_id}/metrics",
+    endpoint=get_group_metrics,
     methods=["GET"],
     summary="Verify Paystack payment for group markings"
 )

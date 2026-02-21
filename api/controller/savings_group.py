@@ -27,7 +27,8 @@ from service.savings_group import (
     delete_group_service,
     get_group_grid_data,
     initiate_group_marking_payment,
-    verify_group_marking_payment
+    verify_group_marking_payment,
+    get_group_savings_metrics,
 )
 from store.repositories.savings_group import SavingsGroupRepository
 from store.repositories.savings import SavingsRepository
@@ -335,4 +336,19 @@ async def verify_group_paystack(
     return await verify_group_marking_payment(
         reference, 
         db
+    )
+
+async def get_group_metrics(
+    group_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    group_repo: SavingsGroupRepository = Depends(get_repository(SavingsGroupRepository)),
+    savings_repo: SavingsRepository = Depends(get_repository(SavingsRepository)),
+):
+    return await get_group_savings_metrics(
+        group_id=group_id,
+        current_user=current_user,
+        db=db,
+        group_repo=group_repo,
+        savings_repo=savings_repo
     )

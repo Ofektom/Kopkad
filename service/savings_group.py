@@ -1,17 +1,19 @@
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
-from typing import List, Dict, Optional, Any
-from dateutil.relativedelta import relativedelta
 
+
+from fastapi import HTTPException
+from sqlalchemy import func, distinct
+from sqlalchemy.orm import Session
+from typing import Dict, List, Optional, Any
 from datetime import date, datetime
+from decimal import Decimal
 import uuid
 import logging
+
+from dateutil.relativedelta import relativedelta
 
 from models.savings_group import SavingsGroup, GroupFrequency
 from models.savings import SavingsAccount, SavingsMarking, SavingsStatus, PaymentMethod, PaymentInitiation, PaymentInitiationStatus
 from models.user import User
-
-
 from models.business import BusinessType
 
 from schemas.savings_group import (
@@ -27,17 +29,12 @@ from store.repositories.savings import SavingsRepository
 from store.repositories.business import BusinessRepository
 from store.repositories.user import UserRepository
 from utils.response import success_response, error_response
-import requests
-
-logger = logging.getLogger(__name__)
 
 from paystackapi.transaction import Transaction
 from paystackapi.paystack import Paystack
 import os
-from decimal import Decimal
 
-from schemas.savings import SavingsMarkingResponse
-
+logger = logging.getLogger(__name__)
 
 paystack = Paystack(secret_key=os.getenv("PAYSTACK_SECRET_KEY"))
 
@@ -54,17 +51,16 @@ def _generate_group_grid_dates(
     end_date: Optional[date] = None
 ) -> List[date]:
     """
-    Generate a list of dates based on frequency, handling pagination.
+    Generate paginated list of contribution dates based on group frequency.
     """
     dates = []
     current_date = start_date
-    
-    # Skip to offset
+
+    # Skip offset dates
     skipped = 0
     while skipped < offset:
         if end_date and current_date > end_date:
             break
-            
         if frequency == GroupFrequency.WEEKLY:
             current_date += relativedelta(weeks=1)
         elif frequency == GroupFrequency.BI_WEEKLY:
@@ -75,14 +71,13 @@ def _generate_group_grid_dates(
             current_date += relativedelta(months=3)
         skipped += 1
 
-    # Collect dates up to limit
+    # Collect up to limit dates
     collected = 0
     while collected < limit:
         if end_date and current_date > end_date:
             break
-            
         dates.append(current_date)
-        
+
         if frequency == GroupFrequency.WEEKLY:
             current_date += relativedelta(weeks=1)
         elif frequency == GroupFrequency.BI_WEEKLY:
@@ -92,7 +87,7 @@ def _generate_group_grid_dates(
         elif frequency == GroupFrequency.QUARTERLY:
             current_date += relativedelta(months=3)
         collected += 1
-        
+
     return dates
 
 
@@ -226,32 +221,23 @@ async def create_group(
     user_repo: Optional[UserRepository] = None,
     savings_repo: Optional[SavingsRepository] = None,
 ) -> CreateSavingsGroupResponse:
-    logger.info("[SERVICE] create_group called")
-    logger.info(f"[SERVICE] Received request data: {request.model_dump_json(indent=2)}")
-    logger.info(f"[SERVICE] Current user: role={current_user.get('role')}, id={current_user.get('user_id')}")
-
     group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
     user_repo = _resolve_repo(user_repo, UserRepository, db)
+    savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
 
     user_id = current_user["user_id"]
     role = current_user["role"]
 
     if role not in ["admin", "super_admin", "agent"]:
-        logger.warning(f"[SERVICE] Unauthorized role attempt: {role}")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admins, super admins or agents can create savings groups"
-        )
+        raise HTTPException(403, "Only admins, super admins or agents can create savings groups")
 
     business = business_repo.get_by_admin_id(user_id) or business_repo.get_by_agent_id(user_id)
     if not business:
-        logger.warning(f"[SERVICE] No business found for user {user_id}")
-        raise HTTPException(status_code=400, detail="User is not associated with any business")
+        raise HTTPException(400, "User is not associated with any business")
 
     if business.business_type != BusinessType.COOPERATIVE:
-        logger.warning(f"[SERVICE] Business type is not COOPERATIVE: {business.business_type}")
-        raise HTTPException(status_code=400, detail="Only cooperative businesses can create savings groups")
+        raise HTTPException(400, "Only cooperative businesses can create savings groups")
 
     member_ids = request.member_ids or []
     duration_months = request.duration_months
@@ -262,18 +248,13 @@ async def create_group(
 
     if duration_months:
         group_data["end_date"] = group_data["start_date"] + relativedelta(months=duration_months)
-    # If no duration_months, end_date remains null (open-ended)
-
-    logger.info(f"[SERVICE] Creating group with data: {group_data}")
 
     group = group_repo.create_group(group_data)
-    logger.info(f"[SERVICE] Group created - ID: {group.id}, frequency: {group.frequency.value}")
 
     created_accounts = []
     for member_id in member_ids:
         try:
             req = AddGroupMemberRequest(user_id=member_id, start_date=group.start_date)
-            logger.info(f"[SERVICE] Attempting to add member {member_id} to group {group.id}")
             account = await add_member_to_group(
                 group_id=group.id,
                 request=req,
@@ -285,19 +266,16 @@ async def create_group(
                 savings_repo=savings_repo,
             )
             created_accounts.append(account)
-            logger.info(f"[SERVICE] Successfully added member {member_id}")
         except Exception as e:
-            logger.warning(f"[SERVICE] Failed to add member {member_id} to group {group.id}: {str(e)}")
+            logger.warning(f"Failed to add member {member_id}: {str(e)}")
             continue
 
-    response = CreateSavingsGroupResponse(
+    return CreateSavingsGroupResponse(
         message="Savings group created successfully",
         group=SavingsGroupResponse.from_orm(group),
         created_members_count=len(created_accounts)
     )
-    logger.info(f"[SERVICE] Returning response: {response.model_dump_json(indent=2)}")
 
-    return response
 
 
 async def list_groups(
@@ -361,12 +339,7 @@ async def list_groups(
     
     for group in groups:
         group_resp = SavingsGroupResponse.from_orm(group)
-        
-        member_account = None
-        member_account = db.query(SavingsAccount).filter(
-            SavingsAccount.group_id == group.id,
-            SavingsAccount.customer_id == user_id
-        ).first()
+        member_account = group_repo.get_member_account_for_user(group.id, user_id)
 
         if member_account:
             group_resp.user_relationship = {
@@ -454,13 +427,9 @@ async def add_member_to_group(
     if not any(b.id == group.business_id for b in user_businesses):
         raise HTTPException(status_code=403, detail="User does not belong to this cooperative")
 
-    existing = db.query(SavingsAccount).filter(
-        SavingsAccount.group_id == group_id,
-        SavingsAccount.customer_id == request.user_id,
-    ).first()
-    if existing:
+    if group_repo.member_exists_in_group(group_id, request.user_id):
         raise HTTPException(status_code=400, detail="User is already a member of this group")
-
+    
     tracking_number = str(uuid.uuid4())[:10].upper()
 
     start_date = request.start_date or group.start_date
@@ -844,5 +813,82 @@ async def verify_group_marking_payment(reference: str, db: Session):
             "status": "PAID",
             "paid_amount": float(paid_amount),
             "markings_updated": len(markings)
+        }
+    )
+
+
+async def get_group_savings_metrics(
+    group_id: int,
+    current_user: dict,
+    db: Session,
+    *,
+    group_repo: Optional[SavingsGroupRepository] = None,
+    savings_repo: Optional[SavingsRepository] = None,
+):
+    group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
+    savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
+
+    group = group_repo.get_active_group(group_id)
+    if not group:
+        raise HTTPException(404, "Group not found or inactive")
+
+    # Authorization check
+    if current_user["role"] not in ["agent", "admin", "super_admin"]:
+        membership_exists = db.query(func.exists().where(
+            SavingsAccount.group_id == group_id,
+            SavingsAccount.customer_id == current_user["user_id"]
+        )).scalar()
+        if not membership_exists:
+            raise HTTPException(403, "Not authorized to view this group's metrics")
+
+    # 1. Total members → from repo
+    total_members = group_repo.get_member_count(group_id)
+
+    contribution_amount = group.contribution_amount or Decimal("0")
+
+    # 2. Total scheduled dates → from repo
+    total_scheduled_dates = savings_repo.get_total_scheduled_dates_for_group(group_id)
+
+    # Fallback projection if zero (no markings yet)
+    if total_scheduled_dates == 0:
+        end_date = group.end_date or (group.start_date + relativedelta(years=1))
+        current = group.start_date
+        projected = 0
+        while current <= end_date:
+            projected += 1
+            if group.frequency == GroupFrequency.WEEKLY:
+                current += relativedelta(weeks=1)
+            elif group.frequency == GroupFrequency.BI_WEEKLY:
+                current += relativedelta(weeks=2)
+            elif group.frequency == GroupFrequency.MONTHLY:
+                current += relativedelta(months=1)
+            elif group.frequency == GroupFrequency.QUARTERLY:
+                current += relativedelta(months=3)
+        total_scheduled_dates = projected
+
+    # 3. Total target
+    total_target = contribution_amount * Decimal(total_members) * Decimal(total_scheduled_dates)
+
+    # 4. Total contributed → from repo
+    total_contributed = savings_repo.get_total_contributed_for_group(group_id)
+
+    # 5. Unique paid dates → from repo
+    unique_paid_dates = savings_repo.get_unique_paid_dates_count_for_group(group_id)
+
+    remaining_days = max(0, total_scheduled_dates - unique_paid_dates)
+
+    return success_response(
+        data={
+            "group_name": group.name,
+            "total_members": total_members,
+            "contribution_amount_per_member_per_date": float(contribution_amount),
+            "total_scheduled_dates": total_scheduled_dates,
+            "total_target_amount": float(total_target),
+            "total_contributed_so_far": float(total_contributed),
+            "remaining_days": remaining_days,
+            "progress_percentage": (
+                float(total_contributed) / float(total_target) * 100
+                if total_target > 0 else 0.0
+            )
         }
     )
