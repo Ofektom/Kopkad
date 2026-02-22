@@ -482,7 +482,8 @@ async def add_customer_to_business(
             message=message,
             data={
                 "customer_id": customer.id,
-                "whatsapp_link": whatsapp_link
+                "whatsapp_link": whatsapp_link,
+                "setup_url": setup_url,
             }
         )
 
