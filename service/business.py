@@ -429,7 +429,7 @@ async def add_customer_to_business(
         )
         session.commit()
 
-        setup_url = f"{settings.APP_BASE_URL}/setup-account?token={token}"
+        setup_url = f"{settings.APP_BASE_URL}/business/accept-invitation?token={token}"
 
         # WhatsApp message (setup-focused for cooperatives, accept/reject for standard)
         if business.business_type == BusinessType.COOPERATIVE:
