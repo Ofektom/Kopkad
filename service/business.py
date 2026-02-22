@@ -404,13 +404,23 @@ async def add_customer_to_business(
 
     # ── Pending request + WhatsApp link ──
     try:
-        # Clean up old pending requests
-        pending_repo.delete_by_user_business(customer.id, business.id)
+        # Clean up old pending requests for this user + business
+        old_requests = (
+            session.query(PendingBusinessRequest)
+            .filter(
+                PendingBusinessRequest.customer_id == customer.id,
+                PendingBusinessRequest.business_id == business.id
+            )
+            .all()
+        )
+        for old_req in old_requests:
+            pending_repo.delete_request(old_req)
+        logger.info(f"Cleaned {len(old_requests)} old pending requests for user {customer.id} + business {business.id}")
 
         token = str(uuid.uuid4())
         expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
 
-        pending_request = pending_repo.create_request(
+        pending_repo.create_request(
             customer_id=customer.id,
             business_id=business.id,
             unit_id=request.unit_id,
