@@ -258,7 +258,7 @@ async def add_customer_to_business(
     pending_repo: PendingBusinessRequestRepository | None = None,
     unit_repo: UnitRepository | None = None,
 ):
-    """Add an existing customer to a business for AGENT, SUB_AGENT, or SUPER_ADMIN."""
+    """Add/invite a customer to a business (cooperative or standard)."""
     user_repo = _resolve_repo(user_repo, UserRepository, db)
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
     user_business_repo = _resolve_repo(user_business_repo, UserBusinessRepository, db)
@@ -266,190 +266,150 @@ async def add_customer_to_business(
     unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
     session = user_repo.db
 
+    logger.info(f"Adding customer phone={request.customer_phone} to business code={request.business_unique_code} by user {current_user['user_id']}")
+
+    # ── Authorization checks ──
     current_user_obj = user_repo.get_by_id(current_user["user_id"])
     if not current_user_obj:
         return error_response(status_code=404, message="User not found")
+
     if current_user["role"] not in [Role.AGENT, Role.SUB_AGENT, Role.SUPER_ADMIN]:
         return error_response(
-            status_code=403, message="Only AGENT, SUB_AGENT, or SUPER_ADMIN can add customers to a business"
+            status_code=403, message="Only AGENT, SUB_AGENT, or SUPER_ADMIN can add customers"
         )
+
     if current_user["role"] != Role.SUPER_ADMIN and not has_permission(current_user_obj, Permission.ASSIGN_BUSINESS, session):
         return error_response(status_code=403, message="No permission to assign customers to business")
 
-    input_phone = request.customer_phone.replace("+", "")
-    if input_phone.startswith("234") and len(input_phone) == 13:
-        phone_number = "0" + input_phone[3:]
-    elif len(input_phone) == 11 and input_phone.startswith("0"):
-        phone_number = input_phone
-    elif len(input_phone) == 10 and not input_phone.startswith("0"):
-        phone_number = "0" + input_phone
+    # ── Normalize phone number ──
+    phone = request.customer_phone.replace("+", "")
+    if phone.startswith("234") and len(phone) == 13:
+        phone_number = "0" + phone[3:]
+    elif len(phone) == 11 and phone.startswith("0"):
+        phone_number = phone
+    elif len(phone) == 10 and not phone.startswith("0"):
+        phone_number = "0" + phone
     else:
-        return error_response(
-            status_code=400,
-            message="Customer phone number must be 10 or 11 digits (with leading 0) or include country code 234 with 13 digits"
-        )
+        return error_response(status_code=400, message="Invalid phone number format")
 
+    # ── Check for existing user by phone (primary identity) ──
     customer = user_repo.get_by_phone(phone_number)
-    
-    # Handle New User Creation or Re-invitation
-        # Handle New User Creation or Re-invitation
-    if not customer:
-        if request.email and user_repo.exists_by_email(request.email):
-             return error_response(
-                status_code=status.HTTP_409_CONFLICT,
-                message="Email already in use by another user"
-            )
+
+    if customer:
+        # Reuse existing user - do NOT create duplicate
+        logger.info(f"Reusing existing user {customer.id} (phone: {phone_number})")
+        
+        # Strict email conflict check (no override allowed if different)
+        if request.email:
+            provided_email = request.email.lower().strip()
+            existing_email = customer.email.lower().strip() if customer.email else None
             
-        # Load business early to determine type
+            if existing_email and provided_email != existing_email:
+                return error_response(
+                    status_code=409,
+                    message=(
+                        f"This phone number is already registered with email '{existing_email}'. "
+                        "You cannot assign a different email during addition. "
+                        "Either leave the email field blank (keep existing), "
+                        "or enter the exact same email, or correct the phone number if this is a mistake."
+                    )
+                )
+            
+            # Emails match or no existing email → safe to set/update
+            if not existing_email or provided_email == existing_email:
+                customer.email = provided_email
+                session.add(customer)
+                logger.info(f"Email confirmed/updated for existing user {customer.id}: {provided_email}")
+        # If no email provided → keep existing (no change)
+
+    else:
+        # Create new user
+        if request.email and user_repo.exists_by_email(request.email.lower()):
+            return error_response(status_code=409, message="Email already in use by another user")
+
         business = business_repo.find_one_by(unique_code=request.business_unique_code)
         if not business:
-             return error_response(status_code=404, message="Business not found")
-             
-        # Determine role based on business type (Enum comparison)
-        new_role = Role.CUSTOMER
-        if business.business_type == BusinessType.COOPERATIVE:
-             new_role = Role.COOPERATIVE_MEMBER
-             
+            return error_response(status_code=404, message="Business not found")
+
+        new_role = Role.COOPERATIVE_MEMBER if business.business_type == BusinessType.COOPERATIVE else Role.CUSTOMER
+
         try:
-            # Create inactive stub user
-            logger.info(f"Attempting to create placeholder user for phone: {phone_number}")
             customer = User(
-                full_name="Invited Member", # Placeholder
+                full_name="Invited Member",
                 phone_number=phone_number,
-                email=request.email,
+                email=request.email.lower() if request.email else None,
                 username=phone_number,
-                pin=hash_password("12345"), # Temporary dummy PIN
+                pin=hash_password("12345"),  # temporary dummy PIN
                 role=new_role,
                 is_active=False,
                 created_by=current_user["user_id"],
                 created_at=datetime.now(timezone.utc),
             )
             session.add(customer)
-            session.flush() # Get ID
-            logger.info(f"Placeholder user created with ID: {customer.id} and role: {new_role}")
-            
-            # Assign minimal permissions (will be expanded on setup)
-            logger.info(f"Assigning permissions. Permission value being used: {Permission.VIEW_OWN_CONTRIBUTIONS}")
-            permissions_to_assign = [
-                {"user_id": customer.id, "permission": Permission.VIEW_OWN_CONTRIBUTIONS.value},
-            ]
-            session.execute(insert(user_permissions).values(permissions_to_assign))
-            
-            logging.info(f"Created stub user {customer.id} for invite")
+            session.flush()
+            logger.info(f"Created new user {customer.id} with role {new_role.value}")
         except Exception as e:
             session.rollback()
-            logger.exception("Full traceback for placeholder user creation failure:")
-            return error_response(status_code=500, message=f"Failed to create placeholder user: {str(e)}")
+            logger.exception("Failed to create new user")
+            return error_response(status_code=500, message=f"Failed to create user: {str(e)}")
 
-    if customer and customer.role not in [Role.CUSTOMER, Role.COOPERATIVE_MEMBER]:
-        return error_response(status_code=400, message="User exists but has an incompatible role")
-        
+    # ── Role validation ──
+    if customer.role not in [Role.CUSTOMER, Role.COOPERATIVE_MEMBER]:
+        return error_response(status_code=400, message=f"User role {customer.role} cannot be added to business")
+
     business = business_repo.find_one_by(unique_code=request.business_unique_code)
     if not business:
         return error_response(status_code=404, message="Business not found")
 
+    # ── Authorization for specific roles ──
     if current_user["role"] == Role.AGENT and business.agent_id != current_user["user_id"]:
-        return error_response(
-            status_code=403, message="Agent must be the owner of the business to add customers"
-        )
+        return error_response(403, "Agent must be the owner of the business to add customers")
+
     if current_user["role"] == Role.SUB_AGENT:
         if not user_business_repo.is_user_in_business(current_user["user_id"], business.id):
-            return error_response(
-                status_code=403, message="Sub-agent not found in this business"
-            )
+            return error_response(403, "Sub-agent not found in this business")
 
-    # COOPERATIVE LOGIC: Auto-Add & Re-invite
-    # FIXED: Proper Enum comparison (business_type is Enum member)
+    # ── Link to business (many-to-many) + set active_business_id ──
+    is_linked = user_business_repo.is_user_in_business(customer.id, business.id)
+
     if business.business_type == BusinessType.COOPERATIVE:
-        # Check if already in business (Active or Inactive)
-        is_already_linked = user_business_repo.is_user_in_business(customer.id, business.id)
-        
-        # If linked and active -> Error (Already a member)
-        if is_already_linked and customer.is_active:
-             return error_response(
-                status_code=409, message="Member already exists and is active in this cooperative"
-            )
-            
-        # If not linked -> Link them immediately
-        if not is_already_linked:
+        if is_linked and customer.is_active:
+            return error_response(409, "Member is already active in this cooperative")
+
+        if not is_linked:
             user_business_repo.link_user_to_business(customer.id, business.id)
             logger.info(f"[COOP AUTO-LINK] User {customer.id} linked to cooperative {business.id}")
-            
-        # Assign Unit (Safe Add)
+            session.flush()
+
+        # Always set/update active_business_id (current context)
+        customer.active_business_id = business.id
+        session.add(customer)
+        logger.info(f"[ACTIVE BUSINESS SET] User {customer.id} active_business_id = {business.id}")
+
+        # Assign unit if provided
         if request.unit_id:
             unit = unit_repo.find_one_by(id=request.unit_id, business_id=business.id)
             if not unit:
                 return error_response(status_code=404, message="Unit not found in this business")
             unit_repo.add_member(request.unit_id, customer.id)
-            
-        # Commit changes so far (preserve the link)
-        session.commit()
-        
-        # Generate/Update Pending Request (Token for Setup)
-        try:
-            token = str(uuid.uuid4())
-            expires_at = datetime.now(timezone.utc) + timedelta(hours=24) # 24 hour token
-            
-            pending_request = pending_repo.create_request(
-                customer_id=customer.id,
-                business_id=business.id,
-                unit_id=request.unit_id,
-                token=token,
-                expires_at=expires_at,
-            )
-            session.commit()
-            
-            setup_url = f"{settings.APP_BASE_URL}/setup-account?token={token}"
-            
-            # Generate WhatsApp Link (setup-focused for cooperatives)
-            wa_message = f"Hello {customer.full_name}, you have been added to {business.name}. Please set up your account here: {setup_url}"
-            encoded_message = urllib.parse.quote(wa_message)
-            whatsapp_link = f"https://wa.me/{phone_number}?text={encoded_message}"
-            
-            # Send Notification (email if available)
-            if request.email or customer.email:
-                email_to_use = request.email or customer.email
-                background_tasks.add_task(
-                    send_setup_account_email,
-                    email_to_use, 
-                    customer.full_name, 
-                    business.name, 
-                    setup_url
-                )
-            
-            message = "Member added successfully. Setup email sent."
-            if is_already_linked: # Re-invite case
-                message = "Member re-invited successfully. Setup email resent."
-                
-            return success_response(
-                status_code=200,
-                message=message,
-                data={
-                    "customer_id": customer.id,
-                    "whatsapp_link": whatsapp_link
-                }
-            )
-            
-        except Exception as e:
-            session.rollback()
-            logger.exception("Failed to process cooperative addition")
-            return error_response(status_code=500, message=f"Failed to add member: {str(e)}")
 
+    else:
+        # Standard business: invitation only - no immediate link or active_business_id change
+        if is_linked:
+            return error_response(409, "Customer already associated with this business")
 
-    # STANDARD (THRIFT) LOGIC: Invitation Flow (requires acceptance)
-    if user_business_repo.is_user_in_business(customer.id, business.id):
-        return error_response(
-            status_code=409, message="Customer already associated with this business"
-        )
+    # Commit early (preserve link + active_business_id + any email update)
+    session.commit()
+    session.refresh(customer)
 
-    if request.unit_id:
-        unit = unit_repo.find_one_by(id=request.unit_id, business_id=business.id)
-        if not unit:
-            return error_response(status_code=404, message="Unit not found in this business")
-
+    # ── Pending request + WhatsApp link ──
     try:
+        # Clean up old pending requests
+        pending_repo.delete_by_user_business(customer.id, business.id)
+
         token = str(uuid.uuid4())
         expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+
         pending_request = pending_repo.create_request(
             customer_id=customer.id,
             business_id=business.id,
@@ -459,61 +419,66 @@ async def add_customer_to_business(
         )
         session.commit()
 
-        accept_url = f"{settings.APP_BASE_URL}/business/accept-invitation?token={token}"
-        reject_url = f"{settings.APP_BASE_URL}/business/reject-invitation?token={token}"
-        
-        # Generate WhatsApp Link (accept/reject focused for standard)
-        wa_message = f"Hello {customer.full_name}, {business.name} invites you to join their savings group. Click here to accept: {accept_url}\n\nOr reject: {reject_url}"
+        setup_url = f"{settings.APP_BASE_URL}/setup-account?token={token}"
+
+        # WhatsApp message (setup-focused for cooperatives, accept/reject for standard)
+        if business.business_type == BusinessType.COOPERATIVE:
+            wa_message = (
+                f"Hello {customer.full_name},\n\n"
+                f"You have been added to {business.name}.\n"
+                f"Please click here to set up your account and create your password/PIN:\n{setup_url}"
+            )
+        else:
+            accept_url = f"{settings.APP_BASE_URL}/business/accept-invitation?token={token}"
+            reject_url = f"{settings.APP_BASE_URL}/business/reject-invitation?token={token}"
+            wa_message = (
+                f"Hello {customer.full_name},\n\n"
+                f"{business.name} invites you to join their savings group.\n"
+                f"Click here to accept: {accept_url}\n"
+                f"Or reject: {reject_url}"
+            )
+
         encoded_message = urllib.parse.quote(wa_message)
         whatsapp_link = f"https://wa.me/{phone_number}?text={encoded_message}"
-        
-        # Determine notification method
-        delivery_method = []
-        
-        # Priority: Email if available
+
+        # Email notification
         if request.email or customer.email:
             email_to_use = request.email or customer.email
-            background_tasks.add_task(
-                send_business_invitation_email,
-                email_to_use, 
-                customer.full_name, 
-                business.name, 
-                accept_url, 
-                reject_url
-            )
-            delivery_method.append("email")
-            
-        if not delivery_method:
-             logging.info(f"Generated WhatsApp Link for {phone_number}: {whatsapp_link}")
-             delivery_method.append("whatsapp (manual)")
+            if business.business_type == BusinessType.COOPERATIVE:
+                background_tasks.add_task(
+                    send_setup_account_email,
+                    email_to_use,
+                    customer.full_name,
+                    business.name,
+                    setup_url
+                )
+            else:
+                background_tasks.add_task(
+                    send_business_invitation_email,
+                    email_to_use,
+                    customer.full_name,
+                    business.name,
+                    accept_url,
+                    reject_url
+                )
 
-        # Notify customer about invitation (if active)
-        if customer.is_active:
-            from service.notifications import notify_user
-            await notify_user(
-                user_id=customer.id,
-                notification_type=NotificationType.BUSINESS_INVITATION,
-                title="Business Invitation",
-                message=f"You have been invited to join {business.name}",
-                priority=NotificationPriority.HIGH,
-                db=session,
-                notification_repo=UserNotificationRepository(session),
-                related_entity_id=business.id,
-                related_entity_type="business",
-            )
+        message = "Member added successfully. Setup link generated."
+        if is_linked:
+            message = "Member re-invited successfully. Setup link regenerated."
 
         return success_response(
-            status_code=200, 
-            message="Invitation sent successfully", 
+            status_code=200,
+            message=message,
             data={
-                "pending_request_id": pending_request.id,
+                "customer_id": customer.id,
                 "whatsapp_link": whatsapp_link
             }
         )
+
     except Exception as e:
         session.rollback()
-        logger.error(f"Failed to initiate customer invitation: {str(e)}")
-        return error_response(status_code=500, message=f"Failed to process invitation: {str(e)}")
+        logger.exception("Failed during pending request / link finalization")
+        return error_response(status_code=500, message=f"Failed to finalize addition: {str(e)}")
 
 async def complete_registration_service(
     token: str,
