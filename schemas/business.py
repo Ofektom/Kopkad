@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -55,6 +55,11 @@ class CustomerInvite(BaseModel):
 
 class CompleteRegistration(BaseModel):
     token: str
-
     pin: str = Field(..., min_length=5, max_length=5) # Assuming 5 digit pin
     full_name: str
+
+    @validator('pin')
+    def pin_must_be_numeric(cls, v):
+        if not v.isdigit():
+            raise ValueError('PIN must contain only digits')
+        return v

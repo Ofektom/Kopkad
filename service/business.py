@@ -28,6 +28,7 @@ from datetime import timezone, timedelta
 from utils.email_service import (
     send_business_created_email,
     send_business_invitation_email,
+    send_setup_account_email,
 )
 from config.settings import settings
 from typing import Optional
