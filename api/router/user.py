@@ -23,6 +23,8 @@ from api.controller.user import (
     get_current_user_info_controller,
     update_admin_details_controller,
     update_current_user_controller,
+    forgot_password_controller,
+    reset_password_controller,
 )
 
 
@@ -116,6 +118,22 @@ user_router.add_api_route(
     methods=["POST"],
     response_model=UserResponse,
     summary="Change user password",
+)
+
+user_router.add_api_route(
+    "/forgot-password",
+    endpoint=forgot_password_controller,
+    methods=["POST"],
+    response_model=dict,
+    summary="Request a password reset link",
+)
+
+user_router.add_api_route(
+    "/reset-password",
+    endpoint=reset_password_controller,
+    methods=["POST"],
+    response_model=dict,
+    summary="Reset password using a valid token",
 )
 
 user_router.add_api_route(

@@ -40,6 +40,13 @@ class ChangePasswordRequest(BaseModel):
     old_pin: str
     new_pin: str
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_pin: str = Field(..., pattern=r"^\d{5}$")
+
 class Response(BaseModel):
     status_code: int
     success: bool

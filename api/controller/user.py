@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from schemas.user import SignupRequest, LoginRequest, ChangePasswordRequest, AdminUpdateRequest, UserUpdateRequest
+from schemas.user import SignupRequest, LoginRequest, ChangePasswordRequest, AdminUpdateRequest, UserUpdateRequest, ForgotPasswordRequest, ResetPasswordRequest
 from typing import List
 from service.user import (
     signup_unauthenticated,
@@ -29,6 +29,8 @@ from service.user import (
     get_current_user_info_service,
     update_admin_details,
     update_current_user_profile,
+    forgot_password_service,
+    reset_password_service,
 )
 from database.postgres_optimized import get_db
 from utils.auth import get_current_user, oauth2_scheme
@@ -213,6 +215,22 @@ async def change_password_controller(
         db=db,
         user_repo=user_repo,
     )
+
+async def forgot_password_controller(
+    request: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+    user_repo: UserRepository = Depends(get_repository(UserRepository)),
+):
+    """Request a password reset link"""
+    return await forgot_password_service(request=request, db=db, user_repo=user_repo)
+
+async def reset_password_controller(
+    request: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+    user_repo: UserRepository = Depends(get_repository(UserRepository)),
+):
+    """Reset password using token"""
+    return await reset_password_service(request=request, db=db, user_repo=user_repo)
 
 
 async def toggle_user_status_controller(

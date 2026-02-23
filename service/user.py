@@ -41,11 +41,16 @@ from schemas.business import BusinessResponse
 # Utilities
 from utils.response import success_response, error_response
 from utils.auth import hash_password, verify_password, create_access_token, refresh_access_token
-from utils.email_service import send_welcome_email
+from utils.email_service import send_welcome_email, send_email_async
 from utils.password_utils import decrypt_password
 from utils.permissions import grant_admin_permissions, revoke_admin_permissions
-from utils.permissions import grant_admin_permissions, revoke_admin_permissions
+from sqlalchemy.sql import select
 from config.settings import settings
+from schemas.user import ForgotPasswordRequest, ResetPasswordRequest
+import secrets
+from datetime import timedelta
+from models.user import PasswordResetToken
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -634,6 +639,88 @@ async def change_password(
         db.rollback()
         logger.error(f"Pin change failed for user {user.id}: {str(e)}")
         return error_response(status_code=500, message=f"Failed to change pin: {str(e)}")
+
+async def forgot_password_service(request: ForgotPasswordRequest, db: Session, user_repo: UserRepository):
+    """Generate a password reset token and send an email."""
+    user = user_repo.get_by_email(request.email)
+    if not user:
+        # Don't reveal if user exists or not for security, just return success
+        return success_response(status_code=200, message="If your email is registered, a password reset link has been sent.")
+    
+    # Generate token
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+    
+    # Save token
+    new_token = PasswordResetToken(
+        user_id=user.id,
+        token=token,
+        expires_at=expires_at,
+        is_used=False
+    )
+    db.add(new_token)
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to save password reset token: {str(e)}")
+        return error_response(status_code=500, message="An error occurred while processing your request.")
+
+    # Send email
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    reset_link = f"{frontend_url}/reset-password?token={token}"
+    
+    email_body = f"""
+    <html>
+        <body>
+            <h2>Password Reset Request</h2>
+            <p>Hi {user.full_name},</p>
+            <p>You requested a password reset for your Kopkad account. Click the link below to set a new PIN.</p>
+            <p><a href="{reset_link}">Reset My Password</a></p>
+            <p>This link will expire in 15 minutes.</p>
+            <p>If you did not request this, please ignore this email.</p>
+        </body>
+    </html>
+    """
+    
+    await send_email_async(
+        to_email=user.email,
+        subject="Kopkad Password Reset",
+        body=email_body
+    )
+    
+    return success_response(status_code=200, message="If your email is registered, a password reset link has been sent.")
+
+async def reset_password_service(request: ResetPasswordRequest, db: Session, user_repo: UserRepository):
+    """Verify token and update the user's PIN."""
+    stmt = select(PasswordResetToken).where(
+        PasswordResetToken.token == request.token,
+        PasswordResetToken.is_used == False,
+        PasswordResetToken.expires_at > datetime.now(timezone.utc)
+    )
+    token_record = db.execute(stmt).scalar_one_or_none()
+    
+    if not token_record:
+        return error_response(status_code=400, message="Invalid or expired password reset token.")
+    
+    user = user_repo.get_by_id(token_record.user_id)
+    if not user:
+        return error_response(status_code=404, message="User not found.")
+    
+    try:
+        # Update user's pin
+        user.pin = hash_password(request.new_pin)
+        
+        # Mark token as used
+        token_record.is_used = True
+        
+        db.commit()
+        logger.info(f"Password reset successful for user ID {user.id}")
+        return success_response(status_code=200, message="Password reset successful. You can now login with your new PIN.")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to reset password for user {user.id}: {str(e)}")
+        return error_response(status_code=500, message="An error occurred while resetting your password.")
 
 async def get_all_users(
     db: Session,

@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, Enum, Table, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, Enum, Table, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import select
+from sqlalchemy.sql import select, func
 from database.postgres_optimized import Base
 from models.audit import AuditMixin
 from models.user_business import user_business
@@ -112,6 +112,7 @@ class User(AuditMixin, Base):
         foreign_keys="Settings.user_id",
     )
     payment_initiations = relationship("PaymentInitiation", back_populates="user")
+    password_reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
 
     @property
     def permissions(self):
@@ -123,3 +124,15 @@ class User(AuditMixin, Base):
             if self.id
             else []
         )
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token = Column(String(255), unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    is_used = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    user = relationship("User", back_populates="password_reset_tokens")

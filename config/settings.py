@@ -3,8 +3,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 import logging
 
+# Dynamically construct the path to the .env file
+ENV_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+
 # Load environment variables from specific .env file
-load_dotenv("/Users/decagon/Documents/Ofektom/savings-system/.env")
+load_dotenv(ENV_PATH)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -60,7 +63,7 @@ class Settings(BaseSettings):
     SCORE_WEIGHT_SAVINGS_ACTIVITY: int = 10
 
     model_config = SettingsConfigDict(
-        env_file="/Users/decagon/Documents/Ofektom/savings-system/.env",
+        env_file=ENV_PATH,
         env_file_encoding="utf-8",
         extra="ignore",
     )
