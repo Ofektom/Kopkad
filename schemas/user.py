@@ -41,7 +41,7 @@ class ChangePasswordRequest(BaseModel):
     new_pin: str
 
 class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
+    username: str = Field(..., description="Email or Phone Number")
 
 class ResetPasswordRequest(BaseModel):
     token: str

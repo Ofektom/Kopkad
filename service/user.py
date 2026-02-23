@@ -641,11 +641,17 @@ async def change_password(
         return error_response(status_code=500, message=f"Failed to change pin: {str(e)}")
 
 async def forgot_password_service(request: ForgotPasswordRequest, db: Session, user_repo: UserRepository):
-    """Generate a password reset token and send an email."""
-    user = user_repo.get_by_email(request.email)
+    """Generate a password reset token and send an email or return a WA link."""
+    # Attempt to find user by email, phone, or username
+    user = user_repo.get_by_email_or_phone_or_username(
+        email=request.username, 
+        phone=request.username, 
+        username=request.username
+    )
+    
     if not user:
         # Don't reveal if user exists or not for security, just return success
-        return success_response(status_code=200, message="If your email is registered, a password reset link has been sent.")
+        return success_response(status_code=200, message="If your account is registered, a password reset link has been sent.")
     
     # Generate token
     token = secrets.token_urlsafe(32)
@@ -666,30 +672,35 @@ async def forgot_password_service(request: ForgotPasswordRequest, db: Session, u
         logger.error(f"Failed to save password reset token: {str(e)}")
         return error_response(status_code=500, message="An error occurred while processing your request.")
 
-    # Send email
+    # Send email if available
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
     reset_link = f"{frontend_url}/reset-password?token={token}"
-    
-    email_body = f"""
-    <html>
-        <body>
-            <h2>Password Reset Request</h2>
-            <p>Hi {user.full_name},</p>
-            <p>You requested a password reset for your Kopkad account. Click the link below to set a new PIN.</p>
-            <p><a href="{reset_link}">Reset My Password</a></p>
-            <p>This link will expire in 15 minutes.</p>
-            <p>If you did not request this, please ignore this email.</p>
-        </body>
-    </html>
-    """
-    
-    await send_email_async(
-        to_email=user.email,
-        subject="Kopkad Password Reset",
-        body=email_body
+            
+    if user.email:
+        email_body = f"""
+        <html>
+            <body>
+                <h2>Password Reset Request</h2>
+                <p>Hi {user.full_name},</p>
+                <p>You requested a password reset for your Kopkad account. Click the link below to set a new PIN.</p>
+                <p><a href="{reset_link}">Reset My Password</a></p>
+                <p>This link will expire in 15 minutes.</p>
+                <p>If you did not request this, please ignore this email.</p>
+            </body>
+        </html>
+        """
+        
+        # We don't block if email fails, it just logs
+        await send_email_async(
+            to_email=user.email,
+            subject="Kopkad Password Reset",
+            body=email_body
+        )
+            
+    return success_response(
+        status_code=200, 
+        message="If your account is registered, a password reset link has been sent."
     )
-    
-    return success_response(status_code=200, message="If your email is registered, a password reset link has been sent.")
 
 async def reset_password_service(request: ResetPasswordRequest, db: Session, user_repo: UserRepository):
     """Verify token and update the user's PIN."""
