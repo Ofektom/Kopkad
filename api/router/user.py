@@ -25,6 +25,8 @@ from api.controller.user import (
     update_current_user_controller,
     forgot_password_controller,
     reset_password_controller,
+    verify_reset_otp_controller,
+    resend_reset_otp_controller,
 )
 
 
@@ -134,6 +136,22 @@ user_router.add_api_route(
     methods=["POST"],
     response_model=dict,
     summary="Reset password using a valid token",
+)
+
+user_router.add_api_route(
+    "/verify-reset-otp",
+    endpoint=verify_reset_otp_controller,
+    methods=["POST"],
+    response_model=dict,
+    summary="Verify reset OTP and get reset session",
+)
+
+user_router.add_api_route(
+    "/resend-reset-otp",
+    endpoint=resend_reset_otp_controller,
+    methods=["POST"],
+    response_model=dict,
+    summary="Resend reset OTP for phone",
 )
 
 user_router.add_api_route(

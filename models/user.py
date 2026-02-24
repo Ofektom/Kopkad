@@ -4,6 +4,7 @@ from sqlalchemy.sql import select, func
 from database.postgres_optimized import Base
 from models.audit import AuditMixin
 from models.user_business import user_business
+import datetime
 
 class Role:
     SUPER_ADMIN = "super_admin"
@@ -136,3 +137,19 @@ class PasswordResetToken(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     user = relationship("User", back_populates="password_reset_tokens")
+
+
+
+class PasswordResetOtp(Base):
+    __tablename__ = "password_reset_otps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    otp_hash = Column(String(255), nullable=False)           # hashed OTP
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    is_used = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    def is_valid(self):
+        return not self.is_used and self.expires_at > datetime.datetime.now(datetime.timezone.utc)

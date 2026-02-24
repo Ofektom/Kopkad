@@ -6,6 +6,7 @@ import string
 from cryptography.fernet import Fernet
 from config.settings import settings
 import logging
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -140,3 +141,10 @@ def generate_admin_credentials(business_name: str, unique_code: str):
         'full_name': f"{business_name} Admin"
     }
 
+def generate_otp(length=6):
+    """Generate a secure 6-digit OTP."""
+    return ''.join(secrets.choice('0123456789') for _ in range(length))
+
+def hash_otp(otp: str) -> str:
+    """Hash OTP for secure storage (SHA-256)."""
+    return hashlib.sha256(otp.encode()).hexdigest()

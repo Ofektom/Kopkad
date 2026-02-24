@@ -1,14 +1,18 @@
 from fastapi import status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from sqlalchemy.sql import insert
 from datetime import datetime, timezone
 from typing import List, Optional
 import httpx
 import logging
 
-# Models (only for type hints and relationships)
-from models.user import User, user_permissions
-from models.business import Business
+from models.user import user_permissions, PasswordResetOtp, PasswordResetToken
+from utils.password_utils import generate_otp, hash_otp, decrypt_password
+from datetime import datetime, timezone, timedelta
+from utils.email_service import send_reset_password_email_async, send_welcome_email, send_email_async
+from utils.sms_service import send_termii_sms_async
+from schemas.user import ForgotPasswordRequest, ResetPasswordRequest
+import os
 
 # Repositories (for data access)
 from store.repositories import (
@@ -41,16 +45,10 @@ from schemas.business import BusinessResponse
 # Utilities
 from utils.response import success_response, error_response
 from utils.auth import hash_password, verify_password, create_access_token, refresh_access_token
-from utils.email_service import send_welcome_email, send_email_async
-from utils.password_utils import decrypt_password
-from utils.permissions import grant_admin_permissions, revoke_admin_permissions
+from utils.permissions import grant_admin_permissions
 from sqlalchemy.sql import select
 from config.settings import settings
-from schemas.user import ForgotPasswordRequest, ResetPasswordRequest
 import secrets
-from datetime import timedelta
-from models.user import PasswordResetToken
-import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -640,98 +638,197 @@ async def change_password(
         logger.error(f"Pin change failed for user {user.id}: {str(e)}")
         return error_response(status_code=500, message=f"Failed to change pin: {str(e)}")
 
+
 async def forgot_password_service(request: ForgotPasswordRequest, db: Session, user_repo: UserRepository):
-    """Generate a password reset token and send an email or return a WA link."""
-    # Attempt to find user by email, phone, or username
+    """Initiate password reset: send link (email) or OTP (SMS)."""
+    # Find user by username (email or phone)
     user = user_repo.get_by_email_or_phone_or_username(
-        email=request.username, 
-        phone=request.username, 
+        email=request.username,
+        phone=request.username,
         username=request.username
     )
-    
-    if not user:
-        # Don't reveal if user exists or not for security, just return success
-        return success_response(status_code=200, message="If your account is registered, a password reset link has been sent.")
-    
-    # Generate token
-    token = secrets.token_urlsafe(32)
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
-    
-    # Save token
-    new_token = PasswordResetToken(
-        user_id=user.id,
-        token=token,
-        expires_at=expires_at,
-        is_used=False
-    )
-    db.add(new_token)
-    try:
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Failed to save password reset token: {str(e)}")
-        return error_response(status_code=500, message="An error occurred while processing your request.")
 
-    # Send email if available
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
-    reset_link = f"{frontend_url}/reset-password?token={token}"
-            
+    if not user:
+        # Don't leak existence
+        return success_response(
+            status_code=200,
+            message="If your account is registered, a reset link or code has been sent."
+        )
+
+    # Decide delivery method
     if user.email:
+        # Prefer email → magic link
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+
+        reset_token = PasswordResetToken(
+            user_id=user.id,
+            token=token,
+            expires_at=expires_at,
+            is_used=False
+        )
+        db.add(reset_token)
+
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+        reset_url = f"{frontend_url}/reset-pin?token={token}"
+
         email_body = f"""
         <html>
             <body>
                 <h2>Password Reset Request</h2>
-                <p>Hi {user.full_name},</p>
-                <p>You requested a password reset for your Kopkad account. Click the link below to set a new PIN.</p>
-                <p><a href="{reset_link}">Reset My Password</a></p>
-                <p>This link will expire in 15 minutes.</p>
-                <p>If you did not request this, please ignore this email.</p>
+                <p>Hi {user.full_name or 'User'},</p>
+                <p>Click the link below to reset your PIN:</p>
+                <p><a href="{reset_url}">Reset PIN</a></p>
+                <p>This link expires in 15 minutes.</p>
+                <p>If you didn't request this, ignore this email.</p>
             </body>
         </html>
         """
-        
-        # We don't block if email fails, it just logs
-        await send_email_async(
-            to_email=user.email,
-            subject="Kopkad Password Reset",
-            body=email_body
+
+        await send_reset_password_email_async(user.email, user.full_name, reset_url)
+
+        logger.info(f"Reset link sent to email {user.email}")
+
+    else:
+        # Phone only → OTP via Termii
+        otp = generate_otp(6)
+        otp_hash = hash_otp(otp)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+        reset_otp = PasswordResetOtp(
+            user_id=user.id,
+            otp_hash=otp_hash,
+            expires_at=expires_at,
+            is_used=False
         )
-            
+        db.add(reset_otp)
+
+        sms_text = (
+            f"Kopkad reset code: {otp}\n"
+            f"Enter this code to reset your PIN. Valid for 10 minutes.\n"
+            f"Do not share this code."
+        )
+
+        sms_result = await send_termii_sms_async(user.phone_number, sms_text)
+
+        if sms_result["status"] == "error":
+            logger.error(f"SMS failed for {user.phone_number}: {sms_result['message']}")
+            # Still return generic success (don't block user)
+        else:
+            logger.info(f"OTP sent to {user.phone_number}")
+
+    db.commit()
+
     return success_response(
-        status_code=200, 
-        message="If your account is registered, a password reset link has been sent."
+        status_code=200,
+        message="If your account is registered, a reset link or code has been sent."
     )
 
 async def reset_password_service(request: ResetPasswordRequest, db: Session, user_repo: UserRepository):
-    """Verify token and update the user's PIN."""
+    token = request.token
     stmt = select(PasswordResetToken).where(
-        PasswordResetToken.token == request.token,
+        PasswordResetToken.token == token,
         PasswordResetToken.is_used == False,
         PasswordResetToken.expires_at > datetime.now(timezone.utc)
     )
     token_record = db.execute(stmt).scalar_one_or_none()
-    
+
     if not token_record:
-        return error_response(status_code=400, message="Invalid or expired password reset token.")
-    
+        return error_response(status_code=400, message="Invalid or expired reset token")
+
     user = user_repo.get_by_id(token_record.user_id)
     if not user:
-        return error_response(status_code=404, message="User not found.")
+        return error_response(status_code=404, message="User not found")
+
+    user.pin = hash_password(request.new_pin)
+    token_record.is_used = True
+    db.commit()
+
+    return success_response(status_code=200, message="PIN reset successful. You can now login.")
+
+async def verify_reset_otp_service(
+    request: dict,
+    db: Session,
+    user_repo: UserRepository,
+):
     
-    try:
-        # Update user's pin
-        user.pin = hash_password(request.new_pin)
-        
-        # Mark token as used
-        token_record.is_used = True
-        
-        db.commit()
-        logger.info(f"Password reset successful for user ID {user.id}")
-        return success_response(status_code=200, message="Password reset successful. You can now login with your new PIN.")
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Failed to reset password for user {user.id}: {str(e)}")
-        return error_response(status_code=500, message="An error occurred while resetting your password.")
+    otp = request.get("otp")
+    if not otp or len(otp) != 6 or not otp.isdigit():
+        return error_response(status_code=400, message="Invalid OTP format")
+
+    otp_hash = hash_otp(otp)
+
+    stmt = select(PasswordResetOtp).where(
+        PasswordResetOtp.otp_hash == otp_hash,
+        PasswordResetOtp.is_used == False,
+        PasswordResetOtp.expires_at > datetime.now(timezone.utc)
+    )
+    otp_record = db.execute(stmt).scalar_one_or_none()
+
+    if not otp_record:
+        return error_response(status_code=400, message="Invalid or expired OTP")
+
+    # Mark as used
+    otp_record.is_used = True
+    db.commit()
+
+    # Generate short-lived reset token for PIN change
+    reset_token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+    reset_token_record = PasswordResetToken(
+        user_id=otp_record.user_id,
+        token=reset_token,
+        expires_at=expires_at,
+        is_used=False
+    )
+    db.add(reset_token_record)
+    db.commit()
+
+    return success_response(
+        status_code=200,
+        message="OTP verified successfully",
+        data={"reset_token": reset_token}
+    )
+
+async def resend_reset_otp_service(
+    request: dict,
+    db: Session,
+    user_repo: UserRepository,
+):
+    username = request.get("username")
+    if not username:
+        return error_response(status_code=400, message="Username required")
+
+    user = user_repo.get_by_email_or_phone_or_username(username=username)
+    if not user or not user.phone_number:
+        return success_response(200, "If account exists, OTP sent")  # generic
+
+    # Rate limit check (simple: last OTP < 60s ago)
+    last_otp = db.query(PasswordResetOtp).filter(
+        PasswordResetOtp.user_id == user.id
+    ).order_by(PasswordResetOtp.created_at.desc()).first()
+
+    if last_otp and (datetime.now(timezone.utc) - last_otp.created_at) < timedelta(seconds=60):
+        return error_response(status_code=429, message="Please wait before requesting new OTP")
+
+    otp = generate_otp(6)
+    otp_hash = hash_otp(otp)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+    new_otp = PasswordResetOtp(
+        user_id=user.id,
+        otp_hash=otp_hash,
+        expires_at=expires_at,
+        is_used=False
+    )
+    db.add(new_otp)
+    db.commit()
+
+    sms_text = f"Kopkad reset code: {otp}\nValid for 10 minutes. Do not share."
+    await send_termii_sms_async(user.phone_number, sms_text)
+
+    return success_response(200, "New OTP sent if account exists")
 
 async def get_all_users(
     db: Session,

@@ -405,7 +405,7 @@ async def add_customer_to_business(
 
     # ── Pending request + WhatsApp link ──
     try:
-        # Clean up old pending requests for this user + business
+        # Clean up old pending requests
         old_requests = (
             session.query(PendingBusinessRequest)
             .filter(
@@ -418,9 +418,9 @@ async def add_customer_to_business(
             pending_repo.delete_request(old_req)
         logger.info(f"Cleaned {len(old_requests)} old pending requests for user {customer.id} + business {business.id}")
 
+        # Generate token and pending request
         token = str(uuid.uuid4())
         expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
-
         pending_repo.create_request(
             customer_id=customer.id,
             business_id=business.id,
@@ -432,46 +432,60 @@ async def add_customer_to_business(
 
         setup_url = f"{settings.APP_BASE_URL}/business/accept-invitation?token={token}"
 
-        # WhatsApp message (setup-focused for cooperatives, accept/reject for standard)
+        # WhatsApp fallback message
         if business.business_type == BusinessType.COOPERATIVE:
             wa_message = (
-                f"Hello {customer.full_name},\n\n"
-                f"You have been added to {business.name}.\n"
-                f"Please click here to set up your account and create your password/PIN:\n{setup_url}"
+                f"Hello {customer.full_name or 'Member'},\n\n"
+                f"You've been added to {business.name}.\n"
+                f"Set up your account here: {setup_url}"
             )
         else:
             accept_url = f"{settings.APP_BASE_URL}/business/accept-invitation?token={token}"
             reject_url = f"{settings.APP_BASE_URL}/business/reject-invitation?token={token}"
             wa_message = (
-                f"Hello {customer.full_name},\n\n"
-                f"{business.name} invites you to join their savings group.\n"
-                f"Click here to accept: {accept_url}\n"
-                f"Or reject: {reject_url}"
+                f"Hello {customer.full_name or 'Member'},\n\n"
+                f"{business.name} invites you to join.\n"
+                f"Accept: {accept_url}\n"
+                f"Reject: {reject_url}"
             )
 
         encoded_message = urllib.parse.quote(wa_message)
         whatsapp_link = f"https://wa.me/{phone_number}?text={encoded_message}"
 
-        # Email notification
-        if request.email or customer.email:
-            email_to_use = request.email or customer.email
+        # Automated delivery (email or SMS)
+        recipient = request.email or customer.email
+        if recipient:
+            # Prefer email if available
             if business.business_type == BusinessType.COOPERATIVE:
                 background_tasks.add_task(
                     send_setup_account_email,
-                    email_to_use,
-                    customer.full_name,
+                    recipient,
+                    customer.full_name or "Member",
                     business.name,
                     setup_url
                 )
             else:
                 background_tasks.add_task(
                     send_business_invitation_email,
-                    email_to_use,
-                    customer.full_name,
+                    recipient,
+                    customer.full_name or "Member",
                     business.name,
                     accept_url,
                     reject_url
                 )
+        elif customer.phone_number:
+            # Fallback to Termii SMS if no email
+            from utils.sms_service import send_termii_sms_async
+            sms_text = (
+                f"Welcome to {business.name}!\n"
+                f"Set up your account: {setup_url}\n"
+                f"This link expires in 24 hours."
+            )
+            background_tasks.add_task(
+                send_termii_sms_async,
+                customer.phone_number,
+                sms_text
+            )
 
         message = "Member added successfully. Setup link generated."
         if is_linked:

@@ -31,6 +31,8 @@ from service.user import (
     update_current_user_profile,
     forgot_password_service,
     reset_password_service,
+    verify_reset_otp_service,
+    resend_reset_otp_service,
 )
 from database.postgres_optimized import get_db
 from utils.auth import get_current_user, oauth2_scheme
@@ -232,6 +234,28 @@ async def reset_password_controller(
     """Reset password using token"""
     return await reset_password_service(request=request, db=db, user_repo=user_repo)
 
+async def verify_reset_otp_controller(
+    request: dict = Body(...),  # {"otp": "123456"}
+    db: Session = Depends(get_db),
+    user_repo: UserRepository = Depends(get_repository(UserRepository)),
+):
+    
+    return await verify_reset_otp_service(
+        request=request,
+        db=db,
+        user_repo=user_repo,
+    )
+
+async def resend_reset_otp_controller(
+    request: dict = Body(...),  # {"username": "..."}
+    db: Session = Depends(get_db),
+    user_repo: UserRepository = Depends(get_repository(UserRepository)),
+):
+    return await resend_reset_otp_service(
+        request=request,
+        db=db,
+        user_repo=user_repo,
+    )
 
 async def toggle_user_status_controller(
     user_id: int,
