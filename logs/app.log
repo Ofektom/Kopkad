@@ -1,0 +1,220 @@
+2026-02-25 22:34:20.288 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-25 22:34:20.327 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-25 22:34:20.335 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-25 22:34:29.683 | INFO     | logging:callHandlers:1736 - Started server process [16203]
+2026-02-25 22:34:29.704 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-25 22:34:29.924 | INFO     | main:on_startup:133 - ============================================================
+2026-02-25 22:34:29.928 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-25 22:34:29.931 | INFO     | main:on_startup:135 - ============================================================
+2026-02-25 22:34:29.937 | INFO     | main:on_startup:155 - ℹ️  REDIS_URL not configured - using in-memory cache
+2026-02-25 22:34:29.946 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-25 22:34:43.562 | INFO     | main:on_startup:170 - ✓ Database connected: defaultdb at 94.237.82.215:26296
+2026-02-25 22:34:43.728 | INFO     | main:on_startup:174 - ✓ Connection pool initialized: {'size': 20, 'checked_in': 1, 'checked_out': 0, 'overflow': -19, 'total_connections': 1}
+2026-02-25 22:34:43.729 | INFO     | main:on_startup:179 - Starting SUPER_ADMIN bootstrap process...
+2026-02-25 22:34:44.797 | INFO     | main:on_startup:186 - ✓ SUPER_ADMIN bootstrap completed
+2026-02-25 22:34:44.970 | INFO     | main:on_startup:197 - Initializing Financial Advisor Scheduler...
+2026-02-25 22:34:44.976 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:44.979 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:44.980 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:44.981 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:44.982 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:44.988 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:44.989 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:44.990 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:44.991 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:44.991 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:44.992 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:44.993 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:44.994 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:44.995 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:44.996 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:45.005 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:45.009 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:34:45.010 | INFO     | logging:callHandlers:1736 - Scheduler initialized with all financial advisor jobs
+2026-02-25 22:34:45.051 | INFO     | logging:callHandlers:1736 - Added job "Check for overspending alerts" to job store "default"
+2026-02-25 22:34:45.054 | INFO     | logging:callHandlers:1736 - Added job "Check for spending anomalies" to job store "default"
+2026-02-25 22:34:45.057 | INFO     | logging:callHandlers:1736 - Added job "Check savings goal progress" to job store "default"
+2026-02-25 22:34:45.058 | INFO     | logging:callHandlers:1736 - Added job "Check for savings opportunities" to job store "default"
+2026-02-25 22:34:45.061 | INFO     | logging:callHandlers:1736 - Added job "Generate weekly financial summaries" to job store "default"
+2026-02-25 22:34:45.063 | INFO     | logging:callHandlers:1736 - Added job "Generate monthly financial summaries" to job store "default"
+2026-02-25 22:34:45.064 | INFO     | logging:callHandlers:1736 - Added job "Update financial health scores" to job store "default"
+2026-02-25 22:34:45.064 | INFO     | logging:callHandlers:1736 - Added job "Savings nearing completion reminders" to job store "default"
+2026-02-25 22:34:45.065 | INFO     | logging:callHandlers:1736 - Added job "Savings completion reminders" to job store "default"
+2026-02-25 22:34:45.066 | INFO     | logging:callHandlers:1736 - Added job "Overdue savings payments" to job store "default"
+2026-02-25 22:34:45.068 | INFO     | logging:callHandlers:1736 - Added job "Daily system summary" to job store "default"
+2026-02-25 22:34:45.070 | INFO     | logging:callHandlers:1736 - Added job "Payment request reminders" to job store "default"
+2026-02-25 22:34:45.071 | INFO     | logging:callHandlers:1736 - Added job "Business without admin alerts" to job store "default"
+2026-02-25 22:34:45.072 | INFO     | logging:callHandlers:1736 - Added job "Low balance alerts" to job store "default"
+2026-02-25 22:34:45.074 | INFO     | logging:callHandlers:1736 - Added job "Inactive user reminders" to job store "default"
+2026-02-25 22:34:45.075 | INFO     | logging:callHandlers:1736 - Added job "Weekly analytics report" to job store "default"
+2026-02-25 22:34:45.077 | INFO     | logging:callHandlers:1736 - Added job "Notify about legacy pending payment requests" to job store "default"
+2026-02-25 22:34:45.080 | INFO     | logging:callHandlers:1736 - Scheduler started
+2026-02-25 22:34:45.082 | INFO     | logging:callHandlers:1736 - Scheduler started successfully
+2026-02-25 22:34:45.084 | INFO     | main:on_startup:200 - ✓ Financial Advisor Scheduler started
+2026-02-25 22:34:45.084 | INFO     | main:on_startup:208 - ============================================================
+2026-02-25 22:34:45.085 | INFO     | main:on_startup:209 - APPLICATION READY
+2026-02-25 22:34:45.085 | INFO     | main:on_startup:210 - ============================================================
+2026-02-25 22:34:45.094 | INFO     | logging:callHandlers:1736 - Application startup complete.
+2026-02-25 22:50:30.855 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-25 22:50:30.857 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-25 22:50:30.858 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-25 22:50:31.342 | INFO     | logging:callHandlers:1736 - Started server process [17381]
+2026-02-25 22:50:31.348 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-25 22:50:31.354 | INFO     | main:on_startup:133 - ============================================================
+2026-02-25 22:50:31.354 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-25 22:50:31.355 | INFO     | main:on_startup:135 - ============================================================
+2026-02-25 22:50:31.356 | INFO     | main:on_startup:155 - ℹ️  REDIS_URL not configured - using in-memory cache
+2026-02-25 22:50:31.356 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-25 22:50:39.596 | INFO     | main:on_startup:170 - ✓ Database connected: defaultdb at 94.237.82.215:26296
+2026-02-25 22:50:40.156 | INFO     | main:on_startup:174 - ✓ Connection pool initialized: {'size': 20, 'checked_in': 1, 'checked_out': 0, 'overflow': -19, 'total_connections': 1}
+2026-02-25 22:50:40.158 | INFO     | main:on_startup:179 - Starting SUPER_ADMIN bootstrap process...
+2026-02-25 22:50:41.217 | INFO     | main:on_startup:186 - ✓ SUPER_ADMIN bootstrap completed
+2026-02-25 22:50:41.399 | INFO     | main:on_startup:197 - Initializing Financial Advisor Scheduler...
+2026-02-25 22:50:41.399 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.400 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.400 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.401 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.402 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.403 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.404 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.404 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.405 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.405 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.406 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.407 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.408 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.408 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.409 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.409 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.410 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 22:50:41.411 | INFO     | logging:callHandlers:1736 - Scheduler initialized with all financial advisor jobs
+2026-02-25 22:50:41.426 | INFO     | logging:callHandlers:1736 - Added job "Check for overspending alerts" to job store "default"
+2026-02-25 22:50:41.428 | INFO     | logging:callHandlers:1736 - Added job "Check for spending anomalies" to job store "default"
+2026-02-25 22:50:41.430 | INFO     | logging:callHandlers:1736 - Added job "Check savings goal progress" to job store "default"
+2026-02-25 22:50:41.450 | INFO     | logging:callHandlers:1736 - Added job "Check for savings opportunities" to job store "default"
+2026-02-25 22:50:41.454 | INFO     | logging:callHandlers:1736 - Added job "Generate weekly financial summaries" to job store "default"
+2026-02-25 22:50:41.455 | INFO     | logging:callHandlers:1736 - Added job "Generate monthly financial summaries" to job store "default"
+2026-02-25 22:50:41.466 | INFO     | logging:callHandlers:1736 - Added job "Update financial health scores" to job store "default"
+2026-02-25 22:50:41.473 | INFO     | logging:callHandlers:1736 - Added job "Savings nearing completion reminders" to job store "default"
+2026-02-25 22:50:41.474 | INFO     | logging:callHandlers:1736 - Added job "Savings completion reminders" to job store "default"
+2026-02-25 22:50:41.486 | INFO     | logging:callHandlers:1736 - Added job "Overdue savings payments" to job store "default"
+2026-02-25 22:50:41.487 | INFO     | logging:callHandlers:1736 - Added job "Daily system summary" to job store "default"
+2026-02-25 22:50:41.488 | INFO     | logging:callHandlers:1736 - Added job "Payment request reminders" to job store "default"
+2026-02-25 22:50:41.489 | INFO     | logging:callHandlers:1736 - Added job "Business without admin alerts" to job store "default"
+2026-02-25 22:50:41.489 | INFO     | logging:callHandlers:1736 - Added job "Low balance alerts" to job store "default"
+2026-02-25 22:50:41.490 | INFO     | logging:callHandlers:1736 - Added job "Inactive user reminders" to job store "default"
+2026-02-25 22:50:41.491 | INFO     | logging:callHandlers:1736 - Added job "Weekly analytics report" to job store "default"
+2026-02-25 22:50:41.491 | INFO     | logging:callHandlers:1736 - Added job "Notify about legacy pending payment requests" to job store "default"
+2026-02-25 22:50:41.492 | INFO     | logging:callHandlers:1736 - Scheduler started
+2026-02-25 22:50:41.492 | INFO     | logging:callHandlers:1736 - Scheduler started successfully
+2026-02-25 22:50:41.497 | INFO     | main:on_startup:200 - ✓ Financial Advisor Scheduler started
+2026-02-25 22:50:41.497 | INFO     | main:on_startup:208 - ============================================================
+2026-02-25 22:50:41.502 | INFO     | main:on_startup:209 - APPLICATION READY
+2026-02-25 22:50:41.502 | INFO     | main:on_startup:210 - ============================================================
+2026-02-25 22:50:41.504 | INFO     | logging:callHandlers:1736 - Application startup complete.
+2026-02-25 22:55:41.594 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:00:41 WAT)" (scheduled at 2026-02-25 22:55:41.405647+01:00)
+2026-02-25 22:55:41.651 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-25 22:55:55.962 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-25 22:55:56.151 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:00:41 WAT)" executed successfully
+2026-02-25 23:00:41.486 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:05:41 WAT)" (scheduled at 2026-02-25 23:00:41.405647+01:00)
+2026-02-25 23:00:41.504 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-25 23:00:54.380 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-25 23:00:54.604 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:05:41 WAT)" executed successfully
+2026-02-25 23:05:41.415 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:10:41 WAT)" (scheduled at 2026-02-25 23:05:41.405647+01:00)
+2026-02-25 23:05:41.418 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-25 23:05:53.205 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-25 23:05:53.422 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:10:41 WAT)" executed successfully
+2026-02-25 23:10:41.409 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:15:41 WAT)" (scheduled at 2026-02-25 23:10:41.405647+01:00)
+2026-02-25 23:10:41.412 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-25 23:10:52.801 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-25 23:10:52.986 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:15:41 WAT)" executed successfully
+2026-02-25 23:15:41.422 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:20:41 WAT)" (scheduled at 2026-02-25 23:15:41.405647+01:00)
+2026-02-25 23:15:41.431 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-25 23:15:53.915 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-25 23:15:54.145 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:20:41 WAT)" executed successfully
+2026-02-25 23:20:41.472 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:25:41 WAT)" (scheduled at 2026-02-25 23:20:41.405647+01:00)
+2026-02-25 23:20:41.478 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-25 23:20:52.390 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-25 23:20:52.591 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:25:41 WAT)" executed successfully
+2026-02-25 23:25:41.495 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:30:41 WAT)" (scheduled at 2026-02-25 23:25:41.405647+01:00)
+2026-02-25 23:25:41.514 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-25 23:25:52.647 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-25 23:25:52.845 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:30:41 WAT)" executed successfully
+2026-02-25 23:30:41.508 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:35:41 WAT)" (scheduled at 2026-02-25 23:30:41.405647+01:00)
+2026-02-25 23:30:41.561 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-25 23:30:52.670 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-25 23:30:52.846 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:35:41 WAT)" executed successfully
+2026-02-25 23:35:41.458 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:40:41 WAT)" (scheduled at 2026-02-25 23:35:41.405647+01:00)
+2026-02-25 23:35:41.473 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-25 23:35:52.734 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-25 23:35:52.932 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:40:41 WAT)" executed successfully
+2026-02-25 23:38:01.820 | INFO     | logging:callHandlers:1736 - Shutting down
+2026-02-25 23:38:02.388 | INFO     | logging:callHandlers:1736 - Waiting for application shutdown.
+2026-02-25 23:38:02.718 | INFO     | main:on_shutdown:220 - Application shutting down...
+2026-02-25 23:38:02.742 | INFO     | logging:callHandlers:1736 - Scheduler shutdown successfully
+2026-02-25 23:38:02.744 | INFO     | main:on_shutdown:224 - ✓ Scheduler shutdown
+2026-02-25 23:38:03.265 | INFO     | logging:callHandlers:1736 - All database connections closed
+2026-02-25 23:38:03.267 | INFO     | main:on_shutdown:231 - ✓ Database connections closed
+2026-02-25 23:38:03.280 | INFO     | main:on_shutdown:235 - Shutdown completed
+2026-02-25 23:38:03.336 | INFO     | logging:callHandlers:1736 - Scheduler has been shut down
+2026-02-25 23:38:03.340 | INFO     | logging:callHandlers:1736 - Application shutdown complete.
+2026-02-25 23:42:27.710 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-25 23:42:27.715 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-25 23:42:27.716 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-25 23:42:33.365 | INFO     | logging:callHandlers:1736 - Started server process [19712]
+2026-02-25 23:42:33.369 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-25 23:42:33.377 | INFO     | main:on_startup:133 - ============================================================
+2026-02-25 23:42:33.379 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-25 23:42:33.399 | INFO     | main:on_startup:135 - ============================================================
+2026-02-25 23:42:33.404 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-25 23:42:44.494 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-25 23:42:44.496 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-25 23:42:44.497 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-25 23:42:51.320 | INFO     | main:on_startup:170 - ✓ Database connected: defaultdb at 94.237.82.215:26296
+2026-02-25 23:42:51.482 | INFO     | main:on_startup:174 - ✓ Connection pool initialized: {'size': 20, 'checked_in': 1, 'checked_out': 0, 'overflow': -19, 'total_connections': 1}
+2026-02-25 23:42:51.484 | INFO     | main:on_startup:179 - Starting SUPER_ADMIN bootstrap process...
+2026-02-25 23:42:52.484 | INFO     | main:on_startup:186 - ✓ SUPER_ADMIN bootstrap completed
+2026-02-25 23:42:52.651 | INFO     | main:on_startup:197 - Initializing Financial Advisor Scheduler...
+2026-02-25 23:42:52.652 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.653 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.655 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.656 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.657 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.659 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.661 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.663 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.664 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.666 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.668 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.669 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.670 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.671 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.672 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.672 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.675 | INFO     | logging:callHandlers:1736 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-25 23:42:52.677 | INFO     | logging:callHandlers:1736 - Scheduler initialized with all financial advisor jobs
+2026-02-25 23:42:52.696 | INFO     | logging:callHandlers:1736 - Added job "Check for overspending alerts" to job store "default"
+2026-02-25 23:42:52.698 | INFO     | logging:callHandlers:1736 - Added job "Check for spending anomalies" to job store "default"
+2026-02-25 23:42:52.704 | INFO     | logging:callHandlers:1736 - Added job "Check savings goal progress" to job store "default"
+2026-02-25 23:42:52.710 | INFO     | logging:callHandlers:1736 - Added job "Check for savings opportunities" to job store "default"
+2026-02-25 23:42:52.712 | INFO     | logging:callHandlers:1736 - Added job "Generate weekly financial summaries" to job store "default"
+2026-02-25 23:42:52.719 | INFO     | logging:callHandlers:1736 - Added job "Generate monthly financial summaries" to job store "default"
+2026-02-25 23:42:52.722 | INFO     | logging:callHandlers:1736 - Added job "Update financial health scores" to job store "default"
+2026-02-25 23:42:52.724 | INFO     | logging:callHandlers:1736 - Added job "Savings nearing completion reminders" to job store "default"
+2026-02-25 23:42:52.728 | INFO     | logging:callHandlers:1736 - Added job "Savings completion reminders" to job store "default"
+2026-02-25 23:42:52.730 | INFO     | logging:callHandlers:1736 - Added job "Overdue savings payments" to job store "default"
+2026-02-25 23:42:52.731 | INFO     | logging:callHandlers:1736 - Added job "Daily system summary" to job store "default"
+2026-02-25 23:42:52.733 | INFO     | logging:callHandlers:1736 - Added job "Payment request reminders" to job store "default"
+2026-02-25 23:42:52.745 | INFO     | logging:callHandlers:1736 - Added job "Business without admin alerts" to job store "default"
+2026-02-25 23:42:52.754 | INFO     | logging:callHandlers:1736 - Added job "Low balance alerts" to job store "default"
+2026-02-25 23:42:52.761 | INFO     | logging:callHandlers:1736 - Added job "Inactive user reminders" to job store "default"
+2026-02-25 23:42:52.767 | INFO     | logging:callHandlers:1736 - Added job "Weekly analytics report" to job store "default"
+2026-02-25 23:42:52.774 | INFO     | logging:callHandlers:1736 - Added job "Notify about legacy pending payment requests" to job store "default"
+2026-02-25 23:42:52.778 | INFO     | logging:callHandlers:1736 - Scheduler started
+2026-02-25 23:42:52.781 | INFO     | logging:callHandlers:1736 - Scheduler started successfully
+2026-02-25 23:42:52.783 | INFO     | main:on_startup:200 - ✓ Financial Advisor Scheduler started
+2026-02-25 23:42:52.786 | INFO     | main:on_startup:208 - ============================================================
+2026-02-25 23:42:52.789 | INFO     | main:on_startup:209 - APPLICATION READY
+2026-02-25 23:42:52.793 | INFO     | main:on_startup:210 - ============================================================
+2026-02-25 23:42:52.798 | INFO     | logging:callHandlers:1736 - Application startup complete.
+2026-02-25 23:48:00.106 | WARNING  | logging:callHandlers:1736 - Run time of job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:52:52 WAT)" was missed by 0:00:05.326309
