@@ -33,7 +33,7 @@ from utils.email_service import (
 from config.settings import settings
 from typing import Optional
 from datetime import date
-import logging
+from loguru import logger
 
 from store.repositories import (
     BusinessRepository,
@@ -46,9 +46,6 @@ from store.repositories import (
 )
 from models.financial_advisor import NotificationType, NotificationPriority
 from service.notifications import notify_user, notify_super_admins, notify_business_admin
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 def _resolve_repo(repo, repo_cls, db: Session):

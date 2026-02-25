@@ -4,14 +4,10 @@ from email.message import EmailMessage
 import os
 from jinja2 import Environment, FileSystemLoader
 from dotenv import load_dotenv
-import logging
+from loguru import logger
 
 # Load environment variables from .env file
 load_dotenv()
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Retrieve SMTP and BASE_DIR settings from environment variables
 SMTP_HOST = os.getenv("SMTP_HOST")

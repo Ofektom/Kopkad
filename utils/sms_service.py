@@ -1,13 +1,11 @@
 # utils/sms_service.py
 import httpx
 import os
-import logging
 from typing import Dict, Any
 from dotenv import load_dotenv
+from loguru import logger
 
 load_dotenv()
-
-logger = logging.getLogger(__name__)
 
 TERMII_API_KEY = os.getenv("TERMII_API_KEY")
 TERMII_SENDER_ID = os.getenv("TERMII_SENDER_ID") or "Kopkad"

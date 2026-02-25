@@ -4,7 +4,7 @@ from sqlalchemy.sql import insert
 from datetime import datetime, timezone
 from typing import List, Optional
 import httpx
-import logging
+from loguru import logger
 
 from models.user import user_permissions, PasswordResetOtp, PasswordResetToken
 from utils.password_utils import generate_otp, hash_otp, decrypt_password
@@ -49,9 +49,6 @@ from utils.permissions import grant_admin_permissions
 from sqlalchemy.sql import select
 from config.settings import settings
 import secrets
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 def _normalize_phone_number(raw_phone: str) -> Optional[str]:
@@ -711,7 +708,7 @@ async def forgot_password_service(request: ForgotPasswordRequest, db: Session, u
 
         sms_result = await send_termii_sms_async(user.phone_number, sms_text)
 
-        if sms_result["status"] == "error":
+        if sms_result and sms_result.get("status") == "error":
             logger.error(f"SMS failed for {user.phone_number}: {sms_result['message']}")
             # Still return generic success (don't block user)
         else:

@@ -46,12 +46,9 @@ from sqlalchemy import text
 
 
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+# Configure Loguru structured logging
+from core.logger import setup_logging, logger
+setup_logging()
 
 # Rebuild Pydantic models before app initialization
 logger.info("Rebuilding Pydantic schemas...")
