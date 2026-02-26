@@ -1,9 +1,11 @@
+# utils/cache.py (updated version with TLS support via redis.from_url)
+
 """
 Cache Utility Module
 Provides caching functionality using Redis (primary) or in-memory cache (fallback)
 """
 
-import redis
+import redis.asyncio as redis  # Updated import
 import json
 import logging
 from typing import Any, Optional, Union
@@ -13,6 +15,7 @@ import pickle
 import hashlib
 from cachetools import TTLCache
 import threading
+import os  # Added for env
 
 logger = logging.getLogger(__name__)
 
@@ -142,39 +145,42 @@ class InMemoryCache:
 class RedisCache:
     """Redis cache manager with connection pooling and error handling"""
     
-    def __init__(self, host='localhost', port=6379, db=0, password=None, decode_responses=True):
+    def __init__(self, url: str = None, decode_responses=True):
         """
-        Initialize Redis connection with connection pooling
+        Initialize Redis connection using full URL with TLS support
         
         Args:
-            host: Redis host (default: localhost)
-            port: Redis port (default: 6379)
-            db: Redis database number (default: 0)
-            password: Redis password (optional)
+            url: Full Redis URL (e.g., rediss://user:pass@host:port/db?ssl=true)
             decode_responses: Decode responses to strings (default: True)
         """
-        try:
-            # Create connection pool for better performance
-            self.pool = redis.ConnectionPool(
-                host=host,
-                port=port,
-                db=db,
-                password=password,
-                decode_responses=decode_responses,
-                max_connections=50,  # Max connections in pool
-                socket_keepalive=True,
-                socket_timeout=5,
-                retry_on_timeout=True
-            )
-            self.client = redis.Redis(connection_pool=self.pool)
-            # Test connection
-            self.client.ping()
-            self.enabled = True
-            logger.info(f"✓ Redis connected successfully at {host}:{port}")
-        except (redis.ConnectionError, redis.TimeoutError) as e:
-            logger.warning(f"⚠️  Redis connection failed: {e}. Falling back to in-memory cache.")
-            self.enabled = False
-            self.client = None
+        self.enabled = False
+        self.client = None
+        
+        if url:
+            try:
+                # Use from_url for TLS handling
+                self.client = redis.from_url(
+                    url,
+                    decode_responses=decode_responses,
+                    socket_timeout=5,
+                    socket_connect_timeout=5,
+                    retry_on_timeout=True,
+                    health_check_interval=30,
+                    socket_keepalive=True,
+                )
+                
+                # Test connection
+                pong = self.client.ping()
+                if pong:
+                    self.enabled = True
+                    logger.info(f"✓ Redis connected successfully via URL: {url.split('@')[0]}@***")
+                else:
+                    logger.warning("Redis ping failed")
+            except Exception as e:
+                logger.warning(f"⚠️ Redis connection failed: {str(e)}")
+        
+        if not self.enabled:
+            logger.info("Using in-memory fallback")
     
     def get(self, key: str) -> Optional[Any]:
         """
@@ -243,15 +249,7 @@ class RedisCache:
             return False
     
     def delete(self, *keys: str) -> int:
-        """
-        Delete one or more keys from cache
-        
-        Args:
-            *keys: One or more cache keys to delete
-            
-        Returns:
-            Number of keys deleted
-        """
+        """Delete one or more keys from cache"""
         if not self.enabled or not keys:
             return 0
         
@@ -273,15 +271,7 @@ class RedisCache:
             return False
     
     def get_many(self, *keys: str) -> dict:
-        """
-        Get multiple values from cache
-        
-        Args:
-            *keys: One or more cache keys
-            
-        Returns:
-            Dictionary mapping keys to values
-        """
+        """Get multiple values from cache"""
         if not self.enabled or not keys:
             return {}
         
@@ -303,16 +293,7 @@ class RedisCache:
             return {}
     
     def set_many(self, mapping: dict, ttl: Optional[int] = None) -> bool:
-        """
-        Set multiple key-value pairs in cache
-        
-        Args:
-            mapping: Dictionary of key-value pairs
-            ttl: Time to live in seconds for all keys
-            
-        Returns:
-            True if successful, False otherwise
-        """
+        """Set multiple key-value pairs in cache"""
         if not self.enabled or not mapping:
             return False
         
@@ -341,15 +322,7 @@ class RedisCache:
             return False
     
     def clear_pattern(self, pattern: str) -> int:
-        """
-        Delete all keys matching a pattern
-        
-        Args:
-            pattern: Redis pattern (e.g., "user:*", "session:*")
-            
-        Returns:
-            Number of keys deleted
-        """
+        """Delete all keys matching a pattern"""
         if not self.enabled:
             return 0
         
@@ -411,15 +384,12 @@ class RedisCache:
 cache = None
 
 
-def init_cache(host='localhost', port=6379, db=0, password=None, fallback=True):
+def init_cache(url: str = None, fallback=True):
     """
     Initialize global cache instance with automatic fallback
     
     Args:
-        host: Redis host
-        port: Redis port
-        db: Redis database number
-        password: Redis password
+        url: Full Redis URL (rediss://... for TLS)
         fallback: Use in-memory cache if Redis fails (default: True)
     
     Returns:
@@ -428,7 +398,7 @@ def init_cache(host='localhost', port=6379, db=0, password=None, fallback=True):
     global cache
     
     # Try Redis first
-    redis_cache = RedisCache(host=host, port=port, db=db, password=password)
+    redis_cache = RedisCache(url=url)
     
     if redis_cache.enabled:
         cache = redis_cache
@@ -455,16 +425,20 @@ def get_cache() -> Union[RedisCache, InMemoryCache]:
 
 def cache_key(*args, **kwargs) -> str:
     """
-    Generate a cache key from function arguments
-    
-    Args:
-        *args: Positional arguments
-        **kwargs: Keyword arguments
-        
-    Returns:
-        Hashed cache key
+    Generate a cache key from function arguments, safely ignoring memory-address-based 
+    injected dependencies like SQLAlchemy Sessions and Database Repositories.
     """
-    key_data = str(args) + str(sorted(kwargs.items()))
+    def _is_cacheable(obj):
+        if hasattr(obj, "__class__"):
+            c_name = obj.__class__.__name__
+            if c_name == "Session" or c_name.endswith("Repository") or c_name == "BackgroundTasks":
+                return False
+        return True
+
+    filtered_args = tuple(arg for arg in args if _is_cacheable(arg))
+    filtered_kwargs = {k: v for k, v in kwargs.items() if _is_cacheable(v)}
+    
+    key_data = str(filtered_args) + str(sorted(filtered_kwargs.items()))
     return hashlib.md5(key_data.encode()).hexdigest()
 
 
@@ -530,4 +504,3 @@ class CacheKeys:
     def format(pattern: str, **kwargs) -> str:
         """Format a cache key pattern with values"""
         return pattern.format(**kwargs)
-
