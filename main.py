@@ -1,4 +1,3 @@
-from fastapi import FastAPI, Request
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -8,7 +7,6 @@ import os
 import uvicorn
 import uuid
 
-# Import optimized components
 from database.postgres_optimized import (
     engine, get_db, init_db, 
     get_connection_pool_status, 
@@ -18,39 +16,28 @@ from utils.cache import init_cache, get_cache
 from middleware.auth import AuditMiddleware
 from middleware.caching import CachingMiddleware
 
-# Import routers
-# NEW: Import from api.router (Showroom360 pattern)
 from api.router.user import user_router as user_router_new
-# Analytics router
 from api.router.analytics import analytics_router
 from api.router.search import search_router
 from api.router.business import business_router as business_router_new
 from api.router.savings import savings_router as savings_router_new
-# OLD: Keep for backwards compatibility during migration
 from api.router.payments import payments_router as payments_router_new
-from api.router.expenses import expenses_router as expenses_router_new
 from api.router.expenses import expenses_router as expenses_router_new
 from api.router.financial_advisor import financial_advisor_router as financial_advisor_router_new
 from api.router.cooperative import cooperative_router
 from api.router.savings_group import savings_group_router
 
-# Import scripts
 from scripts.bootstrap_super_admin import bootstrap_super_admin
 from schemas.user import UserResponse
 from schemas.business import BusinessResponse, UnitResponse
 
-# Import scheduler
 from utils.scheduler import init_scheduler, start_scheduler, shutdown_scheduler
 
 from sqlalchemy import text
 
-
-
-# Configure Loguro structured logging
 from core.logger import setup_logging, logger
 setup_logging()
 
-# Rebuild Pydantic models before app initialization
 logger.info("Rebuilding Pydantic schemas...")
 try:
     UserResponse.model_rebuild()
@@ -61,22 +48,18 @@ except Exception as e:
     logger.error(f"Error rebuilding Pydantic schemas: {str(e)}")
     raise
 
-# Initialize FastAPI app
 app = FastAPI(
     title="Ofektom Savings System API",
     description="Optimized API with Redis caching and load balancing",
     version="2.0.0"
 )
 
-# Middleware - Order matters!
-# 1. CORS (must be first)
-
 origins = [
     "http://localhost:3000",
     "http://localhost:8080",
     "http://localhost:5173",
     "https://kopkad-frontend.vercel.app",
-    "https://kopkad.onrender.com",  # Allow same-origin requests
+    "https://kopkad.onrender.com",
 ]
 
 app.add_middleware(
@@ -86,13 +69,12 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["*"],
-    max_age=3600,  # Cache preflight requests for 1 hour
+    max_age=3600,
 )
 
-# 2. Caching Middleware
 app.add_middleware(
     CachingMiddleware,
-    ttl=60,  # Cache for 60 seconds
+    ttl=60,
     exclude_paths=[
         '/api/v1/auth/login',
         '/api/v1/auth/signup',
@@ -102,17 +84,11 @@ app.add_middleware(
     ]
 )
 
-# 3. Audit Middleware (last)
 app.add_middleware(AuditMiddleware)
 
-# Routers
-# NEW: Use new Showroom360-style router
 app.include_router(user_router_new, prefix="/api/v1")
-# Analytics endpoints
 app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(search_router, prefix="/api/v1")
-# OLD: Commented out - keeping for reference during migration
-# app.include_router(user_router_old, prefix="/api/v1")
 app.include_router(business_router_new, prefix="/api/v1")
 app.include_router(savings_router_new, prefix="/api/v1")
 app.include_router(payments_router_new, prefix="/api/v1")
@@ -123,27 +99,19 @@ app.include_router(savings_group_router, prefix="/api/v1")
 
 @app.on_event("startup")
 async def on_startup():
-    """
-    Startup tasks:
-    - Initialize Redis cache
-    - Test database connection
-    - Bootstrap super admin
-    - Start scheduler
-    """
     logger.info("=" * 60)
     logger.info("APPLICATION STARTING UP")
     logger.info("=" * 60)
     
-    # Initialize cache (Redis with in-memory fallback)
+    # Initialize cache
     try:
         from config.settings import settings as app_settings
         redis_url = app_settings.REDIS_URL
         
         if redis_url:
-            logger.info(f"Initializing cache from REDIS_URL: {redis_url.split('@')[0]}@***")
+            logger.info(f"Initializing Redis cache from REDIS_URL")
             init_cache(url=redis_url, fallback=True)
         else:
-            # No Redis configured - use in-memory cache directly
             logger.info("ℹ️  REDIS_URL not configured - using in-memory cache")
             from utils.cache import InMemoryCache
             cache = InMemoryCache(maxsize=10000, ttl=300)
@@ -154,48 +122,36 @@ async def on_startup():
     
     # Test database connection
     try:
-        # Test connection in an isolated block
+        with engine.connect() as connection:
+            result = connection.execute(text("SELECT current_database(), inet_server_addr(), inet_server_port()"))
+            db_name, host, port = result.fetchone()
+            logger.info(f"✓ Database connected: {db_name} at {host}:{port}")
+        
+        pool_status = get_connection_pool_status()
+        logger.info(f"✓ Connection pool initialized: {pool_status}")
+    except Exception as db_test_error:
+        logger.warning(f"⚠️  Database connection test failed: {db_test_error}")
+    
+    # Bootstrap superadmin
+    logger.info("Starting SUPER_ADMIN bootstrap process...")
+    try:
+        from database.postgres_optimized import SessionLocal
+        db = SessionLocal()
         try:
-            with engine.connect() as connection:
-                result = connection.execute(text("SELECT current_database(), inet_server_addr(), inet_server_port()"))
-                db_name, host, port = result.fetchone()
-                logger.info(f"✓ Database connected: {db_name} at {host}:{port}")
-            
-            # Show connection pool status
-            pool_status = get_connection_pool_status()
-            logger.info(f"✓ Connection pool initialized: {pool_status}")
-        except Exception as db_test_error:
-            logger.warning(f"⚠️  Database connection test failed: {db_test_error}")
-        
-        # Bootstrap superadmin with a fresh session
-        logger.info("Starting SUPER_ADMIN bootstrap process...")
-        try:
-            # Create a fresh session outside any transaction context
-            from database.postgres_optimized import SessionLocal
-            db = SessionLocal()
-            try:
-                bootstrap_super_admin(db)
-                logger.info("✓ SUPER_ADMIN bootstrap completed")
-            except Exception as bootstrap_error:
-                logger.error(f"❌ Bootstrap error: {bootstrap_error}")
-                import traceback
-                logger.error(traceback.format_exc())
-            finally:
-                db.close()
-        except Exception as session_error:
-            logger.error(f"❌ Failed to create database session: {session_error}")
-        
-        # Initialize and start scheduler
-        logger.info("Initializing Financial Advisor Scheduler...")
-        init_scheduler()
-        start_scheduler()
-        logger.info("✓ Financial Advisor Scheduler started")
-        
-    except Exception as e:
-        logger.error(f"❌ Error during startup: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        # Don't raise - allow app to start for health checks
+            bootstrap_super_admin(db)
+            logger.info("✓ SUPER_ADMIN bootstrap completed")
+        except Exception as bootstrap_error:
+            logger.error(f"❌ Bootstrap error: {bootstrap_error}")
+        finally:
+            db.close()
+    except Exception as session_error:
+        logger.error(f"❌ Failed to create database session: {session_error}")
+    
+    # Scheduler
+    logger.info("Initializing Financial Advisor Scheduler...")
+    init_scheduler()
+    start_scheduler()
+    logger.info("✓ Financial Advisor Scheduler started")
     
     logger.info("=" * 60)
     logger.info("APPLICATION READY")
@@ -203,12 +159,6 @@ async def on_startup():
 
 @app.on_event("shutdown")
 async def on_shutdown():
-    """
-    Shutdown tasks:
-    - Stop scheduler
-    - Close database connections
-    - Cleanup resources
-    """
     logger.info("Application shutting down...")
     
     try:
@@ -228,7 +178,6 @@ async def on_shutdown():
 
 @app.get("/")
 def read_root():
-    """Root endpoint"""
     return {
         "name": "Ofektom Savings System API",
         "version": "2.0.0",
@@ -242,25 +191,15 @@ def read_root():
         ]
     }
 
-
 @app.get("/health")
 def health_check():
-    """
-    Health check endpoint for load balancers
-    
-    Returns:
-        dict: Health status
-    """
     health = {
         "status": "healthy",
         "timestamp": time.time(),
     }
     
-    # Check cache (Redis or in-memory)
     try:
-        from utils.cache import RedisCache, InMemoryCache
         cache_instance = get_cache()
-        
         if isinstance(cache_instance, RedisCache):
             if cache_instance.enabled and cache_instance.ping():
                 health["cache"] = "redis"
@@ -269,7 +208,6 @@ def health_check():
                 health["status"] = "degraded"
         elif isinstance(cache_instance, InMemoryCache):
             health["cache"] = "in-memory"
-            # In-memory is fine for single-server deployments
         else:
             health["cache"] = "none"
             health["status"] = "degraded"
@@ -277,7 +215,6 @@ def health_check():
         health["cache"] = f"error: {str(e)}"
         health["status"] = "degraded"
     
-    # Check Database
     try:
         db_health = check_database_health()
         health["database"] = db_health.get("status", "unknown")
@@ -290,20 +227,12 @@ def health_check():
     status_code = 200 if health["status"] in ["healthy", "degraded"] else 503
     return JSONResponse(content=health, status_code=status_code)
 
-
 @app.get("/metrics")
 def metrics():
-    """
-    Metrics endpoint for monitoring
-    
-    Returns:
-        dict: System metrics
-    """
     metrics_data = {
         "timestamp": time.time(),
     }
     
-    # Database metrics
     try:
         pool_status = get_connection_pool_status()
         metrics_data["database"] = {
@@ -316,11 +245,9 @@ def metrics():
     except Exception as e:
         metrics_data["database"] = {"error": str(e)}
     
-    # Redis metrics
     try:
         cache = get_cache()
         if cache.enabled:
-            # Get Redis info
             info = cache.client.info()
             metrics_data["redis"] = {
                 "connected_clients": info.get("connected_clients", 0),
@@ -329,8 +256,6 @@ def metrics():
                 "keyspace_hits": info.get("keyspace_hits", 0),
                 "keyspace_misses": info.get("keyspace_misses", 0),
             }
-            
-            # Calculate hit rate
             hits = info.get("keyspace_hits", 0)
             misses = info.get("keyspace_misses", 0)
             total = hits + misses
@@ -345,32 +270,25 @@ def metrics():
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    # Log full details
     logger.exception(f"Unhandled exception on {request.url.path}: {str(exc)}")
 
-    # Return custom message for 500s
     if isinstance(exc, HTTPException):
         return JSONResponse(
             status_code=exc.status_code,
             content={"detail": exc.detail},
         )
 
-    # Custom 500 response
     return JSONResponse(
         status_code=500,
         content={
             "detail": "Internal server error occurred. Our team has been notified.",
-            "error_id": f"err-{uuid.uuid4().hex[:8]}",  # optional unique ID for support
+            "error_id": f"err-{uuid.uuid4().hex[:8]}",
             "path": request.url.path,
         }
     )
 
-
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
-    """
-    Add response time header to all responses
-    """
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
@@ -384,8 +302,8 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=port,
-        reload=False,  # Disable reload in production
-        workers=1,  # Use 1 worker per instance, scale horizontally
+        reload=False,
+        workers=1,
         log_level="info",
         access_log=True,
     )

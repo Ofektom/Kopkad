@@ -3245,3 +3245,25 @@ WHERE user_notifications.user_id = %(user_id_1)s AND user_notifications.notifica
 2026-02-26 12:20:22.695 | INFO     | logging:callHandlers:1736 - Scheduler has been shut down
 2026-02-26 12:20:22.698 | INFO     | logging:callHandlers:1736 - Application shutdown complete.
 2026-02-26 12:20:22.708 | INFO     | logging:callHandlers:1736 - Finished server process [31013]
+2026-02-26 20:59:00.176 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 20:59:00.178 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 20:59:00.185 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 20:59:00.184 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 20:59:00.190 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 20:59:00.189 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 20:59:01.264 | INFO     | logging:callHandlers:1736 - Started server process [43946]
+2026-02-26 20:59:01.268 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 20:59:01.271 | INFO     | logging:callHandlers:1736 - Started server process [43947]
+2026-02-26 20:59:01.274 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 20:59:01.280 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 20:59:01.279 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 20:59:01.294 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 20:59:01.315 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 20:59:01.327 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 20:59:01.348 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 20:59:01.366 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 20:59:01.374 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 20:59:01.283 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 20:59:01.379 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 20:59:01.398 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 20:59:01.407 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
