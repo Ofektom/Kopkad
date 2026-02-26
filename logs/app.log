@@ -218,3 +218,32 @@
 2026-02-25 23:42:52.793 | INFO     | main:on_startup:210 - ============================================================
 2026-02-25 23:42:52.798 | INFO     | logging:callHandlers:1736 - Application startup complete.
 2026-02-25 23:48:00.106 | WARNING  | logging:callHandlers:1736 - Run time of job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-25 23:52:52 WAT)" was missed by 0:00:05.326309
+2026-02-26 10:17:40.472 | WARNING  | logging:callHandlers:1736 - Run time of job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:17:52 WAT)" was missed by 0:04:47.708840
+2026-02-26 10:17:41.500 | WARNING  | logging:callHandlers:1736 - Run time of job "Notify about legacy pending payment requests (trigger: cron[hour='0', minute='0'], next run at: 2026-02-27 00:00:00 WAT)" was missed by 10:17:41.290809
+2026-02-26 10:17:41.529 | WARNING  | logging:callHandlers:1736 - Run time of job "Savings nearing completion reminders (trigger: cron[hour='6', minute='0'], next run at: 2026-02-27 06:00:00 WAT)" was missed by 4:17:41.529547
+2026-02-26 10:17:41.531 | WARNING  | logging:callHandlers:1736 - Run time of job "Savings completion reminders (trigger: cron[hour='6', minute='30'], next run at: 2026-02-27 06:30:00 WAT)" was missed by 3:47:41.530905
+2026-02-26 10:17:41.599 | WARNING  | logging:callHandlers:1736 - Run time of job "Check savings goal progress (trigger: cron[hour='8', minute='0'], next run at: 2026-02-27 08:00:00 WAT)" was missed by 2:17:41.532705
+2026-02-26 10:17:41.832 | WARNING  | logging:callHandlers:1736 - Run time of job "Daily system summary (trigger: cron[hour='8', minute='0'], next run at: 2026-02-27 08:00:00 WAT)" was missed by 2:17:41.740142
+2026-02-26 10:17:41.841 | WARNING  | logging:callHandlers:1736 - Run time of job "Check for overspending alerts (trigger: cron[hour='9', minute='0'], next run at: 2026-02-27 09:00:00 WAT)" was missed by 1:17:41.840983
+2026-02-26 10:17:41.842 | WARNING  | logging:callHandlers:1736 - Run time of job "Check for spending anomalies (trigger: cron[hour='10', minute='0'], next run at: 2026-02-27 10:00:00 WAT)" was missed by 0:17:41.842141
+2026-02-26 10:17:53.431 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:22:52 WAT)" (scheduled at 2026-02-26 10:17:52.666621+01:00)
+2026-02-26 10:17:53.492 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-26 10:18:50.360 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-26 10:18:51.186 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:22:52 WAT)" executed successfully
+2026-02-26 10:22:52.748 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:27:52 WAT)" (scheduled at 2026-02-26 10:22:52.666621+01:00)
+2026-02-26 10:22:52.772 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-26 10:23:02.649 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-26 10:23:02.844 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:27:52 WAT)" executed successfully
+2026-02-26 10:27:52.716 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:32:52 WAT)" (scheduled at 2026-02-26 10:27:52.666621+01:00)
+2026-02-26 10:27:52.726 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-26 10:29:40.786 | ERROR    | logging:callHandlers:1736 - Error during connection checkin: 'NoneType' object has no attribute 'rollback'
+2026-02-26 10:29:40.826 | ERROR    | logging:callHandlers:1736 - Error in overdue savings payment check: (psycopg2.OperationalError) could not receive data from server: Operation timed out
+SSL SYSCALL error: Operation timed out
+
+[SQL: SELECT user_notifications.id AS user_notifications_id, user_notifications.user_id AS user_notifications_user_id, user_notifications.notification_type AS user_notifications_notification_type, user_notifications.title AS user_notifications_title, user_notifications.message AS user_notifications_message, user_notifications.priority AS user_notifications_priority, user_notifications.is_read AS user_notifications_is_read, user_notifications.related_entity_id AS user_notifications_related_entity_id, user_notifications.related_entity_type AS user_notifications_related_entity_type, user_notifications.created_by AS user_notifications_created_by, user_notifications.created_at AS user_notifications_created_at, user_notifications.updated_by AS user_notifications_updated_by, user_notifications.updated_at AS user_notifications_updated_at 
+FROM user_notifications 
+WHERE user_notifications.user_id = %(user_id_1)s AND user_notifications.notification_type = %(notification_type_1)s AND user_notifications.created_at >= %(created_at_1)s AND user_notifications.related_entity_id = %(related_entity_id_1)s 
+ LIMIT %(param_1)s]
+[parameters: {'user_id_1': 4, 'notification_type_1': 'savings_payment_overdue', 'created_at_1': datetime.datetime(2025, 8, 7, 0, 0, tzinfo=datetime.timezone.utc), 'related_entity_id_1': 8, 'param_1': 1}]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-26 10:29:40.832 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:32:52 WAT)" executed successfully
