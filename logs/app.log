@@ -3267,3 +3267,1390 @@ WHERE user_notifications.user_id = %(user_id_1)s AND user_notifications.notifica
 2026-02-26 20:59:01.379 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
 2026-02-26 20:59:01.398 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
 2026-02-26 20:59:01.407 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:00:12.747 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:00:12.756 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:00:12.758 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:00:12.757 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:00:12.759 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:00:12.767 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:00:17.037 | INFO     | logging:callHandlers:1736 - Started server process [44052]
+2026-02-26 21:00:17.043 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:00:17.334 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:00:17.332 | INFO     | logging:callHandlers:1736 - Started server process [44154]
+2026-02-26 21:00:17.338 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:00:17.335 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:00:17.342 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:00:17.369 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:00:17.376 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:00:17.384 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:00:17.391 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:00:17.394 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:00:17.393 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:00:17.395 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:00:17.407 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:00:17.411 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:00:39.277 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:00:39.287 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:00:39.290 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:00:39.352 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:00:39.356 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:00:39.358 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:00:53.330 | INFO     | logging:callHandlers:1736 - Started server process [44433]
+2026-02-26 21:00:53.346 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:00:53.527 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:00:53.550 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:00:53.561 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:00:53.571 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:00:53.835 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:00:53.842 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:00:53.895 | INFO     | logging:callHandlers:1736 - Started server process [44432]
+2026-02-26 21:00:53.902 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:00:53.943 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:00:53.950 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:00:53.987 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:00:53.992 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:00:54.415 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:00:54.417 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:01:53.660 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:01:53.668 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:01:53.667 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:01:53.672 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:01:53.670 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:01:53.688 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:01:55.136 | INFO     | logging:callHandlers:1736 - Started server process [44673]
+2026-02-26 21:01:55.137 | INFO     | logging:callHandlers:1736 - Started server process [44665]
+2026-02-26 21:01:55.139 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:01:55.142 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:01:55.151 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:01:55.142 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:01:55.155 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:01:55.155 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:01:55.168 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:01:55.168 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:01:55.170 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:01:55.188 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:01:55.172 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:01:55.190 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:01:55.193 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:01:55.202 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:02:21.631 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:02:21.635 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:02:21.637 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:02:21.631 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:02:21.635 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:02:21.637 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:02:22.454 | INFO     | logging:callHandlers:1736 - Started server process [44728]
+2026-02-26 21:02:22.456 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:02:22.456 | INFO     | logging:callHandlers:1736 - Started server process [44727]
+2026-02-26 21:02:22.460 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:02:22.461 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:02:22.468 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:02:22.469 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:02:22.471 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:02:22.472 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:02:22.458 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:02:22.461 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:02:22.468 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:02:22.469 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:02:22.471 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:02:22.472 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:02:22.474 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:02:33.543 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:02:33.549 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:02:33.552 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:02:34.172 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:02:34.175 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:02:34.177 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:02:34.882 | INFO     | logging:callHandlers:1736 - Started server process [44751]
+2026-02-26 21:02:34.884 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:02:34.887 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:02:34.888 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:02:34.890 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:02:34.894 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:02:34.896 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:02:34.903 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:02:35.241 | INFO     | logging:callHandlers:1736 - Started server process [44752]
+2026-02-26 21:02:35.252 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:02:35.260 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:02:35.261 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:02:35.269 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:02:35.271 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:02:35.276 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:02:35.284 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:02:50.492 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:02:50.493 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:02:50.496 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:02:50.497 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:02:50.509 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:02:50.507 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:02:51.459 | INFO     | logging:callHandlers:1736 - Started server process [44773]
+2026-02-26 21:02:51.463 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:02:51.486 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:02:51.489 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:02:51.491 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:02:51.521 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:02:51.542 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:02:51.573 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:02:51.605 | INFO     | logging:callHandlers:1736 - Started server process [44772]
+2026-02-26 21:02:51.621 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:02:51.626 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:02:51.630 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:02:51.635 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:02:51.645 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:02:51.654 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:02:51.657 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:03:18.313 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:03:18.316 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:03:18.321 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:03:18.364 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:03:18.371 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:03:18.373 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:03:20.277 | INFO     | logging:callHandlers:1736 - Started server process [44861]
+2026-02-26 21:03:20.292 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:03:20.295 | INFO     | logging:callHandlers:1736 - Started server process [44862]
+2026-02-26 21:03:20.294 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:03:20.295 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:03:20.299 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:03:20.298 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:03:20.323 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:03:20.324 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:03:20.327 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:03:20.328 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:03:20.343 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:03:20.340 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:03:20.344 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:03:20.358 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:03:20.374 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:03:33.328 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:03:33.331 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:03:33.337 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:03:33.350 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:03:33.363 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:03:33.366 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:03:34.733 | INFO     | logging:callHandlers:1736 - Started server process [44881]
+2026-02-26 21:03:34.740 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:03:34.738 | INFO     | logging:callHandlers:1736 - Started server process [44879]
+2026-02-26 21:03:34.743 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:03:34.747 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:03:34.753 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:03:34.754 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:03:34.758 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:03:34.757 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:03:34.759 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:03:34.761 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:03:34.780 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:03:34.781 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:03:34.808 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:03:34.812 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:03:34.816 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:03:58.678 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:03:58.680 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:03:58.682 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:03:58.684 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:03:58.685 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:03:58.693 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:03:59.650 | INFO     | logging:callHandlers:1736 - Started server process [44907]
+2026-02-26 21:03:59.650 | INFO     | logging:callHandlers:1736 - Started server process [44912]
+2026-02-26 21:03:59.651 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:03:59.655 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:03:59.657 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:03:59.658 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:03:59.654 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:03:59.657 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:03:59.659 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:03:59.664 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:03:59.665 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:03:59.658 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:03:59.659 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:03:59.663 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:03:59.665 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:03:59.692 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:04:09.885 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:04:09.897 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:04:09.900 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:04:09.911 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:04:09.916 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:04:09.918 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:04:10.731 | INFO     | logging:callHandlers:1736 - Started server process [44930]
+2026-02-26 21:04:10.731 | INFO     | logging:callHandlers:1736 - Started server process [44929]
+2026-02-26 21:04:10.733 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:04:10.744 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:04:10.746 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:04:10.747 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:04:10.734 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:04:10.742 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:04:10.746 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:04:10.747 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:04:10.748 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:04:10.749 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:04:10.748 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:04:10.760 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:04:10.749 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:04:10.759 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:04:21.935 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:04:21.940 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:04:21.943 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:04:22.086 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:04:22.094 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:04:22.096 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:04:22.533 | INFO     | logging:callHandlers:1736 - Started server process [44952]
+2026-02-26 21:04:22.535 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:04:22.536 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:04:22.537 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:04:22.542 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:04:22.543 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:04:22.544 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:04:22.545 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:04:22.631 | INFO     | logging:callHandlers:1736 - Started server process [44953]
+2026-02-26 21:04:22.632 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:04:22.634 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:04:22.635 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:04:22.636 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:04:22.637 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:04:22.642 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:04:22.644 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:04:35.427 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:04:35.431 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:04:35.440 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:04:35.811 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:04:35.815 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:04:35.817 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:04:36.737 | INFO     | logging:callHandlers:1736 - Started server process [44966]
+2026-02-26 21:04:36.742 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:04:36.745 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:04:36.751 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:04:36.762 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:04:36.768 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:04:36.771 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:04:36.777 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:04:36.948 | INFO     | logging:callHandlers:1736 - Started server process [44969]
+2026-02-26 21:04:36.949 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:04:36.951 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:04:36.952 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:04:36.954 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:04:36.959 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:04:36.961 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:04:36.962 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:04:48.019 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:04:48.028 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:04:48.031 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:04:48.502 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:04:48.509 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:04:48.512 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:04:48.933 | INFO     | logging:callHandlers:1736 - Started server process [44991]
+2026-02-26 21:04:48.934 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:04:48.936 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:04:48.938 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:04:48.939 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:04:48.946 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:04:48.952 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:04:48.954 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:04:49.224 | INFO     | logging:callHandlers:1736 - Started server process [44992]
+2026-02-26 21:04:49.228 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:04:49.251 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:04:49.287 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:04:49.300 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:04:49.303 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:04:49.305 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:04:49.315 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:04:57.547 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:04:57.550 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:04:57.552 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:04:58.184 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:04:58.186 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:04:58.212 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:04:58.388 | INFO     | logging:callHandlers:1736 - Started server process [45058]
+2026-02-26 21:04:58.389 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:04:58.394 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:04:58.396 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:04:58.397 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:04:58.400 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:04:58.402 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:04:58.404 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:04:58.727 | INFO     | logging:callHandlers:1736 - Started server process [45059]
+2026-02-26 21:04:58.729 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:04:58.731 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:04:58.732 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:04:58.734 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:04:58.735 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:04:58.736 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:04:58.744 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:05:07.030 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:05:07.033 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:05:07.035 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:05:07.716 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:05:07.719 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:05:07.752 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:05:08.095 | INFO     | logging:callHandlers:1736 - Started server process [45073]
+2026-02-26 21:05:08.097 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:05:08.101 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:05:08.105 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:05:08.112 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:05:08.115 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:05:08.120 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:05:08.130 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:05:08.493 | INFO     | logging:callHandlers:1736 - Started server process [45074]
+2026-02-26 21:05:08.496 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:05:08.499 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:05:08.501 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:05:08.503 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:05:08.504 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:05:08.508 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:05:08.512 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:05:21.673 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:05:21.679 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:05:21.681 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:05:21.677 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:05:21.681 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:05:21.683 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:05:22.615 | INFO     | logging:callHandlers:1736 - Started server process [45113]
+2026-02-26 21:05:22.615 | INFO     | logging:callHandlers:1736 - Started server process [45108]
+2026-02-26 21:05:22.616 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:05:22.618 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:05:22.617 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:05:22.619 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:05:22.618 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:05:22.619 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:05:22.620 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:05:22.620 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:05:22.621 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:05:22.621 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:05:22.630 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:05:22.630 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:05:22.631 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:05:22.631 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:05:36.092 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:05:36.092 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:05:36.098 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:05:36.098 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:05:36.101 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:05:36.102 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:05:37.019 | INFO     | logging:callHandlers:1736 - Started server process [45128]
+2026-02-26 21:05:37.020 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:05:37.020 | INFO     | logging:callHandlers:1736 - Started server process [45129]
+2026-02-26 21:05:37.021 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:05:37.022 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:05:37.024 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:05:37.034 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:05:37.037 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:05:37.039 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:05:37.024 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:05:37.041 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:05:37.034 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:05:37.037 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:05:37.038 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:05:37.041 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:05:37.057 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:05:53.759 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:05:53.771 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:05:53.757 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:05:53.771 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:05:53.775 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:05:53.776 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:05:54.485 | INFO     | logging:callHandlers:1736 - Started server process [45148]
+2026-02-26 21:05:54.487 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:05:54.490 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:05:54.492 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:05:54.500 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:05:54.503 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:05:54.485 | INFO     | logging:callHandlers:1736 - Started server process [45153]
+2026-02-26 21:05:54.487 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:05:54.489 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:05:54.491 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:05:54.495 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:05:54.501 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:05:54.509 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:05:54.535 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:05:54.524 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:05:54.537 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:06:12.760 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:06:12.770 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:06:12.774 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:06:12.843 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:06:12.893 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:06:12.903 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:06:16.074 | INFO     | logging:callHandlers:1736 - Started server process [45171]
+2026-02-26 21:06:16.079 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:06:16.085 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:06:16.098 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:06:16.100 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:06:16.102 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:06:16.107 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:06:16.116 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:06:16.130 | INFO     | logging:callHandlers:1736 - Started server process [45172]
+2026-02-26 21:06:16.137 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:06:16.140 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:06:16.156 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:06:16.159 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:06:16.167 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:06:16.170 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:06:16.329 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:06:29.855 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:06:29.858 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:06:29.853 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:06:29.855 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:06:29.857 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:06:29.861 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:06:30.571 | INFO     | logging:callHandlers:1736 - Started server process [45198]
+2026-02-26 21:06:30.568 | INFO     | logging:callHandlers:1736 - Started server process [45199]
+2026-02-26 21:06:30.569 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:06:30.570 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:06:30.571 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:06:30.572 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:06:30.574 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:06:30.575 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:06:30.576 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:06:30.572 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:06:30.574 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:06:30.575 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:06:30.576 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:06:30.577 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:06:30.583 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:06:30.586 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:06:43.373 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:07:10.078 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:07:10.087 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:07:10.114 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:07:10.163 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:07:10.209 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:07:10.212 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:07:11.547 | INFO     | logging:callHandlers:1736 - Started server process [45296]
+2026-02-26 21:07:11.554 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:07:11.560 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:07:11.570 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:07:11.573 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:07:11.578 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:07:11.590 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:07:11.605 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:07:11.663 | INFO     | logging:callHandlers:1736 - Started server process [45269]
+2026-02-26 21:07:11.678 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:07:11.681 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:07:11.696 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:07:11.702 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:07:11.705 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:07:11.713 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:07:11.726 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:07:35.649 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:07:35.654 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:07:35.656 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:07:35.761 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:07:35.765 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:07:35.768 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:07:36.857 | INFO     | logging:callHandlers:1736 - Started server process [45317]
+2026-02-26 21:07:36.860 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:07:36.861 | INFO     | logging:callHandlers:1736 - Started server process [45325]
+2026-02-26 21:07:36.864 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:07:36.868 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:07:36.876 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:07:36.869 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:07:36.878 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:07:36.877 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:07:36.882 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:07:36.879 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:07:36.883 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:07:36.889 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:07:36.896 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:07:36.892 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:07:36.898 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:08:04.916 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:08:04.932 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:08:04.947 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:08:04.993 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:08:04.996 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:08:04.999 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:08:07.938 | INFO     | logging:callHandlers:1736 - Started server process [45346]
+2026-02-26 21:08:07.935 | INFO     | logging:callHandlers:1736 - Started server process [45347]
+2026-02-26 21:08:07.939 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:08:07.941 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:08:07.944 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:08:07.951 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:08:07.951 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:08:07.964 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:08:07.964 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:08:07.966 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:08:07.979 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:08:07.999 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:08:08.017 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:08:08.017 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:08:08.034 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:08:08.042 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:08:37.335 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:08:37.337 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:08:37.342 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:08:37.345 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:08:37.345 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:08:37.358 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:08:41.997 | INFO     | logging:callHandlers:1736 - Started server process [45375]
+2026-02-26 21:08:42.013 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:08:42.020 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:08:42.076 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:08:42.187 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:08:42.205 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:08:42.214 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:08:42.219 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:08:42.235 | INFO     | logging:callHandlers:1736 - Started server process [45374]
+2026-02-26 21:08:42.245 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:08:42.250 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:08:42.252 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:08:42.262 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:08:42.268 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:08:42.278 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:08:42.282 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:09:07.287 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:09:07.359 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:09:07.307 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:09:07.371 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:09:07.373 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:09:07.374 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:09:11.894 | INFO     | logging:callHandlers:1736 - Started server process [45437]
+2026-02-26 21:09:11.900 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:09:11.892 | INFO     | logging:callHandlers:1736 - Started server process [45431]
+2026-02-26 21:09:11.897 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:09:11.913 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:09:11.915 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:09:11.936 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:09:11.913 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:09:11.939 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:09:11.916 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:09:11.979 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:09:12.004 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:09:12.011 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:09:12.013 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:09:11.951 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:09:12.007 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:09:47.484 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:09:47.490 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:09:47.502 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:09:47.563 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:09:47.569 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:09:47.603 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:09:50.111 | INFO     | logging:callHandlers:1736 - Started server process [45500]
+2026-02-26 21:09:50.114 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:09:50.111 | INFO     | logging:callHandlers:1736 - Started server process [45489]
+2026-02-26 21:09:50.114 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:09:50.121 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:09:50.121 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:09:50.128 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:09:50.128 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:09:50.134 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:09:50.137 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:09:50.134 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:09:50.138 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:09:50.147 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:09:50.150 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:09:50.152 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:09:50.218 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:10:09.890 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:10:09.892 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:10:09.899 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:10:09.901 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:10:09.899 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:10:09.901 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:10:12.217 | INFO     | logging:callHandlers:1736 - Started server process [45532]
+2026-02-26 21:10:12.231 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:10:12.346 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:10:12.357 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:10:12.363 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:10:12.365 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:10:12.400 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:10:12.407 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:10:12.969 | INFO     | logging:callHandlers:1736 - Started server process [45531]
+2026-02-26 21:10:12.974 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:10:12.981 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:10:12.992 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:10:13.002 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:10:13.004 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:10:13.014 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:10:13.020 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:10:57.822 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:10:57.836 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:10:57.839 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:10:57.842 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:10:57.826 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:10:57.828 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:11:00.733 | INFO     | logging:callHandlers:1736 - Started server process [45552]
+2026-02-26 21:11:00.738 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:11:00.742 | INFO     | logging:callHandlers:1736 - Started server process [45553]
+2026-02-26 21:11:00.742 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:11:00.744 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:11:00.757 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:11:00.759 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:11:00.762 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:11:00.761 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:11:00.768 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:11:00.768 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:11:00.770 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:11:00.773 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:11:00.791 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:11:00.796 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:11:00.801 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:11:22.159 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:11:22.163 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:11:22.167 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:11:21.966 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:11:22.161 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:11:22.163 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:11:23.345 | INFO     | logging:callHandlers:1736 - Started server process [45652]
+2026-02-26 21:11:23.347 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:11:23.348 | INFO     | logging:callHandlers:1736 - Started server process [45651]
+2026-02-26 21:11:23.351 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:11:23.357 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:11:23.359 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:11:23.360 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:11:23.365 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:11:23.371 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:11:23.371 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:11:23.376 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:11:23.378 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:11:23.385 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:11:23.388 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:11:23.393 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:11:23.396 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:11:49.796 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:11:49.802 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:11:49.809 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:11:49.862 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:11:49.865 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:11:49.868 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:11:52.468 | INFO     | logging:callHandlers:1736 - Started server process [45693]
+2026-02-26 21:11:52.471 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:11:52.475 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:11:52.477 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:11:52.484 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:11:52.500 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:11:52.509 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:11:52.512 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:11:53.224 | INFO     | logging:callHandlers:1736 - Started server process [45694]
+2026-02-26 21:11:53.241 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:11:53.267 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:11:53.282 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:11:53.577 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:11:53.585 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:11:53.608 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:11:53.625 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:12:13.470 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:12:13.474 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:12:13.474 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:12:13.477 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:12:13.481 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:12:13.487 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:12:14.915 | INFO     | logging:callHandlers:1736 - Started server process [45734]
+2026-02-26 21:12:14.920 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:12:14.924 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:12:14.926 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:12:14.927 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:12:14.928 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:12:14.929 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:12:14.932 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:12:15.005 | INFO     | logging:callHandlers:1736 - Started server process [45730]
+2026-02-26 21:12:15.009 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:12:15.013 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:12:15.015 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:12:15.017 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:12:15.019 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:12:15.021 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:12:15.023 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:12:32.677 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:12:32.676 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:12:32.686 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:12:32.719 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:12:32.719 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:12:32.734 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:12:34.379 | INFO     | logging:callHandlers:1736 - Started server process [45764]
+2026-02-26 21:12:34.381 | INFO     | logging:callHandlers:1736 - Started server process [45765]
+2026-02-26 21:12:34.381 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:12:34.384 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:12:34.385 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:12:34.386 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:12:34.383 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:12:34.385 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:12:34.386 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:12:34.389 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:12:34.402 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:12:34.418 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:12:34.418 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:12:34.420 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:12:34.430 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:12:34.434 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:13:29.706 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:13:29.711 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:13:29.725 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:13:29.756 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:13:29.812 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:13:29.815 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:13:31.158 | INFO     | logging:callHandlers:1736 - Started server process [45783]
+2026-02-26 21:13:31.163 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:13:31.183 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:13:31.187 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:13:31.204 | INFO     | logging:callHandlers:1736 - Started server process [45782]
+2026-02-26 21:13:31.195 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:13:31.198 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:13:31.202 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:13:31.205 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:13:31.210 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:13:31.245 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:13:31.252 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:13:31.359 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:13:31.382 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:13:31.389 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:13:31.395 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:13:54.003 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:13:54.012 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:13:54.002 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:13:54.056 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:13:54.075 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:13:54.097 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:13:54.889 | INFO     | logging:callHandlers:1736 - Started server process [45895]
+2026-02-26 21:13:54.891 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:13:54.893 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:13:54.894 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:13:54.902 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:13:54.904 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:13:54.907 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:13:54.908 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:13:54.901 | INFO     | logging:callHandlers:1736 - Started server process [45888]
+2026-02-26 21:13:54.903 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:13:54.907 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:13:54.908 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:13:54.910 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:13:54.914 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:13:54.918 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:13:54.935 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:14:10.392 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:14:10.396 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:14:10.399 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:14:10.401 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:14:10.419 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:14:10.421 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:14:11.447 | INFO     | logging:callHandlers:1736 - Started server process [45915]
+2026-02-26 21:14:11.450 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:14:11.453 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:14:11.455 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:14:11.460 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:14:11.463 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:14:11.466 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:14:11.470 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:14:11.467 | INFO     | logging:callHandlers:1736 - Started server process [45921]
+2026-02-26 21:14:11.469 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:14:11.472 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:14:11.475 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:14:11.504 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:14:11.510 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:14:11.538 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:14:11.544 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:14:35.785 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:14:35.914 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:14:35.920 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:14:35.953 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:14:35.959 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:14:35.968 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:14:54.205 | INFO     | logging:callHandlers:1736 - Started server process [45936]
+2026-02-26 21:14:54.211 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:14:54.239 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:14:54.242 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:14:54.244 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:14:54.209 | INFO     | logging:callHandlers:1736 - Started server process [45935]
+2026-02-26 21:14:54.250 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:14:54.245 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:14:54.259 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:14:54.258 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:14:54.262 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:14:54.262 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:14:54.271 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:14:54.277 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:14:54.285 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:14:54.288 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:15:21.732 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:15:21.735 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:15:21.739 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:15:21.734 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:15:21.739 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:15:21.743 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:15:22.833 | INFO     | logging:callHandlers:1736 - Started server process [46033]
+2026-02-26 21:15:22.834 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:15:22.837 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:15:22.838 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:15:22.840 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:15:22.841 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:15:22.846 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:15:22.848 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:15:22.833 | INFO     | logging:callHandlers:1736 - Started server process [46034]
+2026-02-26 21:15:22.835 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:15:22.837 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:15:22.839 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:15:22.841 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:15:22.846 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:15:22.847 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:15:22.850 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:15:42.656 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:15:42.660 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:15:42.664 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:15:42.754 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:15:42.764 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:15:42.776 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:15:43.974 | INFO     | logging:callHandlers:1736 - Started server process [46116]
+2026-02-26 21:15:43.975 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:15:43.978 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:15:43.979 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:15:43.981 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:15:43.982 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:15:43.987 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:15:43.990 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:15:43.997 | INFO     | logging:callHandlers:1736 - Started server process [46105]
+2026-02-26 21:15:44.002 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:15:44.007 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:15:44.013 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:15:44.015 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:15:44.021 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:15:44.024 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:15:44.026 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:16:12.168 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:16:12.170 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:16:12.174 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:16:12.177 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:16:12.172 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:16:12.174 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:16:13.488 | INFO     | logging:callHandlers:1736 - Started server process [46137]
+2026-02-26 21:16:13.490 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:16:13.495 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:16:13.500 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:16:13.503 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:16:13.522 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:16:13.557 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:16:13.588 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:16:13.751 | INFO     | logging:callHandlers:1736 - Started server process [46136]
+2026-02-26 21:16:13.756 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:16:13.765 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:16:13.767 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:16:13.775 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:16:13.778 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:16:13.782 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:16:13.784 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:16:30.558 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:16:30.594 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:16:30.598 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:16:30.567 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:16:30.595 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:16:30.609 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:16:31.617 | INFO     | logging:callHandlers:1736 - Started server process [46184]
+2026-02-26 21:16:31.620 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:16:31.626 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:16:31.628 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:16:31.635 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:16:31.641 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:16:31.646 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:16:31.650 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:16:31.747 | INFO     | logging:callHandlers:1736 - Started server process [46185]
+2026-02-26 21:16:31.751 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:16:31.759 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:16:31.767 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:16:31.770 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:16:31.773 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:16:31.778 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:16:31.781 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:16:54.700 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:16:54.702 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:16:54.706 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:16:55.440 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:16:55.447 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:16:55.656 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:16:56.888 | INFO     | logging:callHandlers:1736 - Started server process [46209]
+2026-02-26 21:16:56.890 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:16:56.893 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:16:56.896 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:16:56.898 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:16:56.903 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:16:56.908 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:16:56.911 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:16:57.076 | INFO     | logging:callHandlers:1736 - Started server process [46215]
+2026-02-26 21:16:57.078 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:16:57.080 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:16:57.081 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:16:57.082 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:16:57.084 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:16:57.091 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:16:57.093 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:17:31.444 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:17:31.446 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:17:31.467 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:17:31.466 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:17:31.468 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:17:31.469 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:17:33.343 | INFO     | logging:callHandlers:1736 - Started server process [46264]
+2026-02-26 21:17:33.343 | INFO     | logging:callHandlers:1736 - Started server process [46255]
+2026-02-26 21:17:33.345 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:17:33.348 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:17:33.350 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:17:33.352 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:17:33.354 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:17:33.362 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:17:33.369 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:17:33.345 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:17:33.349 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:17:33.352 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:17:33.355 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:17:33.359 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:17:33.367 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:17:33.371 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:17:53.968 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:17:53.972 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:17:53.974 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:17:53.974 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:17:53.978 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:17:53.980 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:17:55.085 | INFO     | logging:callHandlers:1736 - Started server process [46337]
+2026-02-26 21:17:55.087 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:17:55.104 | INFO     | logging:callHandlers:1736 - Started server process [46343]
+2026-02-26 21:17:55.106 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:17:55.091 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:17:55.094 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:17:55.099 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:17:55.101 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:17:55.105 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:17:55.107 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:17:55.144 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:17:55.148 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:17:55.155 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:17:55.173 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:17:55.183 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:17:55.187 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:18:14.091 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:18:14.099 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:18:14.101 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:18:14.237 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:18:14.241 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:18:14.245 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:18:15.986 | INFO     | logging:callHandlers:1736 - Started server process [46361]
+2026-02-26 21:18:15.989 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:18:15.995 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:18:16.004 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:18:16.014 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:18:16.016 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:18:16.019 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:18:16.023 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:18:16.226 | INFO     | logging:callHandlers:1736 - Started server process [46360]
+2026-02-26 21:18:16.228 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:18:16.231 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:18:16.233 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:18:16.235 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:18:16.238 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:18:16.245 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:18:16.248 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:18:35.678 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:18:35.682 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:18:35.687 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:18:36.260 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:18:36.263 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:18:36.266 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:18:37.752 | INFO     | logging:callHandlers:1736 - Started server process [46394]
+2026-02-26 21:18:37.760 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:18:37.797 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:18:37.805 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:18:37.817 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:18:37.819 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:18:37.932 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:18:37.937 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:18:38.455 | INFO     | logging:callHandlers:1736 - Started server process [46399]
+2026-02-26 21:18:38.458 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:18:38.463 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:18:38.465 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:18:38.468 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:18:38.470 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:18:38.475 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:18:38.481 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:18:58.738 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:18:58.743 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:18:58.746 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:18:58.753 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:18:58.760 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:18:58.770 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:19:00.749 | INFO     | logging:callHandlers:1736 - Started server process [46427]
+2026-02-26 21:19:00.751 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:19:00.754 | INFO     | logging:callHandlers:1736 - Started server process [46422]
+2026-02-26 21:19:00.755 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:19:00.757 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:19:00.820 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:19:00.821 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:19:00.823 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:19:00.844 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:19:00.757 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:19:00.819 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:19:00.843 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:19:00.845 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:19:00.851 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:19:00.856 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:19:00.860 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:19:14.117 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:19:14.120 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:19:14.122 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:19:14.119 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:19:14.122 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:19:14.124 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:19:16.738 | INFO     | logging:callHandlers:1736 - Started server process [46495]
+2026-02-26 21:19:16.741 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:19:16.752 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:19:16.757 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:19:16.763 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:19:16.772 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:19:16.777 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:19:16.779 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:19:16.930 | INFO     | logging:callHandlers:1736 - Started server process [46498]
+2026-02-26 21:19:16.981 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:19:16.993 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:19:16.999 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:19:17.017 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:19:17.019 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:19:17.025 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:19:17.027 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:19:32.539 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:19:32.542 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:19:32.545 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:19:33.823 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:19:33.827 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:19:33.829 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:19:34.601 | INFO     | logging:callHandlers:1736 - Started server process [46519]
+2026-02-26 21:19:34.634 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:19:34.654 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:19:34.660 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:19:34.663 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:19:34.672 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:19:34.684 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:19:34.688 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:19:35.269 | INFO     | logging:callHandlers:1736 - Started server process [46524]
+2026-02-26 21:19:35.274 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:19:35.282 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:19:35.288 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:19:35.291 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:19:35.302 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:19:35.306 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:19:35.313 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:19:58.787 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:19:58.793 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:19:58.797 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:19:58.802 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:19:58.805 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:19:58.813 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:20:01.098 | INFO     | logging:callHandlers:1736 - Started server process [46552]
+2026-02-26 21:20:01.101 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:20:01.105 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:20:01.115 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:20:01.134 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:20:01.105 | INFO     | logging:callHandlers:1736 - Started server process [46537]
+2026-02-26 21:20:01.136 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:20:01.138 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:20:01.145 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:20:01.144 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:20:01.148 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:20:01.155 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:20:01.188 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:20:01.198 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:20:01.205 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:20:01.210 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:20:16.419 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:20:16.426 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:20:16.429 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:20:16.427 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:20:16.434 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:20:16.442 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:20:20.285 | INFO     | logging:callHandlers:1736 - Started server process [46578]
+2026-02-26 21:20:20.288 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:20:20.292 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:20:20.300 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:20:20.303 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:20:20.308 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:20:20.314 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:20:20.316 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:20:20.499 | INFO     | logging:callHandlers:1736 - Started server process [46579]
+2026-02-26 21:20:20.509 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:20:20.525 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:20:20.531 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:20:20.542 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:20:20.547 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:20:20.556 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:20:20.558 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:20:38.742 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:20:38.745 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:20:38.748 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:20:38.743 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:20:38.747 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:20:38.749 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:20:40.836 | INFO     | logging:callHandlers:1736 - Started server process [46602]
+2026-02-26 21:20:40.836 | INFO     | logging:callHandlers:1736 - Started server process [46610]
+2026-02-26 21:20:40.838 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:20:40.838 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:20:40.842 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:20:40.842 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:20:40.843 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:20:40.843 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:20:40.845 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:20:40.857 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:20:40.860 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:20:40.862 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:20:40.846 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:20:40.857 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:20:40.859 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:20:40.863 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:21:13.011 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:21:13.017 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:21:13.019 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:21:13.082 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:21:13.086 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:21:13.088 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:21:14.531 | INFO     | logging:callHandlers:1736 - Started server process [46674]
+2026-02-26 21:21:14.533 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:21:14.534 | INFO     | logging:callHandlers:1736 - Started server process [46635]
+2026-02-26 21:21:14.536 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:21:14.537 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:21:14.540 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:21:14.544 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:21:14.547 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:21:14.551 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:21:14.542 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:21:14.547 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:21:14.549 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:21:14.551 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:21:14.554 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:21:14.562 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:21:14.567 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:21:36.685 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:21:36.690 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:21:36.725 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:21:37.043 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:21:37.047 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:21:37.050 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:21:38.553 | INFO     | logging:callHandlers:1736 - Started server process [46746]
+2026-02-26 21:21:38.554 | INFO     | logging:callHandlers:1736 - Started server process [46744]
+2026-02-26 21:21:38.555 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:21:38.554 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:21:38.556 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:21:38.559 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:21:38.558 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:21:38.560 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:21:38.560 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:21:38.562 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:21:38.569 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:21:38.571 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:21:38.561 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:21:38.566 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:21:38.569 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:21:38.573 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:22:13.873 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:22:13.882 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:22:13.905 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:22:13.923 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:22:13.928 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:22:13.930 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:22:17.290 | INFO     | logging:callHandlers:1736 - Started server process [46799]
+2026-02-26 21:22:17.285 | INFO     | logging:callHandlers:1736 - Started server process [46803]
+2026-02-26 21:22:17.287 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:22:17.291 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:22:17.295 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:22:17.300 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:22:17.307 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:22:17.293 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:22:17.301 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:22:17.309 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:22:17.311 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:22:17.369 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:22:17.372 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:22:17.382 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:22:17.311 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:22:17.375 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:22:47.315 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:22:47.383 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:22:47.335 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:22:47.392 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:22:47.392 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:22:47.395 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:22:49.160 | INFO     | logging:callHandlers:1736 - Started server process [46837]
+2026-02-26 21:22:49.168 | INFO     | logging:callHandlers:1736 - Started server process [46838]
+2026-02-26 21:22:49.172 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:22:49.163 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:22:49.169 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:22:49.171 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:22:49.173 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:22:49.174 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:22:49.177 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:22:49.176 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:22:49.180 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:22:49.180 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:22:49.182 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:22:49.184 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:22:49.188 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:22:49.190 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:23:08.322 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:23:08.324 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:23:08.328 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:23:08.331 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:23:08.328 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:23:08.331 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:23:10.616 | INFO     | logging:callHandlers:1736 - Started server process [46901]
+2026-02-26 21:23:10.620 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:23:10.625 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:23:10.627 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:23:10.630 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:23:10.633 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:23:10.636 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:23:10.639 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:23:10.839 | INFO     | logging:callHandlers:1736 - Started server process [46909]
+2026-02-26 21:23:10.843 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:23:10.846 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:23:10.851 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:23:10.854 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:23:10.856 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:23:10.860 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:23:10.862 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:23:29.589 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:23:29.595 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:23:29.598 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:23:29.714 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:23:29.723 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:23:29.770 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:23:30.555 | INFO     | logging:callHandlers:1736 - Started server process [46948]
+2026-02-26 21:23:30.557 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:23:30.561 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:23:30.563 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:23:30.571 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:23:30.574 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:23:30.580 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:23:30.585 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:23:30.589 | INFO     | logging:callHandlers:1736 - Started server process [46949]
+2026-02-26 21:23:30.595 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:23:30.602 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:23:30.607 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:23:30.699 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:23:30.704 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:23:30.707 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:23:30.712 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:23:49.581 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:23:49.586 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:23:49.586 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:23:49.591 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:23:49.625 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:23:49.628 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:23:50.887 | INFO     | logging:callHandlers:1736 - Started server process [46974]
+2026-02-26 21:23:50.886 | INFO     | logging:callHandlers:1736 - Started server process [46975]
+2026-02-26 21:23:50.888 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:23:50.889 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:23:50.894 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:23:50.892 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:23:50.896 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:23:50.895 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:23:50.922 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:23:50.923 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:23:50.925 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:23:50.925 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:23:50.928 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:23:50.935 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:23:50.928 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:23:50.965 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:24:13.047 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:24:13.053 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:24:13.048 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:24:13.053 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:24:13.055 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:24:13.055 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:24:14.066 | INFO     | logging:callHandlers:1736 - Started server process [46998]
+2026-02-26 21:24:14.072 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:24:14.077 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:24:14.081 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:24:14.097 | INFO     | logging:callHandlers:1736 - Started server process [46999]
+2026-02-26 21:24:14.089 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:24:14.107 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:24:14.099 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:24:14.122 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:24:14.123 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:24:14.129 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:24:14.128 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:24:14.132 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:24:14.145 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:24:14.149 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:24:14.153 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:24:28.340 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:24:28.337 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:24:28.341 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:24:28.343 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:24:28.343 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:24:28.345 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:24:29.221 | INFO     | logging:callHandlers:1736 - Started server process [47019]
+2026-02-26 21:24:29.223 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:24:29.221 | INFO     | logging:callHandlers:1736 - Started server process [47020]
+2026-02-26 21:24:29.223 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:24:29.226 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:24:29.228 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:24:29.227 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:24:29.229 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:24:29.232 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:24:29.230 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:24:29.282 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:24:29.288 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:24:29.291 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:24:29.291 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:24:29.294 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:24:29.300 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:24:39.401 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:24:39.412 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:24:39.410 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:24:39.528 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:24:39.529 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:24:39.532 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:24:41.024 | INFO     | logging:callHandlers:1736 - Started server process [47043]
+2026-02-26 21:24:41.026 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:24:41.028 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:24:41.030 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:24:41.031 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:24:41.032 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:24:41.033 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:24:41.037 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:24:41.028 | INFO     | logging:callHandlers:1736 - Started server process [47044]
+2026-02-26 21:24:41.029 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:24:41.031 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:24:41.032 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:24:41.033 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:24:41.036 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:24:41.039 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:24:41.042 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:25:08.431 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:25:08.435 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:25:08.436 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:25:08.437 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:25:08.441 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:25:08.443 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:25:18.573 | INFO     | logging:callHandlers:1736 - Started server process [47059]
+2026-02-26 21:25:18.596 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:25:18.743 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:25:18.758 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:25:18.783 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:25:18.790 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:25:18.898 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:25:18.900 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:25:20.972 | INFO     | logging:callHandlers:1736 - Started server process [47058]
+2026-02-26 21:25:21.060 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:25:21.127 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:25:21.132 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:25:21.139 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:25:21.141 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:25:21.149 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:25:21.154 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:26:13.438 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:26:13.442 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:26:13.440 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 21:26:13.505 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:26:13.505 | INFO     | main:<module>:41 - Rebuilding Pydantic schemas...
+2026-02-26 21:26:13.523 | INFO     | main:<module>:46 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 21:26:15.489 | INFO     | logging:callHandlers:1736 - Started server process [47160]
+2026-02-26 21:26:15.490 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:26:15.493 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:26:15.498 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:26:15.502 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:26:15.504 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:26:15.508 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:26:15.510 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
+2026-02-26 21:26:15.596 | INFO     | logging:callHandlers:1736 - Started server process [47153]
+2026-02-26 21:26:15.598 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 21:26:15.601 | INFO     | main:on_startup:102 - ============================================================
+2026-02-26 21:26:15.602 | INFO     | main:on_startup:103 - APPLICATION STARTING UP
+2026-02-26 21:26:15.603 | INFO     | main:on_startup:104 - ============================================================
+2026-02-26 21:26:15.605 | INFO     | main:on_startup:112 - Initializing Redis cache from REDIS_URL
+2026-02-26 21:26:15.609 | INFO     | logging:callHandlers:1736 - ✓ Redis connected successfully via URL
+2026-02-26 21:26:15.615 | INFO     | logging:callHandlers:1736 - ✓ Using Redis cache
