@@ -109,7 +109,7 @@ class CachingMiddleware(BaseHTTPMiddleware):
         
         # Try to get cached response
         cache = get_cache()
-        cached_data = cache.get(cache_key)
+        cached_data = await cache.get(cache_key) if hasattr(cache.get, '__await__') else cache.get(cache_key)
         
         if cached_data:
             logger.debug(f"Cache HIT for {request.url.path}")
@@ -139,7 +139,7 @@ class CachingMiddleware(BaseHTTPMiddleware):
                 'headers': dict(response.headers),
                 'media_type': response.media_type,
             }
-            cache.set(cache_key, cache_data, ttl=self.ttl)
+            await cache.set(cache_key, cache_data, ttl=self.ttl) if hasattr(cache.set, '__await__') else cache.set(cache_key, cache_data, ttl=self.ttl)
             
             # Return response with body
             return StarletteResponse(
@@ -218,4 +218,3 @@ class QueryCacheMixin:
         deleted = cache.clear_pattern(pattern)
         logger.info(f"Invalidated {deleted} cached queries matching pattern: {pattern}")
         return deleted
-
