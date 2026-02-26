@@ -46,7 +46,7 @@ from sqlalchemy import text
 
 
 
-# Configure Loguru structured logging
+# Configure Loguro structured logging
 from core.logger import setup_logging, logger
 setup_logging()
 
@@ -137,19 +137,11 @@ async def on_startup():
     # Initialize cache (Redis with in-memory fallback)
     try:
         from config.settings import settings as app_settings
-        if app_settings.REDIS_URL:
-            logger.info(f"Initializing cache from REDIS_URL")
-            from urllib.parse import urlparse
-            
-            # Parse Redis URL (format: redis://host:port/db or redis://host:port)
-            parsed = urlparse(app_settings.REDIS_URL)
-            host = parsed.hostname or 'localhost'
-            port = parsed.port or 6379
-            db = int(parsed.path.lstrip('/')) if parsed.path and parsed.path != '/' else 0
-            password = parsed.password
-            
-            # Try Redis, auto-fallback to in-memory if fails
-            init_cache(host=host, port=port, db=db, password=password, fallback=True)
+        redis_url = app_settings.REDIS_URL
+        
+        if redis_url:
+            logger.info(f"Initializing cache from REDIS_URL: {redis_url.split('@')[0]}@***")
+            init_cache(url=redis_url, fallback=True)
         else:
             # No Redis configured - use in-memory cache directly
             logger.info("ℹ️  REDIS_URL not configured - using in-memory cache")

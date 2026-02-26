@@ -30,6 +30,7 @@ from utils.email_service import (
     send_business_invitation_email,
     send_setup_account_email,
 )
+from utils.cache import cached, get_cache
 from config.settings import settings
 from typing import Optional
 from datetime import date
@@ -221,6 +222,9 @@ async def create_business(
         
         # Return with admin credentials for super_admin to view
         logger.info(f"Business '{business.name}' created successfully with code: {unique_code}")
+        
+        get_cache().clear_pattern("businesses:*")
+        
         return success_response(
             status_code=201,
             message=f"Business and admin account created successfully. Unique code: {unique_code}",
@@ -488,6 +492,8 @@ async def add_customer_to_business(
         if is_linked:
             message = "Member re-invited successfully. Setup link regenerated."
 
+        get_cache().clear_pattern("businesses:*")
+
         return success_response(
             status_code=200,
             message=message,
@@ -688,6 +694,9 @@ async def accept_business_invitation(
         
         
         logger.info(f"Invitation accepted by customer_id: {pending_request.customer_id} for business_id: {business.id}")
+        
+        get_cache().clear_pattern("businesses:*")
+        
         return success_response(
             status_code=200,
             message=f"Successfully joined {business.name}",
@@ -767,6 +776,7 @@ async def reject_business_invitation(
             status_code=500, message=f"Failed to reject invitation: {str(e)}"
         )
 
+@cached(ttl=300, key_prefix="businesses")
 async def get_user_businesses(
     current_user: dict,
     db: Session,
@@ -854,6 +864,7 @@ async def get_user_businesses(
         }
     )
 
+@cached(ttl=60, key_prefix="businesses")
 async def get_single_business(
     business_id: int,
     current_user: dict,
@@ -940,6 +951,8 @@ async def update_business(
                 related_entity_id=business_id,
                 related_entity_type="business",
             )
+
+        get_cache().clear_pattern("businesses:*")
 
         return success_response(
             status_code=200,
@@ -1051,6 +1064,10 @@ async def delete_business(
                 related_entity_type="business",
             )
         
+        # Invalidate caches
+        get_cache().clear_pattern("businesses:*")
+        get_cache().clear_pattern("units:*")
+
         return success_response(
             status_code=200, message="Business deleted successfully", data={}
         )
@@ -1178,6 +1195,7 @@ async def get_single_unit(
         data=UnitResponse.model_validate(unit).model_dump()
     )
 
+@cached(ttl=300, key_prefix="units")
 async def get_all_units(
     current_user: dict,
     db: Session,
@@ -1236,6 +1254,7 @@ async def get_all_units(
         }
     )
 
+@cached(ttl=300, key_prefix="units")
 async def get_business_units(
     business_id: int,
     current_user: dict,
@@ -1519,6 +1538,7 @@ async def delete_unit(
         session.rollback()
         return error_response(status_code=500, message=f"Failed to delete unit: {str(e)}")
 
+@cached(ttl=300, key_prefix="businesses")
 async def get_business_summary(
     current_user: dict,
     db: Session,
@@ -1539,6 +1559,7 @@ async def get_business_summary(
         data={"total_businesses": total_businesses}
     )
 
+@cached(ttl=300, key_prefix="units")
 async def get_all_unit_summary(
     current_user: dict,
     db: Session,
@@ -1606,6 +1627,7 @@ async def get_business_unit_summary(
     )
 
 
+@cached(ttl=300, key_prefix="businesses")
 async def get_unassigned_admin_businesses(
     current_user: dict,
     business_repo: "BusinessRepository",

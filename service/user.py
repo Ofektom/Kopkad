@@ -13,6 +13,7 @@ from utils.email_service import send_reset_password_email_async, send_welcome_em
 from utils.sms_service import send_termii_sms_async
 from schemas.user import ForgotPasswordRequest, ResetPasswordRequest
 import os
+from utils.cache import cached, get_cache
 
 # Repositories (for data access)
 from store.repositories import (
@@ -213,7 +214,9 @@ async def signup_unauthenticated(
             created_at=user.created_at,
             access_token=access_token,
             next_action="choose_action",
-        )
+        )        # Clear cache since member list changed
+        get_cache().clear_pattern("users:*")
+
         return success_response(
             status_code=201,
             message=f"Welcome, {user.full_name}!",
@@ -416,7 +419,9 @@ async def signup_authenticated(
             created_at=user.created_at,
             access_token=access_token,
             next_action="choose_action",
-        )
+        )        # Invalidate users cache
+        get_cache().clear_pattern("users:*")
+
         return success_response(
             status_code=201,
             message=f"Welcome, {user.full_name}!",
@@ -827,6 +832,7 @@ async def resend_reset_otp_service(
 
     return success_response(200, "New OTP sent if account exists")
 
+@cached(ttl=300, key_prefix="users")
 async def get_all_users(
     db: Session,
     current_user: dict,
@@ -918,6 +924,7 @@ async def get_all_users(
         logger.error(f"Failed to retrieve users: {str(e)}")
         return error_response(status_code=500, message=f"Failed to retrieve users: {str(e)}")
 
+@cached(ttl=300, key_prefix="users")
 async def get_business_users(
     db: Session,
     current_user: dict,
@@ -1100,7 +1107,9 @@ async def toggle_user_status(
             created_at=target_user.created_at,
             access_token=None,
             next_action="",
-        )
+        )        # Invalidate cache
+        get_cache().clear_pattern("users:*")
+
         return success_response(
             status_code=200,
             message=f"User {'activated' if is_active else 'deactivated'} successfully",
@@ -1178,7 +1187,9 @@ async def delete_user(
             related_entity_id=user_id,
             related_entity_type="user",
         )
-        
+                # Invalidate cache
+        get_cache().clear_pattern("users:*")
+
         return success_response(
             status_code=200,
             message="User deleted successfully",
@@ -1377,7 +1388,9 @@ async def switch_business(
             next_action="choose_action",
             address=None
         )
-        
+                # Invalidate cache
+        get_cache().clear_pattern("users:*")
+
         return success_response(
             status_code=200,
             message="Business switched successfully",
@@ -1568,7 +1581,9 @@ async def update_admin_details(
         admin.username = normalized_phone
         updated = True
 
-    if not updated:
+    if not updated:        # Invalidate cache
+        get_cache().clear_pattern("users:*")
+
         return success_response(
             status_code=200,
             message="No changes applied",
@@ -1616,6 +1631,7 @@ async def update_admin_details(
         return error_response(status_code=500, message=f"Failed to update admin: {str(exc)}")
 
 
+@cached(ttl=60, key_prefix="users")
 async def get_business_admin_credentials(
     current_user: dict,
     db: Session,
@@ -1710,6 +1726,8 @@ async def get_current_user_info_service(
             }
             for business in businesses
         ]
+    # Invalidate cache
+    get_cache().clear_pattern("users:*")
 
     return success_response(
         status_code=200,
