@@ -12,11 +12,11 @@ from utils.password_utils import generate_admin_credentials, encrypt_password
 from utils.permissions import grant_admin_permissions
 from utils.auth import hash_password
 from schemas.business import (
-    BusinessCreate, 
-    BusinessResponse, 
-    BusinessUpdate, 
-    UnitCreate, 
-    UnitResponse, 
+    BusinessCreate,
+    BusinessResponse,
+    BusinessUpdate,
+    UnitCreate,
+    UnitResponse,
     CustomerInvite,
     UnitUpdate,
 )
@@ -35,7 +35,6 @@ from config.settings import settings
 from typing import Optional
 from datetime import date
 from loguru import logger
-
 from store.repositories import (
     BusinessRepository,
     UnitRepository,
@@ -53,8 +52,10 @@ def _resolve_repo(repo, repo_cls, db: Session):
     """Utility to fallback to repository instance if not provided."""
     return repo if repo is not None else repo_cls(db)
 
+
 def has_permission(user: User, permission: str, db: Session) -> bool:
     return permission in user.permissions
+
 
 async def create_business(
     request: BusinessCreate,
@@ -72,10 +73,9 @@ async def create_business(
     user_repo = _resolve_repo(user_repo, UserRepository, db)
     unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
     user_business_repo = _resolve_repo(user_business_repo, UserBusinessRepository, db)
+    notification_repo = _resolve_repo(notification_repo, UserNotificationRepository, db)
     session = business_repo.db
-
     logger.info(f"Initiating business creation for agent_id: {current_user['user_id']}")
-
     current_user_obj = user_repo.get_by_id(current_user["user_id"])
     if not current_user_obj:
         return error_response(status_code=404, message="User not found")
@@ -83,10 +83,8 @@ async def create_business(
         return error_response(status_code=403, message="Only AGENT can create businesses")
     if not has_permission(current_user_obj, Permission.CREATE_BUSINESS, session):
         return error_response(status_code=403, message="No permission to create business")
-
     if business_repo.find_one_by(agent_id=current_user["user_id"]):
         return error_response(status_code=403, message="User can only own one business")
-
     characters = string.digits + string.ascii_letters
     max_attempts = 100
     for _ in range(max_attempts):
@@ -97,7 +95,6 @@ async def create_business(
         return error_response(
             status_code=500, message="Unable to generate unique code after multiple attempts"
         )
-
     try:
         # 1. Create business
         business = Business(
@@ -112,10 +109,10 @@ async def create_business(
         )
         session.add(business)
         session.flush()  # Get business.id before creating admin
-        
+
         # 2. AUTO-CREATE ADMIN USER for this business
         admin_creds = generate_admin_credentials(request.name, unique_code)
-        
+
         admin_user = User(
             full_name=admin_creds['full_name'],
             phone_number=admin_creds['phone'],
@@ -129,10 +126,10 @@ async def create_business(
         )
         session.add(admin_user)
         session.flush()  # Get admin_user.id
-        
+
         # 3. Link admin to business
         business.admin_id = admin_user.id
-        
+
         # 4. Store encrypted admin credentials (super admin can see these)
         admin_credentials_record = AdminCredentials(
             business_id=business.id,
@@ -144,12 +141,11 @@ async def create_business(
             expires_at=datetime.now(timezone.utc) + timedelta(days=30),
         )
         session.add(admin_credentials_record)
-        
+
         # 5. Grant business-scoped permissions to admin
         grant_admin_permissions(admin_user.id, business.id, current_user["user_id"], session)
-        
+
         # Notify super admins about admin credentials generated
-        from service.notifications import notify_super_admins
         await notify_super_admins(
             notification_type=NotificationType.ADMIN_CREDENTIALS_GENERATED,
             title="Admin Credentials Generated",
@@ -157,11 +153,11 @@ async def create_business(
             priority=NotificationPriority.HIGH,
             db=session,
             user_repo=user_repo,
-            notification_repo=UserNotificationRepository(session),
+            notification_repo=notification_repo,
             related_entity_id=business.id,
             related_entity_type="business",
         )
-        
+
         # 6. Create default unit (existing logic)
         if request.address:
             unit = Unit(
@@ -172,10 +168,10 @@ async def create_business(
                 created_at=datetime.now(timezone.utc),
             )
             session.add(unit)
-        
+
         # 7. Link agent to business (existing logic)
         user_business_repo.link_user_to_business(current_user["user_id"], business.id)
-        
+
         session.commit()
         session.refresh(business)
 
@@ -191,7 +187,7 @@ async def create_business(
             related_entity_id=business.id,
             related_entity_type="business",
         )
-        
+
         # Notify super admins about new business
         await notify_super_admins(
             notification_type=NotificationType.NEW_BUSINESS_REGISTERED,
@@ -219,12 +215,15 @@ async def create_business(
             delivery_status = "pending"
 
         business_response = BusinessResponse.model_validate(business)
-        
+
         # Return with admin credentials for super_admin to view
         logger.info(f"Business '{business.name}' created successfully with code: {unique_code}")
-        
+
+        # Invalidate relevant caches
         get_cache().clear_pattern("businesses:*")
-        
+        get_cache().clear_pattern("units:*")
+        get_cache().clear_pattern("unassigned_businesses:*")
+
         return success_response(
             status_code=201,
             message=f"Business and admin account created successfully. Unique code: {unique_code}",
@@ -244,9 +243,9 @@ async def create_business(
         )
     except Exception as e:
         session.rollback()
-        session.rollback()
         logger.exception("Full traceback for create_business failure:")
         return error_response(status_code=500, message=f"Failed to create business: {str(e)}")
+
 
 async def add_customer_to_business(
     request: CustomerInvite,
@@ -267,22 +266,17 @@ async def add_customer_to_business(
     pending_repo = _resolve_repo(pending_repo, PendingBusinessRequestRepository, db)
     unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
     session = user_repo.db
-
     logger.info(f"Adding customer phone={request.customer_phone} to business code={request.business_unique_code} by user {current_user['user_id']}")
-
     # ── Authorization checks ──
     current_user_obj = user_repo.get_by_id(current_user["user_id"])
     if not current_user_obj:
         return error_response(status_code=404, message="User not found")
-
     if current_user["role"] not in [Role.AGENT, Role.SUB_AGENT, Role.SUPER_ADMIN]:
         return error_response(
             status_code=403, message="Only AGENT, SUB_AGENT, or SUPER_ADMIN can add customers"
         )
-
     if current_user["role"] != Role.SUPER_ADMIN and not has_permission(current_user_obj, Permission.ASSIGN_BUSINESS, session):
         return error_response(status_code=403, message="No permission to assign customers to business")
-
     # ── Normalize phone number ──
     phone = request.customer_phone.replace("+", "")
     if phone.startswith("234") and len(phone) == 13:
@@ -293,19 +287,17 @@ async def add_customer_to_business(
         phone_number = "0" + phone
     else:
         return error_response(status_code=400, message="Invalid phone number format")
-
     # ── Check for existing user by phone (primary identity) ──
     customer = user_repo.get_by_phone(phone_number)
-
     if customer:
         # Reuse existing user - do NOT create duplicate
         logger.info(f"Reusing existing user {customer.id} (phone: {phone_number})")
-        
+       
         # Strict email conflict check (no override allowed if different)
         if request.email:
             provided_email = request.email.lower().strip()
             existing_email = customer.email.lower().strip() if customer.email else None
-            
+           
             if existing_email and provided_email != existing_email:
                 return error_response(
                     status_code=409,
@@ -316,25 +308,21 @@ async def add_customer_to_business(
                         "or enter the exact same email, or correct the phone number if this is a mistake."
                     )
                 )
-            
+           
             # Emails match or no existing email → safe to set/update
             if not existing_email or provided_email == existing_email:
                 customer.email = provided_email
                 session.add(customer)
                 logger.info(f"Email confirmed/updated for existing user {customer.id}: {provided_email}")
         # If no email provided → keep existing (no change)
-
     else:
         # Create new user
         if request.email and user_repo.exists_by_email(request.email.lower()):
             return error_response(status_code=409, message="Email already in use by another user")
-
         business = business_repo.find_one_by(unique_code=request.business_unique_code)
         if not business:
             return error_response(status_code=404, message="Business not found")
-
         new_role = Role.COOPERATIVE_MEMBER if business.business_type == BusinessType.COOPERATIVE else Role.CUSTOMER
-
         try:
             customer = User(
                 full_name="Invited Member",
@@ -354,56 +342,44 @@ async def add_customer_to_business(
             session.rollback()
             logger.exception("Failed to create new user")
             return error_response(status_code=500, message=f"Failed to create user: {str(e)}")
-
     # ── Role validation ──
     if customer.role not in [Role.CUSTOMER, Role.COOPERATIVE_MEMBER]:
         return error_response(status_code=400, message=f"User role {customer.role} cannot be added to business")
-
     business = business_repo.find_one_by(unique_code=request.business_unique_code)
     if not business:
         return error_response(status_code=404, message="Business not found")
-
     # ── Authorization for specific roles ──
     if current_user["role"] == Role.AGENT and business.agent_id != current_user["user_id"]:
         return error_response(403, "Agent must be the owner of the business to add customers")
-
     if current_user["role"] == Role.SUB_AGENT:
         if not user_business_repo.is_user_in_business(current_user["user_id"], business.id):
             return error_response(403, "Sub-agent not found in this business")
-
     # ── Link to business (many-to-many) + set active_business_id ──
     is_linked = user_business_repo.is_user_in_business(customer.id, business.id)
-
     if business.business_type == BusinessType.COOPERATIVE:
         if is_linked and customer.is_active:
             return error_response(409, "Member is already active in this cooperative")
-
         if not is_linked:
             user_business_repo.link_user_to_business(customer.id, business.id)
             logger.info(f"[COOP AUTO-LINK] User {customer.id} linked to cooperative {business.id}")
             session.flush()
-
         # Always set/update active_business_id (current context)
         customer.active_business_id = business.id
         session.add(customer)
         logger.info(f"[ACTIVE BUSINESS SET] User {customer.id} active_business_id = {business.id}")
-
         # Assign unit if provided
         if request.unit_id:
             unit = unit_repo.find_one_by(id=request.unit_id, business_id=business.id)
             if not unit:
                 return error_response(status_code=404, message="Unit not found in this business")
             unit_repo.add_member(request.unit_id, customer.id)
-
     else:
         # Standard business: invitation only - no immediate link or active_business_id change
         if is_linked:
             return error_response(409, "Customer already associated with this business")
-
     # Commit early (preserve link + active_business_id + any email update)
     session.commit()
     session.refresh(customer)
-
     # ── Pending request + WhatsApp link ──
     try:
         # Clean up old pending requests
@@ -418,7 +394,6 @@ async def add_customer_to_business(
         for old_req in old_requests:
             pending_repo.delete_request(old_req)
         logger.info(f"Cleaned {len(old_requests)} old pending requests for user {customer.id} + business {business.id}")
-
         # Generate token and pending request
         token = str(uuid.uuid4())
         expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
@@ -430,9 +405,7 @@ async def add_customer_to_business(
             expires_at=expires_at,
         )
         session.commit()
-
         setup_url = f"{settings.APP_BASE_URL}/business/accept-invitation?token={token}"
-
         # WhatsApp fallback message
         if business.business_type == BusinessType.COOPERATIVE:
             wa_message = (
@@ -449,10 +422,8 @@ async def add_customer_to_business(
                 f"Accept: {accept_url}\n"
                 f"Reject: {reject_url}"
             )
-
         encoded_message = urllib.parse.quote(wa_message)
         whatsapp_link = f"https://wa.me/{phone_number}?text={encoded_message}"
-
         # Automated delivery (email or SMS)
         recipient = request.email or customer.email
         if recipient:
@@ -487,13 +458,12 @@ async def add_customer_to_business(
                 customer.phone_number,
                 sms_text
             )
-
         message = "Member added successfully. Setup link generated."
         if is_linked:
             message = "Member re-invited successfully. Setup link regenerated."
-
         get_cache().clear_pattern("businesses:*")
-
+        get_cache().clear_pattern(f"business:{business.id}")
+        get_cache().clear_pattern("user_units:*")
         return success_response(
             status_code=200,
             message=message,
@@ -503,16 +473,16 @@ async def add_customer_to_business(
                 "setup_url": setup_url,
             }
         )
-
     except Exception as e:
         session.rollback()
         logger.exception("Failed during pending request / link finalization")
         return error_response(status_code=500, message=f"Failed to finalize addition: {str(e)}")
 
+
 async def complete_registration_service(
     token: str,
     pin: str,
-    full_name: str, # Allow updating name
+    full_name: str,  # Allow updating name
     db: Session,
     pending_repo: PendingBusinessRequestRepository | None = None,
     user_repo: UserRepository | None = None,
@@ -527,67 +497,54 @@ async def complete_registration_service(
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
     unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
     session = db
-
     logger.info(f"Processing complete_registration for token: {token}")
-
     pending_request = pending_repo.get_by_token(token)
     if not pending_request:
         return error_response(status_code=404, message="Invalid or missing invitation token")
-
     if pending_request.expires_at < datetime.now(timezone.utc):
         pending_repo.delete_request(pending_request)
         session.commit()
         return error_response(status_code=410, message="Invitation has expired")
-
     user = user_repo.get_by_id(pending_request.customer_id)
     if not user:
         return error_response(status_code=404, message="User not found")
-        
+       
     if user.is_active:
         return error_response(status_code=400, message="User is already active. Please log in.")
-
     try:
         # Update User Credentials
-        # Note: UserRepository might not have update_credentials method, doing it via session directly or adding method
         user.pin = hash_password(pin)
-        # We need a password field? User model has 'password' or just 'pin'? 
-        # Looking at User model... it seems to use `pin` for auth in `login` service "verify_password(request.pin, user.pin)".
-        # Wait, the `login` checks `pin`. Does it have `password` field?
-        # Let's check `models/user.py` again.
-        # Assuming `pin` is the main credential or there is `password`.
-        # The PROMPT says "create password/pin".
-        # The `signup_unauthenticated` sets `pin`.
-        # I will set `pin`. If there is a password field I should set it too.
-        # Checking `login` service: `verify_password(request.pin, user.pin)`. It seems PIN is the password.
-        # But `AdminCredentials` has `temp_password`.
-        # I'll update `pin` and `full_name`.
-        
         user.full_name = full_name
         user.is_active = True
-        
+
         # Link to Business
         user_business_repo.link_user_to_business(
             pending_request.customer_id, pending_request.business_id
         )
         if pending_request.unit_id:
-             unit_repo.add_member(pending_request.unit_id, pending_request.customer_id)
-            
+            unit_repo.add_member(pending_request.unit_id, pending_request.customer_id)
+
         # Delete Pending Request
         pending_repo.delete_request(pending_request)
-        
+
         session.commit()
-        
-        # Notify...
-        
+
         # Generate Token
         from utils.auth import create_access_token
         access_token = create_access_token(
-            data={"sub": user.username, "role": user.role, "user_id": user.id}, 
+            data={"sub": user.username, "role": user.role, "user_id": user.id},
             db=db,
             active_business_id=pending_request.business_id
         )
-        
+       
         logger.info(f"Registration completed for user_id: {user.id}")
+
+        # Invalidate caches
+        get_cache().clear_pattern(f"user:{user.id}")
+        get_cache().clear_pattern(f"business:{pending_request.business_id}")
+        get_cache().clear_pattern("businesses:*")
+        get_cache().clear_pattern("user_units:*")
+
         return success_response(
             status_code=200,
             message="Registration completed successfully",
@@ -598,9 +555,8 @@ async def complete_registration_service(
                 "access_token": access_token
             }
         )
-        
+       
     except Exception as e:
-        session.rollback()
         session.rollback()
         logger.exception("Full traceback for complete_registration failure:")
         return error_response(status_code=500, message=f"Failed to complete registration: {str(e)}")
@@ -613,26 +569,22 @@ async def accept_business_invitation(
     pending_repo: PendingBusinessRequestRepository | None = None,
     user_business_repo: UserBusinessRepository | None = None,
     business_repo: BusinessRepository | None = None,
-    user_repo: UserRepository | None = None, # Added
+    user_repo: UserRepository | None = None,
 ):
     """Accept a business invitation via token."""
     pending_repo = _resolve_repo(pending_repo, PendingBusinessRequestRepository, db)
     user_business_repo = _resolve_repo(user_business_repo, UserBusinessRepository, db)
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
-    user_repo = _resolve_repo(user_repo, UserRepository, db) # Added
+    user_repo = _resolve_repo(user_repo, UserRepository, db)
     session = pending_repo.db
-
     logger.info(f"Processing accept_business_invitation for token: {token}")
-
     pending_request = pending_repo.get_by_token(token)
     if not pending_request:
         return error_response(status_code=404, message="Invalid or missing invitation token")
-
     if pending_request.expires_at < datetime.now(timezone.utc):
         pending_repo.delete_request(pending_request)
         session.commit()
         return error_response(status_code=410, message="Invitation has expired")
-
     # CHECK IF USER NEEDS SETUP
     user = user_repo.get_by_id(pending_request.customer_id)
     if user and not user.is_active:
@@ -646,7 +598,6 @@ async def accept_business_invitation(
                 "email": user.email
             }
         )
-
     try:
         user_business_repo.link_user_to_business(
             pending_request.customer_id, pending_request.business_id
@@ -660,12 +611,10 @@ async def accept_business_invitation(
             )
         pending_repo.delete_request(pending_request)
         session.commit()
-
         business = business_repo.get_by_id(pending_request.business_id)
         customer = user_repo.get_by_id(pending_request.customer_id)
-        
+       
         # Notify customer about acceptance
-        from service.notifications import notify_user, notify_business_admin
         await notify_user(
             user_id=pending_request.customer_id,
             notification_type=NotificationType.BUSINESS_INVITATION_ACCEPTED,
@@ -677,7 +626,7 @@ async def accept_business_invitation(
             related_entity_id=business.id,
             related_entity_type="business",
         )
-        
+       
         # Notify business admin and agent about acceptance
         await notify_business_admin(
             business_id=business.id,
@@ -691,12 +640,16 @@ async def accept_business_invitation(
             related_entity_id=pending_request.customer_id,
             related_entity_type="user",
         )
-        
-        
+       
         logger.info(f"Invitation accepted by customer_id: {pending_request.customer_id} for business_id: {business.id}")
-        
+       
+        # Invalidate caches
+        get_cache().clear_pattern(f"user:{pending_request.customer_id}")
+        get_cache().clear_pattern(f"business:{pending_request.business_id}")
         get_cache().clear_pattern("businesses:*")
-        
+        get_cache().clear_pattern("user_units:*")
+        get_cache().clear_pattern("units:*")
+
         return success_response(
             status_code=200,
             message=f"Successfully joined {business.name}",
@@ -704,9 +657,9 @@ async def accept_business_invitation(
         )
     except Exception as e:
         session.rollback()
-        session.rollback()
         logger.exception("Full traceback for accept_business_invitation failure:")
         return error_response(status_code=500, message=f"Failed to accept invitation: {str(e)}")
+
 
 async def reject_business_invitation(
     token: str,
@@ -717,29 +670,24 @@ async def reject_business_invitation(
     """Reject a business invitation via token."""
     pending_repo = _resolve_repo(pending_repo, PendingBusinessRequestRepository, db)
     session = pending_repo.db
-
     logger.info(f"Processing reject_business_invitation for token: {token}")
-
     pending_request = pending_repo.get_by_token(token)
     if not pending_request:
         return error_response(status_code=404, message="Invalid or missing invitation token")
-
     if pending_request.expires_at < datetime.now(timezone.utc):
         pending_repo.delete_request(pending_request)
         session.commit()
         return error_response(status_code=410, message="Invitation has expired")
-
     try:
         business_repo = _resolve_repo(None, BusinessRepository, db)
         user_repo = _resolve_repo(None, UserRepository, db)
         business = business_repo.get_by_id(pending_request.business_id)
         customer = user_repo.get_by_id(pending_request.customer_id)
-        
+       
         pending_repo.delete_request(pending_request)
         session.commit()
-        
+       
         # Notify customer about rejection
-        from service.notifications import notify_user, notify_business_admin
         await notify_user(
             user_id=pending_request.customer_id,
             notification_type=NotificationType.BUSINESS_INVITATION_REJECTED,
@@ -751,7 +699,7 @@ async def reject_business_invitation(
             related_entity_id=business.id,
             related_entity_type="business",
         )
-        
+       
         # Notify business admin and agent about rejection
         await notify_business_admin(
             business_id=business.id,
@@ -765,8 +713,7 @@ async def reject_business_invitation(
             related_entity_id=pending_request.customer_id,
             related_entity_type="user",
         )
-        
-        
+       
         logger.info(f"Invitation rejected by customer_id: {pending_request.customer_id} for business_id: {business.id}")
         return success_response(status_code=200, message="Invitation rejected", data={})
     except Exception as e:
@@ -775,6 +722,7 @@ async def reject_business_invitation(
         return error_response(
             status_code=500, message=f"Failed to reject invitation: {str(e)}"
         )
+
 
 @cached(ttl=300, key_prefix="businesses")
 async def get_user_businesses(
@@ -808,7 +756,7 @@ async def get_user_businesses(
                 "size": size
             }
         )
-    
+   
     if current_user["role"] == Role.ADMIN:
         query = session.query(Business)
     else:
@@ -826,10 +774,9 @@ async def get_user_businesses(
                 }
             )
         query = session.query(Business).filter(Business.id.in_(business_ids))
-
     if address:
         query = query.filter(Business.address.ilike(f"%{address}%"))
-    
+   
     if search:
         search_pattern = f"%{search.lower()}%"
         query = query.filter(
@@ -839,19 +786,15 @@ async def get_user_businesses(
                 func.lower(Business.address).like(search_pattern),
             )
         )
-
     if start_date:
         query = query.filter(Business.created_at >= start_date)
     if end_date:
         query = query.filter(Business.created_at < end_date + timedelta(days=1))
-
     total_items = query.count()
     offset = (page - 1) * size
     businesses = query.order_by(Business.created_at.desc()).offset(offset).limit(size).all()
-
     total_pages = (total_items + size - 1) // size
     business_list = [BusinessResponse.model_validate(business).model_dump() for business in businesses]
-
     return success_response(
         status_code=200,
         message="Businesses retrieved successfully",
@@ -864,7 +807,7 @@ async def get_user_businesses(
         }
     )
 
-@cached(ttl=60, key_prefix="businesses")
+
 async def get_single_business(
     business_id: int,
     current_user: dict,
@@ -882,16 +825,15 @@ async def get_single_business(
             return error_response(
                 status_code=403, message="User is not associated with this business"
             )
-
     business = business_repo.get_by_id(business_id)
     if not business:
         return error_response(status_code=404, message="Business not found")
-
     return success_response(
         status_code=200,
         message="Business retrieved successfully",
         data=BusinessResponse.model_validate(business).model_dump()
     )
+
 
 async def update_business(
     business_id: int,
@@ -904,16 +846,13 @@ async def update_business(
     """Update business details, allowed by AGENT owner or SUPER_ADMIN."""
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
     session = business_repo.db
-
     business = business_repo.get_by_id(business_id)
     if not business:
         return error_response(status_code=404, message="Business not found")
-
     if current_user["role"] != Role.SUPER_ADMIN and business.agent_id != current_user["user_id"]:
         return error_response(
             status_code=403, message="Only the agent owner or SUPER_ADMIN can update this business"
         )
-
     try:
         if request.name:
             business.name = request.name
@@ -921,7 +860,6 @@ async def update_business(
             business.address = request.address
         session.commit()
         session.refresh(business)
-
         # Notify business admin and agent about business update
         from service.notifications import notify_business_admin
         await notify_business_admin(
@@ -936,7 +874,7 @@ async def update_business(
             related_entity_id=business_id,
             related_entity_type="business",
         )
-        
+       
         # Also notify agent if different from admin
         if business.agent_id and business.agent_id != business.admin_id:
             from service.notifications import notify_user
@@ -951,9 +889,8 @@ async def update_business(
                 related_entity_id=business_id,
                 related_entity_type="business",
             )
-
         get_cache().clear_pattern("businesses:*")
-
+        get_cache().clear_pattern(f"business:{business_id}")
         return success_response(
             status_code=200,
             message="Business updated successfully",
@@ -965,6 +902,7 @@ async def update_business(
         return error_response(
             status_code=500, message=f"Failed to update business: {str(e)}"
         )
+
 
 async def delete_business(
     business_id: int,
@@ -980,16 +918,13 @@ async def delete_business(
     user_business_repo = _resolve_repo(user_business_repo, UserBusinessRepository, db)
     unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
     session = business_repo.db
-
     business = business_repo.get_by_id(business_id)
     if not business:
         return error_response(status_code=404, message="Business not found")
-
     if current_user["role"] != Role.SUPER_ADMIN and business.agent_id != current_user["user_id"]:
         return error_response(
             status_code=403, message="Only the agent owner or SUPER_ADMIN can delete this business"
         )
-
     member_count = (
         session.query(user_business)
         .filter(
@@ -1002,7 +937,6 @@ async def delete_business(
         return error_response(
             status_code=400, message="Business is active and cannot be deleted due to associated members"
         )
-
     try:
         # Get all associated users before deletion
         associated_users = session.query(user_business.c.user_id).filter(
@@ -1010,7 +944,7 @@ async def delete_business(
         ).all()
         user_ids = [user_id[0] for user_id in associated_users]
         business_name = business.name
-        
+       
         session.execute(user_business.delete().where(user_business.c.business_id == business_id))
         session.execute(
             user_units.delete().where(
@@ -1020,7 +954,7 @@ async def delete_business(
         session.execute(Unit.__table__.delete().where(Unit.business_id == business_id))
         session.delete(business)
         session.commit()
-        
+       
         # Notify all associated users, business admin, and agent about deletion
         from service.notifications import notify_multiple_users, notify_user
         if user_ids:
@@ -1035,7 +969,7 @@ async def delete_business(
                 related_entity_id=business_id,
                 related_entity_type="business",
             )
-        
+       
         # Notify business admin if exists
         if business.admin_id and business.admin_id not in user_ids:
             await notify_user(
@@ -1049,7 +983,7 @@ async def delete_business(
                 related_entity_id=business_id,
                 related_entity_type="business",
             )
-        
+       
         # Notify agent if exists and different from admin
         if business.agent_id and business.agent_id not in user_ids and business.agent_id != business.admin_id:
             await notify_user(
@@ -1063,10 +997,12 @@ async def delete_business(
                 related_entity_id=business_id,
                 related_entity_type="business",
             )
-        
+       
         # Invalidate caches
         get_cache().clear_pattern("businesses:*")
         get_cache().clear_pattern("units:*")
+        get_cache().clear_pattern("business_summary:*")
+        get_cache().clear_pattern("unassigned_businesses:*")
 
         return success_response(
             status_code=200, message="Business deleted successfully", data={}
@@ -1077,6 +1013,7 @@ async def delete_business(
         return error_response(
             status_code=500, message=f"Failed to delete business: {str(e)}"
         )
+
 
 async def create_unit(
     business_id: int,
@@ -1090,18 +1027,15 @@ async def create_unit(
     """Create a new unit within a business for AGENT or ADMIN."""
     if current_user["role"] not in [Role.AGENT, Role.ADMIN]:
         return error_response(status_code=403, message="Only AGENT or ADMIN can create units")
-
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
     unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
     session = business_repo.db
-
     business_query = session.query(Business).filter(Business.id == business_id)
     if current_user["role"] == Role.AGENT:
         business_query = business_query.filter(Business.agent_id == current_user["user_id"])
     business = business_query.first()
     if not business:
         return error_response(status_code=404, message="Business not found or you do not have access")
-
     try:
         unit = Unit(
             name=request.name,
@@ -1113,7 +1047,6 @@ async def create_unit(
         session.add(unit)
         session.commit()
         session.refresh(unit)
-
         # Notify business admin and agent about unit creation
         from service.notifications import notify_business_admin
         await notify_business_admin(
@@ -1128,8 +1061,10 @@ async def create_unit(
             related_entity_id=unit.id,
             related_entity_type="unit",
         )
-
         unit_response = UnitResponse.model_validate(unit)
+        # Invalidate caches
+        get_cache().clear_pattern(f"units:{business_id}")
+        get_cache().clear_pattern("unit_summary:*")
         return success_response(
             status_code=201,
             message="Unit created successfully",
@@ -1139,6 +1074,7 @@ async def create_unit(
         session.rollback()
         logger.error(f"Unit creation failed: {str(e)}")
         return error_response(status_code=500, message=f"Failed to create unit: {str(e)}")
+
 
 async def get_single_unit(
     business_id: int,
@@ -1156,17 +1092,15 @@ async def get_single_unit(
     unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
     user_business_repo = _resolve_repo(user_business_repo, UserBusinessRepository, db)
     session = unit_repo.db
-    
+   
     unit = session.query(Unit).filter(Unit.id == unit_id, Unit.business_id == business_id).first()
     if not unit:
         logger.error(f"Unit not found for unit_id: {unit_id} in business_id: {business_id}")
         return error_response(status_code=404, message="Unit not found or does not belong to specified business")
-
     business = business_repo.get_by_id(unit.business_id)
     if not business:
         logger.error(f"Business not found for unit_id: {unit_id}")
         return error_response(status_code=404, message="Associated business not found")
-
     # Role-based access control
     if current_user["role"] not in [Role.SUPER_ADMIN, Role.ADMIN]:
         if current_user["role"] == Role.AGENT:
@@ -1187,13 +1121,13 @@ async def get_single_unit(
         else:
             logger.error(f"Invalid role {current_user['role']} for user {current_user['user_id']}")
             return error_response(status_code=403, message="Invalid user role")
-
     logger.info(f"Unit {unit_id} retrieved successfully for user {current_user['user_id']}")
     return success_response(
         status_code=200,
         message="Unit retrieved successfully",
         data=UnitResponse.model_validate(unit).model_dump()
     )
+
 
 @cached(ttl=300, key_prefix="units")
 async def get_all_units(
@@ -1210,10 +1144,8 @@ async def get_all_units(
     if current_user["role"] != Role.SUPER_ADMIN:
         logger.error(f"User {current_user['user_id']} attempted to access all units without SUPER_ADMIN role")
         return error_response(status_code=403, message="Only SUPER_ADMIN can access all units")
-
     unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
     session = unit_repo.db
-
     query = session.query(Unit)
     if search:
         search_pattern = f"%{search.lower()}%"
@@ -1226,7 +1158,6 @@ async def get_all_units(
     total_items = query.count()
     offset = (page - 1) * size
     units = query.order_by(Unit.created_at.desc()).offset(offset).limit(size).all()
-
     if not units:
         logger.warning("No units found in the system")
         return success_response(
@@ -1240,7 +1171,6 @@ async def get_all_units(
                 "size": size
             }
         )
-
     logger.info(f"Found {len(units)} units in the system")
     return success_response(
         status_code=200,
@@ -1253,6 +1183,7 @@ async def get_all_units(
             "size": size
         }
     )
+
 
 @cached(ttl=300, key_prefix="units")
 async def get_business_units(
@@ -1273,12 +1204,10 @@ async def get_business_units(
     unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
     user_business_repo = _resolve_repo(user_business_repo, UserBusinessRepository, db)
     session = unit_repo.db
-
     business = business_repo.get_by_id(business_id)
     if not business:
         logger.error(f"Business not found for id: {business_id}")
         return error_response(status_code=404, message="Business not found")
-
     # Role-based access control
     if current_user["role"] in [Role.SUPER_ADMIN, Role.ADMIN]:
         query = session.query(Unit).filter(Unit.business_id == business.id)
@@ -1296,12 +1225,11 @@ async def get_business_units(
                 user_units.c.user_id == current_user["user_id"],
                 Unit.business_id == business.id
             )
-        else:  # SUB_AGENT
+        else: # SUB_AGENT
             query = session.query(Unit).filter(Unit.business_id == business.id)
     else:
         logger.error(f"Invalid role {current_user['role']} for user {current_user['user_id']}")
         return error_response(status_code=403, message="Invalid user role")
-
     if search:
         search_pattern = f"%{search.lower()}%"
         query = query.filter(
@@ -1310,11 +1238,9 @@ async def get_business_units(
                 func.lower(Unit.location).like(search_pattern),
             )
         )
-
     total_items = query.count()
     offset = (page - 1) * size
     units = query.order_by(Unit.created_at.desc()).offset(offset).limit(size).all()
-
     if not units:
         logger.warning(f"No units found for business {business.id} for user {current_user['user_id']}")
         return success_response(
@@ -1328,7 +1254,6 @@ async def get_business_units(
                 "size": size
             }
         )
-
     logger.info(f"Found {len(units)} units for business {business.id} for user {current_user['user_id']}")
     return success_response(
         status_code=200,
@@ -1341,6 +1266,7 @@ async def get_business_units(
             "size": size
         }
     )
+
 
 async def get_user_units(
     current_user: dict,
@@ -1357,10 +1283,8 @@ async def get_user_units(
     logger.info(f"Fetching units for user_id: {current_user['user_id']}, role: {current_user['role']}, page: {page}, size: {size}")
     unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
     session = unit_repo.db
-
     # Base query: Join units with user_units to get units the user is associated with
     query = session.query(Unit).join(user_units).filter(user_units.c.user_id == current_user["user_id"])
-
     # Apply filters
     if name:
         query = query.filter(Unit.name.ilike(f"%{name}%"))
@@ -1374,12 +1298,10 @@ async def get_user_units(
                 func.lower(Unit.location).like(search_pattern),
             )
         )
-
     # Pagination
     total_items = query.count()
     offset = (page - 1) * size
     units = query.order_by(Unit.created_at.desc()).offset(offset).limit(size).all()
-
     if not units:
         logger.warning(f"No units found for user {current_user['user_id']}")
         return success_response(
@@ -1393,7 +1315,6 @@ async def get_user_units(
                 "size": size
             }
         )
-
     logger.info(f"Found {len(units)} units for user {current_user['user_id']}")
     return success_response(
         status_code=200,
@@ -1407,6 +1328,7 @@ async def get_user_units(
         }
     )
 
+
 async def update_business_unit(
     business_id: int,
     unit_id: int,
@@ -1419,15 +1341,11 @@ async def update_business_unit(
     """Update Unit Details"""
     unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
     session = unit_repo.db
-
     unit = unit_repo.get_by_id(unit_id)
     if not unit or unit.business_id != business_id:
         return error_response(status_code=404, message="Unit Not Found or does not belong to this business")
-
-
     if current_user["role"] != Role.SUPER_ADMIN and unit.created_by != current_user["user_id"]:
         return error_response(status_code=403, message="Only SUPER ADMIN and business owner can update this unit")
-
     try:
         if request.name:
             unit.name = request.name
@@ -1435,7 +1353,6 @@ async def update_business_unit(
             unit.location = request.location
         session.commit()
         session.refresh(unit)
-
         # Notify business admin and agent about unit update
         business_repo = _resolve_repo(None, BusinessRepository, db)
         business = business_repo.get_by_id(unit.business_id)
@@ -1452,10 +1369,12 @@ async def update_business_unit(
             related_entity_id=unit.id,
             related_entity_type="unit",
         )
-
+        # Invalidate caches
+        get_cache().clear_pattern(f"unit:{unit_id}")
+        get_cache().clear_pattern(f"units:{business_id}")
         return success_response(
             status_code=200,
-            message="Business updated successfully",
+            message="Unit updated successfully",
             data=UnitResponse.model_validate(unit).model_dump()
         )
     except Exception as e:
@@ -1464,6 +1383,7 @@ async def update_business_unit(
         return error_response(
             status_code=500, message=f"Failed to update unit: {str(e)}"
         )
+
 
 async def delete_unit(
     unit_id: int,
@@ -1475,22 +1395,18 @@ async def delete_unit(
     """Delete a unit if it has no associated members, allowed by AGENT owner or SUPER_ADMIN."""
     unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
     session = unit_repo.db
-
     unit = unit_repo.get_by_id(unit_id)
     if not unit:
         return error_response(status_code=404, message="Unit not found")
-
     if current_user["role"] != Role.SUPER_ADMIN and unit.created_by != current_user["user_id"]:
         return error_response(
             status_code=403, message="Only the unit owner or SUPER_ADMIN can delete this unit"
         )
-
     member_count = session.query(user_units).filter(user_units.c.unit_id == unit_id).count()
     if member_count > 0:
         return error_response(
             status_code=400, message="Unit has associated members and cannot be deleted"
         )
-
     try:
         # Get business and unit members before deletion
         business_repo = _resolve_repo(None, BusinessRepository, db)
@@ -1498,10 +1414,10 @@ async def delete_unit(
         unit_name = unit.name
         unit_members = session.query(user_units).filter(user_units.c.unit_id == unit_id).all()
         member_ids = [member.user_id for member in unit_members]
-        
+       
         session.delete(unit)
         session.commit()
-        
+       
         # Notify business admin and agent about unit deletion
         from service.notifications import notify_business_admin, notify_multiple_users
         await notify_business_admin(
@@ -1516,7 +1432,7 @@ async def delete_unit(
             related_entity_id=unit_id,
             related_entity_type="unit",
         )
-        
+       
         # Notify unit members
         if member_ids:
             await notify_multiple_users(
@@ -1530,15 +1446,21 @@ async def delete_unit(
                 related_entity_id=unit_id,
                 related_entity_type="unit",
             )
-        
+       
+        # Invalidate caches
+        get_cache().clear_pattern(f"unit:{unit_id}")
+        get_cache().clear_pattern(f"units:{unit.business_id}")
+        get_cache().clear_pattern("unit_summary:*")
+
         return success_response(
             status_code=200, message="Unit deleted successfully", data={}
         )
     except Exception as e:
         session.rollback()
+        logger.error(f"Failed to delete unit: {str(e)}")
         return error_response(status_code=500, message=f"Failed to delete unit: {str(e)}")
 
-@cached(ttl=300, key_prefix="businesses")
+
 async def get_business_summary(
     current_user: dict,
     db: Session,
@@ -1546,20 +1468,18 @@ async def get_business_summary(
     business_repo: BusinessRepository | None = None,
 ):
     """Retrieve the total number of businesses in the system, accessible by ADMIN only."""
- 
     if current_user["role"] != Role.ADMIN:
         return error_response(status_code=403, message="Only ADMIN can access total business count")
-
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
     total_businesses = business_repo.db.query(Business).count()
-    
+   
     return success_response(
         status_code=200,
         message="Total business count retrieved successfully",
         data={"total_businesses": total_businesses}
     )
 
-@cached(ttl=300, key_prefix="units")
+
 async def get_all_unit_summary(
     current_user: dict,
     db: Session,
@@ -1567,18 +1487,18 @@ async def get_all_unit_summary(
     unit_repo: UnitRepository | None = None,
 ):
     """Retrieve the total number of units in the system, accessible by SUPER_ADMIN only."""
-    
+   
     if current_user["role"] != Role.SUPER_ADMIN:
         return error_response(status_code=403, message="Only SUPER_ADMIN can access total unit count")
-
     unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
     total_units = unit_repo.db.query(Unit).count()
-    
+   
     return success_response(
         status_code=200,
         message="Total unit count retrieved successfully",
         data={"total_units": total_units}
     )
+
 
 async def get_business_unit_summary(
     business_id: str,
@@ -1594,11 +1514,9 @@ async def get_business_unit_summary(
     unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
     user_business_repo = _resolve_repo(user_business_repo, UserBusinessRepository, db)
     session = unit_repo.db
-
     business = business_repo.get_by_id(business_id)
     if not business:
         return error_response(status_code=404, message="Business not found")
-
     if current_user["role"] in [Role.SUPER_ADMIN, Role.ADMIN]:
         query = session.query(Unit).filter(Unit.business_id == business_id)
     elif current_user["role"] == Role.AGENT:
@@ -1617,9 +1535,8 @@ async def get_business_unit_summary(
             query = session.query(Unit).filter(Unit.business_id == business_id)
     else:
         return error_response(status_code=403, message="Invalid user role")
-
     total_units = query.count()
-    
+   
     return success_response(
         status_code=200,
         message="Business unit count retrieved successfully",
@@ -1627,7 +1544,6 @@ async def get_business_unit_summary(
     )
 
 
-@cached(ttl=300, key_prefix="businesses")
 async def get_unassigned_admin_businesses(
     current_user: dict,
     business_repo: "BusinessRepository",
