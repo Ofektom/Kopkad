@@ -247,3 +247,950 @@ WHERE user_notifications.user_id = %(user_id_1)s AND user_notifications.notifica
 [parameters: {'user_id_1': 4, 'notification_type_1': 'savings_payment_overdue', 'created_at_1': datetime.datetime(2025, 8, 7, 0, 0, tzinfo=datetime.timezone.utc), 'related_entity_id_1': 8, 'param_1': 1}]
 (Background on this error at: https://sqlalche.me/e/20/e3q8)
 2026-02-26 10:29:40.832 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:32:52 WAT)" executed successfully
+2026-02-26 10:32:52.721 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:37:52 WAT)" (scheduled at 2026-02-26 10:32:52.666621+01:00)
+2026-02-26 10:32:52.726 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-26 10:33:20.961 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-26 10:33:21.141 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:37:52 WAT)" executed successfully
+2026-02-26 10:37:52.817 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:42:52 WAT)" (scheduled at 2026-02-26 10:37:52.666621+01:00)
+2026-02-26 10:37:52.861 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-26 10:38:12.225 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-26 10:38:12.412 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:42:52 WAT)" executed successfully
+2026-02-26 10:42:53.687 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:47:52 WAT)" (scheduled at 2026-02-26 10:42:52.666621+01:00)
+2026-02-26 10:42:54.145 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-26 10:43:26.313 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-26 10:43:26.898 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:47:52 WAT)" executed successfully
+2026-02-26 10:47:53.687 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:52:52 WAT)" (scheduled at 2026-02-26 10:47:52.666621+01:00)
+2026-02-26 10:47:53.754 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-26 10:48:08.163 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-26 10:48:08.571 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:52:52 WAT)" executed successfully
+2026-02-26 10:52:52.789 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:57:52 WAT)" (scheduled at 2026-02-26 10:52:52.666621+01:00)
+2026-02-26 10:52:52.816 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-26 10:53:03.492 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-26 10:53:03.688 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 10:57:52 WAT)" executed successfully
+2026-02-26 10:55:30.924 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 10:55:30.930 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 10:55:30.933 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 10:55:30.970 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 10:55:30.984 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 10:55:31.008 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 10:55:31.004 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 10:55:31.012 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 10:55:31.033 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 10:55:31.419 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 10:55:31.424 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 10:55:31.604 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 10:55:34.630 | INFO     | logging:callHandlers:1736 - Started server process [24053]
+2026-02-26 10:55:34.633 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 10:55:34.637 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 10:55:34.668 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 10:55:34.671 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 10:55:34.676 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 10:55:34.813 | INFO     | logging:callHandlers:1736 - Started server process [24056]
+2026-02-26 10:55:34.838 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 10:55:34.851 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 10:55:34.858 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 10:55:34.862 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 10:55:34.897 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 10:55:34.983 | INFO     | logging:callHandlers:1736 - Started server process [24054]
+2026-02-26 10:55:35.063 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 10:55:35.069 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 10:55:35.071 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 10:55:35.077 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 10:55:35.082 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 10:55:35.108 | INFO     | logging:callHandlers:1736 - Started server process [24055]
+2026-02-26 10:55:35.116 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 10:55:35.126 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 10:55:35.131 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 10:55:35.134 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 10:55:35.136 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 10:55:36.080 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 10:55:36.082 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 10:55:36.085 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 10:55:36.152 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 10:55:36.172 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 10:55:36.179 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 10:55:36.152 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 10:55:36.172 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 10:55:36.175 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 10:55:37.305 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 10:55:37.308 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 10:55:37.311 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 10:56:24.949 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 10:56:24.952 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 10:56:24.955 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 10:56:32.090 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 10:56:32.096 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 10:56:32.105 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 10:56:36.025 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 10:56:36.030 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 10:56:36.034 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 10:56:36.600 | INFO     | logging:callHandlers:1736 - Started server process [24136]
+2026-02-26 10:56:36.617 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 10:56:36.635 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 10:56:36.654 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 10:56:36.660 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 10:56:36.920 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 10:56:37.920 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 10:56:37.974 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 10:56:37.979 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 10:56:38.390 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 10:56:38.400 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 10:56:38.403 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 10:56:38.995 | INFO     | logging:callHandlers:1736 - Started server process [24137]
+2026-02-26 10:56:38.998 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 10:56:39.009 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 10:56:39.013 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 10:56:39.028 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 10:56:39.036 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 10:56:40.964 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 10:56:40.968 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 10:56:41.008 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 10:56:41.249 | INFO     | logging:callHandlers:1736 - Started server process [24144]
+2026-02-26 10:56:41.253 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 10:56:41.262 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 10:56:41.267 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 10:56:41.273 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 10:56:41.277 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 10:56:42.226 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 10:56:42.243 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 10:56:42.249 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 10:56:53.525 | INFO     | logging:callHandlers:1736 - Started server process [24147]
+2026-02-26 10:56:54.603 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 10:56:55.501 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 10:56:55.516 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 10:56:55.519 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 10:56:56.146 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 10:56:57.925 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 10:56:57.941 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 10:56:58.035 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 10:57:53.253 | INFO     | logging:callHandlers:1736 - Running job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 11:02:52 WAT)" (scheduled at 2026-02-26 10:57:52.666621+01:00)
+2026-02-26 10:57:53.295 | INFO     | logging:callHandlers:1736 - Running scheduled overdue savings payment check
+2026-02-26 10:58:08.798 | INFO     | logging:callHandlers:1736 - Sent 0 savings payment overdue notifications
+2026-02-26 10:58:09.009 | INFO     | logging:callHandlers:1736 - Job "Overdue savings payments (trigger: interval[0:05:00], next run at: 2026-02-26 11:02:52 WAT)" executed successfully
+2026-02-26 10:58:24.918 | INFO     | logging:callHandlers:1736 - Shutting down
+2026-02-26 10:58:25.222 | INFO     | logging:callHandlers:1736 - Waiting for application shutdown.
+2026-02-26 10:58:25.473 | INFO     | main:on_shutdown:220 - Application shutting down...
+2026-02-26 10:58:25.529 | INFO     | logging:callHandlers:1736 - Scheduler shutdown successfully
+2026-02-26 10:58:25.537 | INFO     | main:on_shutdown:224 - ✓ Scheduler shutdown
+2026-02-26 10:58:26.070 | INFO     | logging:callHandlers:1736 - All database connections closed
+2026-02-26 10:58:26.072 | INFO     | main:on_shutdown:231 - ✓ Database connections closed
+2026-02-26 10:58:26.073 | INFO     | main:on_shutdown:235 - Shutdown completed
+2026-02-26 10:58:26.299 | INFO     | logging:callHandlers:1736 - Scheduler has been shut down
+2026-02-26 10:58:26.304 | INFO     | logging:callHandlers:1736 - Application shutdown complete.
+2026-02-26 10:58:26.461 | INFO     | logging:callHandlers:1736 - Finished server process [19712]
+2026-02-26 10:58:49.106 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 10:58:49.131 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 10:58:49.137 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 10:58:57.110 | INFO     | logging:callHandlers:1736 - Started server process [24230]
+2026-02-26 10:58:57.119 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 10:58:57.112 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 10:58:57.159 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 10:58:57.172 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 10:58:57.184 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 10:58:57.218 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 10:58:57.221 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 10:58:57.226 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 10:58:59.240 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 10:58:59.277 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 10:58:59.285 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 10:58:59.832 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 10:58:59.840 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 10:58:59.857 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 10:59:00.537 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 10:59:01.273 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 10:59:01.284 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 10:59:11.255 | INFO     | logging:callHandlers:1736 - Started server process [24248]
+2026-02-26 10:59:11.259 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 10:59:11.264 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 10:59:11.267 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 10:59:11.301 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 10:59:11.309 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 10:59:12.918 | INFO     | logging:callHandlers:1736 - Started server process [24308]
+2026-02-26 10:59:12.921 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 10:59:12.973 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 10:59:12.980 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 10:59:13.010 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 10:59:13.016 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 10:59:13.604 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 10:59:13.607 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 10:59:13.615 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 10:59:14.149 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 10:59:14.156 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 10:59:14.184 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 10:59:14.376 | INFO     | logging:callHandlers:1736 - Started server process [24303]
+2026-02-26 10:59:14.809 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 10:59:14.854 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 10:59:14.859 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 10:59:14.862 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 10:59:14.884 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 10:59:17.017 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 10:59:17.021 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 10:59:17.025 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:03:21.883 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:03:21.890 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:03:21.999 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:03:28.458 | INFO     | logging:callHandlers:1736 - Started server process [24525]
+2026-02-26 11:03:28.472 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:03:28.512 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:03:28.516 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:03:28.518 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:03:28.520 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:03:30.751 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:03:30.763 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:03:30.769 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:03:32.449 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:03:32.457 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:03:32.486 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:03:32.521 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:03:32.526 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:03:32.528 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:03:32.886 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:03:32.892 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:03:32.896 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:03:38.776 | INFO     | logging:callHandlers:1736 - Started server process [24540]
+2026-02-26 11:03:38.778 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:03:38.795 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:03:38.803 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:03:38.811 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:03:38.816 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:03:39.693 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:03:39.697 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:03:39.700 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:03:40.518 | INFO     | logging:callHandlers:1736 - Started server process [24552]
+2026-02-26 11:03:40.530 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:03:40.874 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:03:40.880 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:03:40.888 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:03:40.913 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:03:40.925 | INFO     | logging:callHandlers:1736 - Started server process [24546]
+2026-02-26 11:03:40.930 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:03:40.938 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:03:40.945 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:03:40.947 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:03:40.952 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:03:41.693 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:03:41.697 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:03:41.723 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:03:42.398 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:03:42.408 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:03:42.413 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:06:08.223 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:06:08.787 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:06:08.817 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:06:15.427 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:06:15.431 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:06:15.435 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:06:18.518 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:06:18.582 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:06:18.644 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:06:19.492 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:06:19.496 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:06:19.499 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:06:19.745 | INFO     | logging:callHandlers:1736 - Started server process [25066]
+2026-02-26 11:06:19.751 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:06:19.756 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:06:19.761 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:06:19.767 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:06:19.775 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:06:20.724 | INFO     | logging:callHandlers:1736 - Started server process [25075]
+2026-02-26 11:06:20.728 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:06:20.734 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:06:20.739 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:06:20.747 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:06:20.760 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:06:21.724 | INFO     | logging:callHandlers:1736 - Started server process [25080]
+2026-02-26 11:06:21.726 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:06:21.763 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:06:21.772 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:06:21.774 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:06:21.780 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:06:21.988 | INFO     | logging:callHandlers:1736 - Started server process [25084]
+2026-02-26 11:06:21.992 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:06:21.998 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:06:22.003 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:06:22.015 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:06:22.062 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:06:22.203 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:06:22.249 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:06:22.257 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:06:23.343 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:06:23.350 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:06:23.352 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:06:23.809 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:06:23.812 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:06:23.816 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:06:23.958 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:06:23.960 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:06:23.964 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:07:18.291 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:07:18.302 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:07:18.360 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:07:18.476 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:07:18.483 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:07:18.704 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:07:22.746 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:07:22.752 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:07:22.897 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:07:24.287 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:07:24.292 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:07:24.316 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:07:25.236 | INFO     | logging:callHandlers:1736 - Started server process [25323]
+2026-02-26 11:07:25.241 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:07:25.246 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:07:25.281 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:07:25.287 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:07:25.298 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:07:25.333 | INFO     | logging:callHandlers:1736 - Started server process [25324]
+2026-02-26 11:07:25.338 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:07:25.349 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:07:25.354 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:07:25.361 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:07:25.365 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:07:25.729 | INFO     | logging:callHandlers:1736 - Started server process [25400]
+2026-02-26 11:07:25.734 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:07:25.739 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:07:25.743 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:07:25.754 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:07:25.761 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:07:26.199 | INFO     | logging:callHandlers:1736 - Started server process [25412]
+2026-02-26 11:07:26.211 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:07:26.219 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:07:26.262 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:07:26.268 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:07:26.269 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:07:27.110 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:07:27.115 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:07:27.117 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:07:27.175 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:07:27.177 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:07:27.180 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:07:27.174 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:07:27.177 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:07:27.183 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:07:32.730 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Timeout reading from valkey-285eec58-kopkad.h.aivencloud.com:26297. Falling back to in-memory cache.
+2026-02-26 11:07:32.733 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:07:32.735 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:07:56.996 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:07:57.011 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:07:57.218 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:07:57.850 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:07:57.870 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:07:57.938 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:07:59.060 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:07:59.066 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:07:59.068 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:07:59.676 | INFO     | logging:callHandlers:1736 - Started server process [25634]
+2026-02-26 11:07:59.678 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:07:59.683 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:07:59.685 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:07:59.733 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:07:59.736 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:08:00.607 | INFO     | logging:callHandlers:1736 - Started server process [25635]
+2026-02-26 11:08:00.609 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:08:00.621 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:08:00.630 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:08:00.633 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:08:00.644 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:08:00.712 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:08:00.715 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:08:00.718 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:08:01.395 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:08:01.409 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:08:01.412 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:08:03.111 | INFO     | logging:callHandlers:1736 - Started server process [25650]
+2026-02-26 11:08:03.591 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:08:03.609 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:08:03.614 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:08:03.618 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:08:03.620 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:08:04.408 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:08:04.414 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:08:04.421 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:08:04.684 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:08:04.968 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:08:04.971 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:08:07.369 | INFO     | logging:callHandlers:1736 - Started server process [25655]
+2026-02-26 11:08:07.375 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:08:07.382 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:08:07.404 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:08:07.420 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:08:07.464 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:08:08.371 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:08:08.376 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:08:08.377 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:08:42.681 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:08:42.720 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:08:42.729 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:08:42.998 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:08:43.001 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:08:43.167 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:08:45.552 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:08:45.558 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:08:45.562 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:08:47.830 | INFO     | logging:callHandlers:1736 - Started server process [25741]
+2026-02-26 11:08:47.833 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:08:47.840 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:08:47.847 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:08:47.856 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:08:47.860 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:08:47.876 | INFO     | logging:callHandlers:1736 - Started server process [25729]
+2026-02-26 11:08:47.882 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:08:47.890 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:08:47.901 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:08:47.905 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:08:47.907 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:08:48.478 | INFO     | logging:callHandlers:1736 - Started server process [25742]
+2026-02-26 11:08:48.483 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:08:48.488 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:08:48.495 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:08:48.499 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:08:48.505 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:08:48.683 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:08:48.688 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:08:48.690 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:08:48.820 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:08:48.833 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:08:48.836 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:08:50.243 | INFO     | logging:callHandlers:1736 - Started server process [25814]
+2026-02-26 11:08:50.250 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:08:50.372 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:08:50.375 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:08:50.378 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:08:50.383 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:08:50.954 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:08:50.957 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:08:50.960 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:08:51.779 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:08:51.781 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:08:51.783 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:08:52.383 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:08:52.385 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:08:52.387 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:09:32.764 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:09:32.770 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:09:32.817 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:09:33.807 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:09:33.811 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:09:33.841 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:09:34.917 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:09:34.921 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:09:34.938 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:09:35.193 | INFO     | logging:callHandlers:1736 - Started server process [25899]
+2026-02-26 11:09:35.196 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:09:35.200 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:09:35.206 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:09:35.210 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:09:35.216 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:09:35.635 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:09:35.639 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:09:35.642 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:09:36.409 | INFO     | logging:callHandlers:1736 - Started server process [25905]
+2026-02-26 11:09:36.411 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:09:36.418 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:09:36.433 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:09:36.436 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:09:36.439 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:09:36.943 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:09:36.945 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:09:36.947 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:09:37.490 | INFO     | logging:callHandlers:1736 - Started server process [25910]
+2026-02-26 11:09:37.493 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:09:37.488 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:09:37.491 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:09:37.493 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:09:37.499 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:09:37.515 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:09:37.518 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:09:37.522 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:09:38.801 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:09:38.820 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:09:38.842 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:09:40.121 | INFO     | logging:callHandlers:1736 - Started server process [25913]
+2026-02-26 11:09:40.125 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:09:40.130 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:09:40.149 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:09:40.211 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:09:40.581 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:09:41.500 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:09:41.504 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:09:41.509 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:10:21.813 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:10:21.817 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:10:21.819 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:10:21.822 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:10:21.825 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:10:21.819 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:10:22.190 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:10:22.195 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:10:22.198 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:10:23.412 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:10:23.415 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:10:23.418 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:10:23.563 | INFO     | logging:callHandlers:1736 - Started server process [26026]
+2026-02-26 11:10:23.573 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:10:23.576 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:10:23.605 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:10:23.608 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:10:23.611 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:10:23.686 | INFO     | logging:callHandlers:1736 - Started server process [26039]
+2026-02-26 11:10:23.694 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:10:23.702 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:10:23.707 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:10:23.712 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:10:23.715 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:10:24.063 | INFO     | logging:callHandlers:1736 - Started server process [26045]
+2026-02-26 11:10:24.068 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:10:24.078 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:10:24.083 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:10:24.091 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:10:24.111 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:10:24.719 | INFO     | logging:callHandlers:1736 - Started server process [26054]
+2026-02-26 11:10:24.720 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:10:24.722 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:10:24.723 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:10:24.725 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:10:24.726 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:10:24.828 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:10:24.831 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:10:24.835 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:10:25.571 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:10:25.574 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:10:25.578 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:10:25.616 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:10:25.622 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:10:25.623 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:10:27.064 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:10:27.071 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:10:27.073 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:10:55.678 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:10:55.678 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:10:55.681 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:10:55.681 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:10:55.683 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:10:55.683 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:10:56.665 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:10:56.669 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:10:56.672 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:10:57.416 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:10:57.420 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:10:57.424 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:10:57.532 | INFO     | logging:callHandlers:1736 - Started server process [26133]
+2026-02-26 11:10:57.537 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:10:57.537 | INFO     | logging:callHandlers:1736 - Started server process [26127]
+2026-02-26 11:10:57.540 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:10:57.541 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:10:57.555 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:10:57.556 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:10:57.561 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:10:57.561 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:10:57.564 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:10:57.581 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:10:57.564 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:10:58.128 | INFO     | logging:callHandlers:1736 - Started server process [26136]
+2026-02-26 11:10:58.130 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:10:58.132 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:10:58.134 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:10:58.137 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:10:58.141 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:10:58.424 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:10:58.427 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:10:58.429 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:10:58.471 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:10:58.474 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:10:58.476 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:10:58.746 | INFO     | logging:callHandlers:1736 - Started server process [26137]
+2026-02-26 11:10:58.748 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:10:58.752 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:10:58.756 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:10:58.825 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:10:58.831 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:10:58.923 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:10:58.929 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:10:58.930 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:10:59.595 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:10:59.598 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:10:59.600 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:11:29.465 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:11:29.459 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:11:29.461 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:11:29.470 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:11:29.468 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:11:29.475 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:11:30.709 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:11:30.714 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:11:30.717 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:11:31.535 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:11:31.547 | INFO     | logging:callHandlers:1736 - Started server process [26223]
+2026-02-26 11:11:31.550 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:11:31.561 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:11:31.567 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:11:31.600 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:11:31.602 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:11:31.613 | INFO     | logging:callHandlers:1736 - Started server process [26195]
+2026-02-26 11:11:31.616 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:11:31.615 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:11:31.624 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:11:31.632 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:11:31.633 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:11:31.636 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:11:31.668 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:11:32.367 | INFO     | logging:callHandlers:1736 - Started server process [26231]
+2026-02-26 11:11:32.369 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:11:32.371 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:11:32.373 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:11:32.380 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:11:32.396 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:11:32.572 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:11:32.574 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:11:32.576 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:11:33.352 | INFO     | logging:callHandlers:1736 - Started server process [26232]
+2026-02-26 11:11:33.354 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:11:33.356 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:11:33.372 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:11:33.375 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:11:33.379 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:11:33.436 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:11:33.441 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:11:33.443 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:11:33.583 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:11:33.591 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:11:33.597 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:11:34.466 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:11:34.474 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:11:34.480 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:12:05.940 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:12:05.943 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:12:05.950 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:12:06.116 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:12:06.121 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:12:06.125 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:12:06.246 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:12:06.251 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:12:06.254 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:12:07.197 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:12:07.203 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:12:07.213 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:12:08.752 | INFO     | logging:callHandlers:1736 - Started server process [26312]
+2026-02-26 11:12:08.755 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:12:08.759 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:12:08.768 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:12:08.771 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:12:08.776 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:12:08.826 | INFO     | logging:callHandlers:1736 - Started server process [26305]
+2026-02-26 11:12:08.828 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:12:08.834 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:12:08.841 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:12:08.847 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:12:08.928 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:12:08.970 | INFO     | logging:callHandlers:1736 - Started server process [26304]
+2026-02-26 11:12:08.973 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:12:09.048 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:12:09.056 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:12:09.082 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:12:09.087 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:12:09.314 | INFO     | logging:callHandlers:1736 - Started server process [26314]
+2026-02-26 11:12:09.316 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:12:09.318 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:12:09.319 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:12:09.320 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:12:09.322 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:12:09.921 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:12:09.924 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:12:09.925 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:12:09.921 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:12:09.924 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:12:09.926 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:12:10.963 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:12:10.968 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:12:10.970 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:12:12.160 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:12:12.181 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:12:12.184 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:12:44.470 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:12:44.483 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:12:44.500 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:12:44.584 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:12:44.590 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:12:44.602 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:12:45.830 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:12:45.836 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:12:45.855 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:12:48.672 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:12:48.680 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:12:48.683 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:12:49.978 | INFO     | logging:callHandlers:1736 - Started server process [26359]
+2026-02-26 11:12:49.982 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:12:49.983 | INFO     | logging:callHandlers:1736 - Started server process [26361]
+2026-02-26 11:12:49.986 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:12:49.995 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:12:49.995 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:12:50.000 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:12:50.003 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:12:50.015 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:12:50.026 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:12:50.034 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:12:50.057 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:12:50.884 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:12:50.888 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:12:50.890 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:12:50.883 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:12:50.894 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:12:50.899 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:12:52.147 | INFO     | logging:callHandlers:1736 - Started server process [26368]
+2026-02-26 11:12:52.151 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:12:52.184 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:12:52.214 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:12:52.218 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:12:52.286 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:12:53.439 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:12:53.443 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:12:53.448 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:12:54.149 | INFO     | logging:callHandlers:1736 - Started server process [26369]
+2026-02-26 11:12:54.151 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:12:54.184 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:12:54.189 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:12:54.192 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:12:54.194 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:12:56.220 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:12:56.223 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:12:56.225 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:13:33.848 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:13:33.851 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:13:33.855 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:13:33.986 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:13:33.990 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:13:33.993 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:13:36.510 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:13:36.513 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:13:36.515 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:13:37.208 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:13:37.230 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:13:37.235 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:13:37.526 | INFO     | logging:callHandlers:1736 - Started server process [26465]
+2026-02-26 11:13:37.549 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:13:37.553 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:13:37.557 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:13:37.559 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:13:37.561 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:13:37.610 | INFO     | logging:callHandlers:1736 - Started server process [26466]
+2026-02-26 11:13:37.623 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:13:37.657 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:13:37.659 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:13:37.667 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:13:37.674 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:13:38.576 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:13:38.580 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:13:38.583 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:13:38.757 | INFO     | logging:callHandlers:1736 - Started server process [26517]
+2026-02-26 11:13:38.759 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:13:38.763 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:13:38.768 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:13:38.771 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:13:38.776 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:13:38.872 | INFO     | logging:callHandlers:1736 - Started server process [26547]
+2026-02-26 11:13:38.878 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:13:38.881 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:13:38.882 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:13:38.890 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:13:38.893 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:13:39.708 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:13:39.709 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:13:39.711 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:13:39.736 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:13:39.737 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:13:39.738 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:13:41.489 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:13:41.491 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:13:41.493 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:14:01.354 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:14:01.359 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:14:01.364 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:14:01.439 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:14:01.450 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:14:01.457 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:14:02.292 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:14:02.299 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:14:02.301 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:14:04.578 | INFO     | logging:callHandlers:1736 - Started server process [26635]
+2026-02-26 11:14:04.582 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:14:04.810 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:14:04.827 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:14:04.829 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:14:04.892 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:14:05.052 | INFO     | logging:callHandlers:1736 - Started server process [26636]
+2026-02-26 11:14:05.063 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:14:05.072 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:14:05.079 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:14:05.256 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:14:05.259 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:14:05.301 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:14:05.322 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:14:05.327 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:14:05.704 | INFO     | logging:callHandlers:1736 - Started server process [26641]
+2026-02-26 11:14:05.706 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:14:05.708 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:14:05.710 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:14:05.736 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:14:05.738 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:14:05.844 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:14:05.846 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:14:05.847 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:14:06.181 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:14:06.184 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:14:06.187 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:14:06.425 | INFO     | logging:callHandlers:1736 - Started server process [26643]
+2026-02-26 11:14:06.440 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:14:06.457 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:14:06.460 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:14:06.553 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:14:06.555 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:14:06.560 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:14:06.462 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:14:06.590 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:14:07.409 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:14:07.412 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:14:07.415 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:14:32.887 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:14:32.928 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:14:32.972 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:14:33.075 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:14:33.080 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:14:33.086 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:14:34.390 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:14:34.394 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:14:34.401 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:14:35.177 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:14:35.181 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:14:35.221 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:14:35.692 | INFO     | logging:callHandlers:1736 - Started server process [26671]
+2026-02-26 11:14:35.694 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:14:35.702 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:14:35.708 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:14:35.722 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:14:35.728 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:14:35.790 | INFO     | logging:callHandlers:1736 - Started server process [26670]
+2026-02-26 11:14:35.798 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:14:35.810 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:14:35.828 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:14:35.832 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:14:35.898 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:14:36.251 | INFO     | logging:callHandlers:1736 - Started server process [26674]
+2026-02-26 11:14:36.254 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:14:36.258 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:14:36.268 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:14:36.271 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:14:36.277 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:14:36.538 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:14:36.543 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:14:36.544 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:14:36.762 | INFO     | logging:callHandlers:1736 - Started server process [26679]
+2026-02-26 11:14:36.766 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:14:36.772 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:14:36.781 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:14:36.784 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:14:36.788 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:14:36.861 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:14:36.862 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:14:36.864 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:14:38.160 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:14:38.164 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:14:38.166 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:14:38.667 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:14:38.670 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:14:38.672 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:15:12.856 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:15:12.846 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:15:12.850 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:15:12.853 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:15:12.860 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:15:12.864 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:15:15.194 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:15:15.359 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:15:15.365 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:15:17.089 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:15:17.096 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:15:17.098 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:15:17.288 | INFO     | logging:callHandlers:1736 - Started server process [26706]
+2026-02-26 11:15:17.297 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:15:17.395 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:15:17.691 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:15:17.700 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:15:17.717 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:15:18.184 | INFO     | logging:callHandlers:1736 - Started server process [26712]
+2026-02-26 11:15:18.191 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:15:18.197 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:15:18.207 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:15:18.210 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:15:18.221 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:15:18.614 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:15:18.619 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:15:18.623 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:15:20.171 | INFO     | logging:callHandlers:1736 - Started server process [26714]
+2026-02-26 11:15:20.177 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:15:20.215 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:15:20.228 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:15:20.246 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:15:20.248 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:15:20.271 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:15:20.275 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:15:20.279 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:15:21.280 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:15:21.294 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:15:21.298 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:15:21.651 | INFO     | logging:callHandlers:1736 - Started server process [26717]
+2026-02-26 11:15:21.838 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:15:21.876 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:15:21.912 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:15:21.943 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:15:21.947 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:15:24.267 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:15:24.273 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:15:24.276 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:16:34.751 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:16:34.821 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:16:34.831 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:16:34.835 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:16:34.764 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:16:35.250 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:16:37.534 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:16:37.541 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:16:37.547 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:17:01.578 | INFO     | core.logger:setup_logging:58 - Structured logging (Loguru) initialized successfully.
+2026-02-26 11:17:01.619 | INFO     | main:<module>:54 - Rebuilding Pydantic schemas...
+2026-02-26 11:17:01.801 | INFO     | main:<module>:59 - ✓ Pydantic schemas rebuilt successfully
+2026-02-26 11:17:01.609 | INFO     | logging:callHandlers:1736 - Started server process [26806]
+2026-02-26 11:17:01.808 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:17:02.017 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:17:02.021 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:17:02.024 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:17:02.031 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:17:02.600 | INFO     | logging:callHandlers:1736 - Started server process [26809]
+2026-02-26 11:17:02.618 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:17:03.067 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:17:03.072 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:17:03.085 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:17:03.106 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:17:05.031 | INFO     | logging:callHandlers:1736 - Started server process [26813]
+2026-02-26 11:17:05.313 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:17:05.361 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:17:05.387 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:17:05.402 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:17:05.408 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:17:06.065 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:17:06.069 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:17:06.072 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:17:06.068 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:17:06.073 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:17:06.075 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:17:06.416 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:17:06.421 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:17:06.424 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
+2026-02-26 11:17:14.885 | INFO     | logging:callHandlers:1736 - Started server process [26825]
+2026-02-26 11:17:14.899 | INFO     | logging:callHandlers:1736 - Waiting for application startup.
+2026-02-26 11:17:14.915 | INFO     | main:on_startup:133 - ============================================================
+2026-02-26 11:17:14.920 | INFO     | main:on_startup:134 - APPLICATION STARTING UP
+2026-02-26 11:17:14.924 | INFO     | main:on_startup:135 - ============================================================
+2026-02-26 11:17:14.926 | INFO     | main:on_startup:141 - Initializing cache from REDIS_URL
+2026-02-26 11:17:18.236 | WARNING  | logging:callHandlers:1736 - ⚠️  Redis connection failed: Connection closed by server.. Falling back to in-memory cache.
+2026-02-26 11:17:18.242 | INFO     | logging:callHandlers:1736 - ✓ In-memory cache initialized (maxsize=10000, default_ttl=300s)
+2026-02-26 11:17:18.255 | INFO     | logging:callHandlers:1736 - ✓ Using in-memory cache fallback
