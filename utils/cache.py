@@ -1,11 +1,9 @@
-# utils/cache.py (updated version with TLS support via redis.from_url)
-
 """
 Cache Utility Module
 Provides caching functionality using Redis (primary) or in-memory cache (fallback)
 """
 
-import redis.asyncio as redis  # Updated import
+import redis.asyncio as redis
 import json
 import logging
 from typing import Any, Optional, Union
@@ -15,7 +13,6 @@ import pickle
 import hashlib
 from cachetools import TTLCache
 import threading
-import os  # Added for env
 
 logger = logging.getLogger(__name__)
 
@@ -27,20 +24,12 @@ class InMemoryCache:
     """
     
     def __init__(self, maxsize=10000, ttl=300):
-        """
-        Initialize in-memory cache
-        
-        Args:
-            maxsize: Maximum number of items to cache (default: 10000)
-            ttl: Default time-to-live in seconds (default: 300)
-        """
         self.cache = TTLCache(maxsize=maxsize, ttl=ttl)
         self.lock = threading.RLock()
         self.enabled = True
         logger.info(f"✓ In-memory cache initialized (maxsize={maxsize}, default_ttl={ttl}s)")
     
     def get(self, key: str) -> Optional[Any]:
-        """Get value from cache"""
         try:
             with self.lock:
                 return self.cache.get(key)
@@ -49,10 +38,6 @@ class InMemoryCache:
             return None
     
     def set(self, key: str, value: Any, ttl: Optional[Union[int, timedelta]] = None) -> bool:
-        """
-        Set value in cache with optional TTL
-        Note: cachetools TTLCache uses global TTL, so custom TTL per key is not supported
-        """
         try:
             with self.lock:
                 self.cache[key] = value
@@ -62,7 +47,6 @@ class InMemoryCache:
             return False
     
     def delete(self, *keys: str) -> int:
-        """Delete one or more keys from cache"""
         try:
             with self.lock:
                 deleted = 0
@@ -76,12 +60,10 @@ class InMemoryCache:
             return 0
     
     def exists(self, key: str) -> bool:
-        """Check if key exists in cache"""
         with self.lock:
             return key in self.cache
     
     def get_many(self, *keys: str) -> dict:
-        """Get multiple values from cache"""
         result = {}
         with self.lock:
             for key in keys:
@@ -90,7 +72,6 @@ class InMemoryCache:
         return result
     
     def set_many(self, mapping: dict, ttl: Optional[int] = None) -> bool:
-        """Set multiple key-value pairs in cache"""
         try:
             with self.lock:
                 for key, value in mapping.items():
@@ -101,10 +82,8 @@ class InMemoryCache:
             return False
     
     def clear_pattern(self, pattern: str) -> int:
-        """Delete all keys matching a pattern (simplified for in-memory)"""
         try:
             with self.lock:
-                # Simple pattern matching (starts with)
                 prefix = pattern.rstrip('*')
                 keys_to_delete = [k for k in self.cache.keys() if k.startswith(prefix)]
                 for key in keys_to_delete:
@@ -115,7 +94,6 @@ class InMemoryCache:
             return 0
     
     def increment(self, key: str, amount: int = 1) -> Optional[int]:
-        """Increment a key's value"""
         try:
             with self.lock:
                 current = self.cache.get(key, 0)
@@ -127,16 +105,12 @@ class InMemoryCache:
             return None
     
     def get_ttl(self, key: str) -> Optional[int]:
-        """Get remaining TTL (not directly supported by TTLCache)"""
-        # TTLCache doesn't expose per-key TTL
         return None
     
     def ping(self) -> bool:
-        """Check if cache is available"""
         return self.enabled
     
     def flush_db(self):
-        """Clear entire cache"""
         with self.lock:
             self.cache.clear()
         return True
@@ -146,19 +120,11 @@ class RedisCache:
     """Redis cache manager with connection pooling and error handling"""
     
     def __init__(self, url: str = None, decode_responses=True):
-        """
-        Initialize Redis connection using full URL with TLS support
-        
-        Args:
-            url: Full Redis URL (e.g., rediss://user:pass@host:port/db?ssl=true)
-            decode_responses: Decode responses to strings (default: True)
-        """
         self.enabled = False
         self.client = None
         
         if url:
             try:
-                # Use from_url for TLS handling
                 self.client = redis.from_url(
                     url,
                     decode_responses=decode_responses,
@@ -168,12 +134,10 @@ class RedisCache:
                     health_check_interval=30,
                     socket_keepalive=True,
                 )
-                
-                # Test connection
                 pong = self.client.ping()
                 if pong:
                     self.enabled = True
-                    logger.info(f"✓ Redis connected successfully via URL: {url.split('@')[0]}@***")
+                    logger.info(f"✓ Redis connected successfully via URL")
                 else:
                     logger.warning("Redis ping failed")
             except Exception as e:
@@ -183,15 +147,6 @@ class RedisCache:
             logger.info("Using in-memory fallback")
     
     def get(self, key: str) -> Optional[Any]:
-        """
-        Get value from cache
-        
-        Args:
-            key: Cache key
-            
-        Returns:
-            Cached value or None if not found/error
-        """
         if not self.enabled:
             return None
         
@@ -200,11 +155,9 @@ class RedisCache:
             if value is None:
                 return None
             
-            # Try to deserialize JSON
             try:
                 return json.loads(value)
             except (json.JSONDecodeError, TypeError):
-                # If not JSON, try pickle
                 try:
                     return pickle.loads(value)
                 except:
@@ -214,30 +167,16 @@ class RedisCache:
             return None
     
     def set(self, key: str, value: Any, ttl: Optional[Union[int, timedelta]] = None) -> bool:
-        """
-        Set value in cache with optional TTL
-        
-        Args:
-            key: Cache key
-            value: Value to cache
-            ttl: Time to live in seconds or timedelta object
-            
-        Returns:
-            True if successful, False otherwise
-        """
         if not self.enabled:
             return False
         
         try:
-            # Convert timedelta to seconds
             if isinstance(ttl, timedelta):
                 ttl = int(ttl.total_seconds())
             
-            # Try to serialize as JSON first (faster)
             try:
                 serialized = json.dumps(value)
             except (TypeError, ValueError):
-                # Fall back to pickle for complex objects
                 serialized = pickle.dumps(value)
             
             if ttl:
@@ -249,7 +188,6 @@ class RedisCache:
             return False
     
     def delete(self, *keys: str) -> int:
-        """Delete one or more keys from cache"""
         if not self.enabled or not keys:
             return 0
         
@@ -260,7 +198,6 @@ class RedisCache:
             return 0
     
     def exists(self, key: str) -> bool:
-        """Check if key exists in cache"""
         if not self.enabled:
             return False
         
@@ -271,7 +208,6 @@ class RedisCache:
             return False
     
     def get_many(self, *keys: str) -> dict:
-        """Get multiple values from cache"""
         if not self.enabled or not keys:
             return {}
         
@@ -293,12 +229,10 @@ class RedisCache:
             return {}
     
     def set_many(self, mapping: dict, ttl: Optional[int] = None) -> bool:
-        """Set multiple key-value pairs in cache"""
         if not self.enabled or not mapping:
             return False
         
         try:
-            # Serialize all values
             serialized = {}
             for key, value in mapping.items():
                 try:
@@ -306,11 +240,9 @@ class RedisCache:
                 except (TypeError, ValueError):
                     serialized[key] = pickle.dumps(value)
             
-            # Use pipeline for efficiency
             pipe = self.client.pipeline()
             pipe.mset(serialized)
             
-            # Set TTL for each key if specified
             if ttl:
                 for key in serialized.keys():
                     pipe.expire(key, ttl)
@@ -322,7 +254,6 @@ class RedisCache:
             return False
     
     def clear_pattern(self, pattern: str) -> int:
-        """Delete all keys matching a pattern"""
         if not self.enabled:
             return 0
         
@@ -336,7 +267,6 @@ class RedisCache:
             return 0
     
     def increment(self, key: str, amount: int = 1) -> Optional[int]:
-        """Increment a key's value"""
         if not self.enabled:
             return None
         
@@ -347,7 +277,6 @@ class RedisCache:
             return None
     
     def get_ttl(self, key: str) -> Optional[int]:
-        """Get remaining TTL for a key in seconds"""
         if not self.enabled:
             return None
         
@@ -358,7 +287,6 @@ class RedisCache:
             return None
     
     def ping(self) -> bool:
-        """Check if Redis is available"""
         if not self.enabled:
             return False
         
@@ -369,7 +297,6 @@ class RedisCache:
             return False
     
     def flush_db(self):
-        """Clear entire database (use with caution!)"""
         if not self.enabled:
             return False
         
@@ -397,18 +324,16 @@ def init_cache(url: str = None, fallback=True):
     """
     global cache
     
-    # Try Redis first
     redis_cache = RedisCache(url=url)
     
     if redis_cache.enabled:
         cache = redis_cache
         logger.info("✓ Using Redis cache")
     elif fallback:
-        # Fallback to in-memory cache
         cache = InMemoryCache(maxsize=10000, ttl=300)
         logger.info("✓ Using in-memory cache fallback")
     else:
-        cache = redis_cache  # Return disabled Redis cache
+        cache = redis_cache
         logger.warning("⚠️  No cache available")
     
     return cache
@@ -418,7 +343,6 @@ def get_cache() -> Union[RedisCache, InMemoryCache]:
     """Get global cache instance"""
     global cache
     if cache is None:
-        # Initialize with fallback by default
         cache = init_cache(fallback=True)
     return cache
 
@@ -445,39 +369,25 @@ def cache_key(*args, **kwargs) -> str:
 def cached(ttl: Union[int, timedelta] = 300, key_prefix: str = ""):
     """
     Decorator to cache function results
-    
-    Args:
-        ttl: Time to live in seconds or timedelta
-        key_prefix: Prefix for cache key
-    
-    Usage:
-        @cached(ttl=60, key_prefix="user")
-        def get_user(user_id):
-            return db.query(User).filter(User.id == user_id).first()
     """
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # Generate cache key
             func_name = f"{func.__module__}.{func.__name__}"
             arg_key = cache_key(*args, **kwargs)
             full_key = f"{key_prefix}:{func_name}:{arg_key}" if key_prefix else f"{func_name}:{arg_key}"
             
-            # Try to get from cache
             cached_value = get_cache().get(full_key)
             if cached_value is not None:
                 logger.debug(f"Cache HIT for {full_key}")
                 return cached_value
             
-            # Cache miss - call function
             logger.debug(f"Cache MISS for {full_key}")
             result = func(*args, **kwargs)
             
-            # Store in cache
             get_cache().set(full_key, result, ttl)
             return result
         
-        # Add cache invalidation method
         wrapper.invalidate = lambda *args, **kwargs: get_cache().delete(
             f"{key_prefix}:{func.__module__}.{func.__name__}:{cache_key(*args, **kwargs)}"
         )
@@ -486,10 +396,7 @@ def cached(ttl: Union[int, timedelta] = 300, key_prefix: str = ""):
     return decorator
 
 
-# Cache key patterns for different data types
 class CacheKeys:
-    """Standardized cache key patterns"""
-    
     USER = "user:{user_id}"
     USER_BY_USERNAME = "user:username:{username}"
     USER_BUSINESSES = "user:{user_id}:businesses"
@@ -502,5 +409,4 @@ class CacheKeys:
     
     @staticmethod
     def format(pattern: str, **kwargs) -> str:
-        """Format a cache key pattern with values"""
         return pattern.format(**kwargs)
