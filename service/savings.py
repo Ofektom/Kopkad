@@ -40,18 +40,13 @@ from store.repositories import (
 )
 from models.financial_advisor import NotificationType, NotificationPriority
 from service.notifications import notify_user, notify_business_admin
-from utils.cache import cached, get_cache
-
 paystack = Paystack(secret_key=os.getenv("PAYSTACK_SECRET_KEY"))
-
 logging.basicConfig(
     filename="savings.log",
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
-
-
 def calculate_total_commission(savings: SavingsAccount) -> Decimal:
     if not savings.commission_days or savings.commission_days <= 0:
         return Decimal("0.00")
@@ -60,12 +55,8 @@ def calculate_total_commission(savings: SavingsAccount) -> Decimal:
     commission_periods = math.ceil(total_days / savings.commission_days)
     total_commission = savings.commission_amount * Decimal(commission_periods)
     return total_commission.quantize(Decimal("0.01"))
-
-
 def _resolve_repo(repo, repo_cls, db: Session):
     return repo if repo is not None else repo_cls(db)
-
-
 async def initiate_virtual_account_payment(amount: Decimal, email: str, customer_id: int, reference: str, db: Session):
     try:
         headers = {
@@ -179,27 +170,19 @@ async def initiate_virtual_account_payment(amount: Decimal, email: str, customer
     except Exception as e:
         logger.error(f"Error initiating virtual account: {str(e)}", exc_info=True)
         return error_response(status_code=500, message=f"Error initiating virtual account: {str(e)}")
-
-
 def has_permission(user: User, permission: str, db: Session) -> bool:
     return permission in user.permissions
-
-
 def _calculate_total_days(start_date: date, duration_months: int) -> int:
     end_date = start_date + relativedelta(months=duration_months) - timedelta(days=1)
     total_days = (end_date - start_date).days + 1
     logger.info(f"Calculated {total_days} days from {start_date} to {end_date} for {duration_months} months")
     return total_days
-
-
 def _generate_unique_tracking_number(db: Session, model) -> str:
     import random
     while True:
         number = ''.join([str(random.randint(0, 9)) for _ in range(10)])
         if not db.query(model).filter(model.tracking_number == number).first():
             return number
-
-
 def _adjust_savings_markings(savings: SavingsAccount, markings: list[SavingsMarking], db: Session):
     total_days = _calculate_total_days(savings.start_date, savings.duration_months)
     existing_days = len(markings)
@@ -229,8 +212,6 @@ def _adjust_savings_markings(savings: SavingsAccount, markings: list[SavingsMark
         for marking in extra_markings:
             db.delete(marking)
     db.commit()
-
-
 def _savings_response(savings: SavingsAccount) -> dict:
     return success_response(
         status_code=status.HTTP_201_CREATED if savings.created_at == savings.updated_at else 200,
@@ -253,8 +234,6 @@ def _savings_response(savings: SavingsAccount) -> dict:
             updated_at=savings.updated_at,
         ).model_dump(),
     )
-
-
 async def create_savings_daily(
     request: SavingsCreateDaily,
     current_user: dict,
@@ -269,8 +248,6 @@ async def create_savings_daily(
     user_repo = _resolve_repo(user_repo, UserRepository, db)
     savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
     unit_repo = _resolve_repo(unit_repo, UnitRepository, db)
-    notification_repo = _resolve_repo(notification_repo, UserNotificationRepository, db)
-    business_repo = _resolve_repo(business_repo, BusinessRepository, db)
     session = user_repo.db
     current_user_obj = user_repo.get_by_id(current_user["user_id"])
     if not has_permission(current_user_obj, Permission.CREATE_SAVINGS, session):
@@ -353,14 +330,7 @@ async def create_savings_daily(
         related_entity_type="savings_account",
     )
    
-    # Invalidate caches after creation
-    get_cache().clear_pattern("savings:*")
-    get_cache().clear_pattern(f"savings:{tracking_number}")
-    get_cache().clear_pattern("savings_metrics:*")
-
     return _savings_response(savings)
-
-
 async def calculate_target_savings(request: SavingsCreateTarget):
     if request.target_amount <= 0:
         return error_response(status_code=400, message="Target amount must be positive")
@@ -377,8 +347,6 @@ async def calculate_target_savings(request: SavingsCreateTarget):
             duration_months=duration_months,
         ).model_dump(),
     )
-
-
 async def create_savings_target(
     request: SavingsCreateTarget,
     current_user: dict,
@@ -390,7 +358,6 @@ async def create_savings_target(
 ):
     user_repo = _resolve_repo(user_repo, UserRepository, db)
     savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
-    notification_repo = _resolve_repo(notification_repo, UserNotificationRepository, db)
     session = user_repo.db
     current_user_obj = user_repo.get_by_id(current_user["user_id"])
     if not has_permission(current_user_obj, Permission.CREATE_SAVINGS, session):
@@ -470,15 +437,7 @@ async def create_savings_target(
         related_entity_id=savings.id,
         related_entity_type="savings_account",
     )
-   
-    # Invalidate caches after creation
-    get_cache().clear_pattern("savings:*")
-    get_cache().clear_pattern(f"savings:{tracking_number}")
-    get_cache().clear_pattern("savings_metrics:*")
-
     return _savings_response(savings)
-
-
 async def extend_savings(
     request: SavingsExtend,
     current_user: dict,
@@ -530,14 +489,7 @@ async def extend_savings(
         related_entity_type="savings_account",
     )
    
-    # Invalidate caches after extension
-    get_cache().clear_pattern(f"savings:{request.tracking_number}")
-    get_cache().clear_pattern("savings:*")
-    get_cache().clear_pattern("savings_metrics:*")
-
     return _savings_response(savings)
-
-
 async def update_savings(
     savings_id: int,
     request: SavingsUpdate,
@@ -630,14 +582,7 @@ async def update_savings(
         related_entity_type="savings_account",
     )
    
-    # Invalidate caches after update
-    get_cache().clear_pattern(f"savings:{savings.tracking_number}")
-    get_cache().clear_pattern("savings:*")
-    get_cache().clear_pattern("savings_metrics:*")
-
     return _savings_response(savings)
-
-
 async def delete_savings(
     savings_id: int,
     current_user: dict,
@@ -650,8 +595,6 @@ async def delete_savings(
 ):
     user_repo = _resolve_repo(user_repo, UserRepository, db)
     savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
-    notification_repo = _resolve_repo(notification_repo, UserNotificationRepository, db)
-    business_repo = _resolve_repo(business_repo, BusinessRepository, db)
     session = savings_repo.db
     current_user_obj = user_repo.get_by_id(current_user["user_id"])
     if not has_permission(current_user_obj, Permission.UPDATE_SAVINGS, session):
@@ -704,19 +647,11 @@ async def delete_savings(
             related_entity_type="savings_account",
         )
    
-    # Invalidate caches after deletion
-    get_cache().clear_pattern(f"savings:{tracking_number}")
-    get_cache().clear_pattern("savings:*")
-    get_cache().clear_pattern("savings_metrics:*")
-
     return success_response(
         status_code=200,
         message="Savings account deleted successfully",
         data={"tracking_number": tracking_number, "savings_id": savings_id}
     )
-
-
-@cached(ttl=300, key_prefix="savings")
 async def get_all_savings(
     customer_id: int | None,
     business_id: int | None,
@@ -826,9 +761,6 @@ async def get_all_savings(
             "offset": offset,
         },
     )
-
-
-@cached(ttl=300, key_prefix="savings_markings")
 async def get_savings_markings_by_tracking_number(
     tracking_number: str,
     db: Session,
@@ -859,8 +791,6 @@ async def get_savings_markings_by_tracking_number(
     )
     logger.info(f"Retrieved {len(savings_schedule)} markings for savings {tracking_number}")
     return success_response(status_code=200, message="Savings schedule retrieved successfully", data=response_data.model_dump())
-
-
 async def mark_savings_payment(
     tracking_number: str,
     request: SavingsMarkingRequest,
@@ -953,8 +883,6 @@ async def mark_savings_payment(
             "marked_date": str(request.marked_date),
         }
     )
-
-
 async def mark_savings_bulk(
     request: BulkMarkSavingsRequest,
     current_user: dict,
@@ -1078,8 +1006,6 @@ async def mark_savings_bulk(
             "tracking_numbers": list(tracking_numbers),
         }
     )
-
-
 async def verify_savings_payment(reference: str, db: Session):
     """
     Verify Paystack payment for savings markings (single or bulk).
@@ -1172,32 +1098,22 @@ async def verify_savings_payment(reference: str, db: Session):
     }
     if completion_messages:
         response_data["completion_message"] = " ".join(completion_messages)
-    # Invalidate caches after successful verification/marking
-    get_cache().clear_pattern("savings:*")
-    get_cache().clear_pattern(f"savings:{savings.tracking_number if 'savings' in locals() else ''}")
-    get_cache().clear_pattern("savings_markings:*")
-    get_cache().clear_pattern("savings_metrics:*")
     return success_response(
         status_code=200,
         message="Payment verified successfully",
         data=response_data
-    )  
-
-
+    )
 async def confirm_bank_transfer(reference: str, current_user: dict, db: Session):
     markings = db.query(SavingsMarking).filter(SavingsMarking.payment_reference == reference).all()
     if not markings:
         return error_response(status_code=404, message="Payment reference not found")
-
     if markings[0].payment_method != PaymentMethod.BANK_TRANSFER:
         return error_response(status_code=400, message="Reference is not for a bank transfer")
-
     savings = db.query(SavingsAccount).filter(SavingsAccount.id == markings[0].savings_account_id).first()
     if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
         return error_response(status_code=403, message="Not your savings account")
     elif current_user["role"] not in ["agent", "sub_agent", "admin", "customer"]:
         return error_response(status_code=401, message="Unauthorized role")
-
     savings_accounts = {m.savings_account_id: m.savings_account for m in markings}
     commission_due_by_savings = {}
     for savings_id, savings in savings_accounts.items():
@@ -1209,7 +1125,6 @@ async def confirm_bank_transfer(reference: str, current_user: dict, db: Session)
                 if days_since_start % savings.commission_days == 0 or (commission_periods == 1 and days_since_start <= savings.commission_days):
                     commission_due += savings.commission_amount
         commission_due_by_savings[savings_id] = commission_due
-
     total_amount = sum(m.amount for m in markings) + sum(commission_due_by_savings.values())
     response = {
         "status": True,
@@ -1219,7 +1134,6 @@ async def confirm_bank_transfer(reference: str, current_user: dict, db: Session)
         }
     }
     logger.info(f"Mock Paystack verify response for bank transfer: {response}")
-
     completion_message = None
     total_paid = Decimal(response["data"]["amount"]) / 100
     if total_paid < total_amount:
@@ -1259,37 +1173,29 @@ async def confirm_bank_transfer(reference: str, current_user: dict, db: Session)
     }
     if completion_message:
         response_data["completion_message"] = completion_message
-    get_cache().clear_pattern("savings:*")
-    get_cache().clear
     return success_response(
         status_code=200,
         message="Bank transfer confirmed successfully",
         data=response_data
     )
-
 async def end_savings_markings(tracking_number: str, current_user: dict, db: Session):
     current_user_obj = db.query(User).filter(User.id == current_user["user_id"]).first()
     if not has_permission(current_user_obj, Permission.UPDATE_SAVINGS, db):
         return error_response(status_code=403, message="No permission to end savings markings")
-
     savings = db.query(SavingsAccount).filter(SavingsAccount.tracking_number == tracking_number).first()
     if not savings:
         return error_response(status_code=404, message=f"Savings {tracking_number} not found")
-
     if current_user["role"] == "customer" and savings.customer_id != current_user["user_id"]:
         return error_response(status_code=403, message=f"Not your savings {tracking_number}")
     elif current_user["role"] not in ["agent", "sub_agent", "admin", "customer"]:
         return error_response(status_code=401, message="Unauthorized role")
-
     markings = db.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings.id).all()
     if not markings:
         return error_response(status_code=404, message="No markings found for this savings account")
-
     savings.marking_status = MarkingStatus.COMPLETED
     for marking in markings:
         marking.updated_by = current_user["user_id"]
         marking.updated_at = datetime.now()
-
     total_commission = calculate_total_commission(savings)
     logger.info(f"Abruptly ended markings for savings {tracking_number} with total_commission={total_commission} for customer {savings.customer_id}")
     db.commit()
@@ -1301,7 +1207,6 @@ async def end_savings_markings(tracking_number: str, current_user: dict, db: Ses
             "completion_message": f"Congratulations! You have successfully completed your savings plan {tracking_number}!"
         }
     )
-
 async def get_savings_metrics(
     user_id: str,
     db: Session,
@@ -1312,46 +1217,36 @@ async def get_savings_metrics(
     user_repo: UserRepository | None = None,
 ):
     logger.info(f"Fetching savings metrics for user_id: {user_id}, tracking_number: {tracking_number}, business_id: {business_id}")
-
     savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
     user_repo = _resolve_repo(user_repo, UserRepository, db)
     session = savings_repo.db
-
     if tracking_number:
         # Metrics for a specific savings account (for SavingsMarkings.jsx)
         savings_account = session.query(SavingsAccount).filter(
             SavingsAccount.tracking_number == tracking_number,
             SavingsAccount.customer_id == user_id
         ).first()
-
         if not savings_account:
             logger.error(f"Savings account {tracking_number} not found for user {user_id}")
             return error_response(status_code=404, message="Savings account not found")
-
         markings = session.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings_account.id).all()
-
         if not markings:
             logger.error(f"No markings found for savings {tracking_number}")
             return error_response(status_code=404, message="No savings schedule found for this account")
-
         total_amount = savings_account.target_amount or sum(marking.amount for marking in markings)
         amount_marked = sum(marking.amount for marking in markings if marking.status == SavingsStatus.PAID)
         days_remaining = sum(1 for marking in markings if marking.status == SavingsStatus.PENDING)
         can_extend = savings_account.marking_status != MarkingStatus.COMPLETED and date.today() <= savings_account.end_date
         total_commission = calculate_total_commission(savings_account)
-
         # Check for existing payment request
         from models.payments import PaymentRequest, PaymentRequestStatus
-
         payment_request = session.query(PaymentRequest).filter(
             PaymentRequest.savings_account_id == savings_account.id,
             PaymentRequest.status.in_(
                 [PaymentRequestStatus.PENDING, PaymentRequestStatus.APPROVED]
             ),
         ).first()
-
         payment_request_status = payment_request.status.value if payment_request else None
-
         response_data = SavingsMetricsResponse(
             tracking_number=tracking_number,
             savings_account_id=savings_account.id,
@@ -1363,7 +1258,6 @@ async def get_savings_metrics(
             marking_status=savings_account.marking_status,
             payment_request_status=payment_request_status,
         ).model_dump()
-
         logger.info(
             "Retrieved metrics for savings %s: savings_account_id=%s, total=%s, marked=%s, days_remaining=%s, "
             "can_extend=%s, total_commission=%s, marking_status=%s, payment_request_status=%s",
@@ -1378,11 +1272,9 @@ async def get_savings_metrics(
             payment_request_status,
         )
         return success_response(status_code=200, message="Savings metrics retrieved successfully", data=response_data)
-
     # Aggregated metrics for all accounts (for Savings.jsx and Dashboard)
     user = user_repo.get_by_id(user_id)
     target_business_id = business_id or (user.active_business_id if user else None)
-
     today = datetime.now()
     month_start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     month_end = month_start + relativedelta(months=1)
@@ -1392,7 +1284,6 @@ async def get_savings_metrics(
         month_end.date(),
         target_business_id,
     )
-
     total_savings_query = (
         session.query(func.coalesce(func.sum(SavingsMarking.amount), 0))
         .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)
@@ -1406,7 +1297,6 @@ async def get_savings_metrics(
             SavingsAccount.business_id == target_business_id
         )
     total_savings_all_time = total_savings_query.scalar()
-
     this_month_query = (
         session.query(func.coalesce(func.sum(SavingsMarking.amount), 0))
         .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)
@@ -1422,14 +1312,12 @@ async def get_savings_metrics(
             SavingsAccount.business_id == target_business_id
         )
     this_month_savings = this_month_query.scalar()
-
     total_cards_query = session.query(SavingsAccount).filter(SavingsAccount.customer_id == user_id)
     if target_business_id:
         total_cards_query = total_cards_query.filter(
             SavingsAccount.business_id == target_business_id
         )
     total_savings_cards = total_cards_query.count()
-
     total_markings_query = (
         session.query(func.count(SavingsMarking.id))
         .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)
@@ -1440,7 +1328,6 @@ async def get_savings_metrics(
             SavingsAccount.business_id == target_business_id
         )
     total_markings_all_time = total_markings_query.scalar()
-
     pending_markings_query = (
         session.query(func.count(SavingsMarking.id))
         .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)
@@ -1454,7 +1341,6 @@ async def get_savings_metrics(
             SavingsAccount.business_id == target_business_id
         )
     total_pending_markings = pending_markings_query.scalar()
-
     paid_markings_query = (
         session.query(func.count(SavingsMarking.id))
         .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)
@@ -1468,7 +1354,6 @@ async def get_savings_metrics(
             SavingsAccount.business_id == target_business_id
         )
     total_paid_markings = paid_markings_query.scalar()
-
     logger.info(
         "Aggregated metrics for user %s: cards=%s, total_markings=%s, pending_markings=%s, paid_markings=%s",
         user_id,
@@ -1477,7 +1362,6 @@ async def get_savings_metrics(
         total_pending_markings,
         total_paid_markings,
     )
-
     response_data = {
         "overview": {
             "total_savings_all_time": float(total_savings_all_time or 0),
@@ -1490,17 +1374,15 @@ async def get_savings_metrics(
             "completed_markings": int(total_paid_markings or 0),
         },
     }
-
     logger.info("Aggregated metrics payload for user %s: %s", user_id, response_data)
     return success_response(
         status_code=200,
         message="Savings metrics retrieved successfully",
         data=response_data,
     )
-
 async def get_monthly_summary(current_user: dict, db: Session, business_id: int | None = None):
     """Get monthly summary of savings and expenses for the current month, plus all-time totals"""
-    
+   
     # Get current month start and end dates
     now = datetime.now()
     month_start = datetime(now.year, now.month, 1)
@@ -1508,9 +1390,9 @@ async def get_monthly_summary(current_user: dict, db: Session, business_id: int 
         month_end = datetime(now.year + 1, 1, 1) - timedelta(seconds=1)
     else:
         month_end = datetime(now.year, now.month + 1, 1) - timedelta(seconds=1)
-    
+   
     user_id = current_user["user_id"]
-    
+   
     # Calculate total savings for current month (amount marked in current month)
     total_savings_current_month = db.query(
         func.coalesce(func.sum(SavingsMarking.amount), 0)
@@ -1522,7 +1404,7 @@ async def get_monthly_summary(current_user: dict, db: Session, business_id: int 
         SavingsMarking.marked_date >= month_start.date(),
         SavingsMarking.marked_date <= month_end.date()
     ).scalar() or Decimal('0')
-    
+   
     if business_id:
         total_savings_current_month = db.query(
             func.coalesce(func.sum(SavingsMarking.amount), 0)
@@ -1535,7 +1417,7 @@ async def get_monthly_summary(current_user: dict, db: Session, business_id: int 
             SavingsMarking.marked_date >= month_start.date(),
             SavingsMarking.marked_date <= month_end.date(),
         ).scalar() or Decimal("0")
-    
+   
     # Calculate total expenses for current month
     total_expenses_current_month = db.query(
         func.coalesce(func.sum(Expense.amount), 0)
@@ -1546,7 +1428,7 @@ async def get_monthly_summary(current_user: dict, db: Session, business_id: int 
         Expense.created_at >= month_start,
         Expense.created_at <= month_end
     ).scalar() or Decimal('0')
-    
+   
     # Calculate ALL-TIME total savings (all paid markings ever)
     total_savings_all_time_query = db.query(
         func.coalesce(func.sum(SavingsMarking.amount), 0)
@@ -1559,7 +1441,7 @@ async def get_monthly_summary(current_user: dict, db: Session, business_id: int 
     if business_id:
         total_savings_all_time_query = total_savings_all_time_query.filter(SavingsAccount.business_id == business_id)
     total_savings_all_time = total_savings_all_time_query.scalar() or Decimal("0")
-    
+   
     # Calculate ALL-TIME total expenses (all expenses ever)
     total_expenses_all_time = db.query(
         func.coalesce(func.sum(Expense.amount), 0)
@@ -1568,7 +1450,7 @@ async def get_monthly_summary(current_user: dict, db: Session, business_id: int 
     ).filter(
         ExpenseCard.customer_id == user_id
     ).scalar() or Decimal('0')
-    
+   
     return success_response(
         status_code=200,
         message="Monthly summary retrieved successfully",
