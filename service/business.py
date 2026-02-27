@@ -724,7 +724,6 @@ async def reject_business_invitation(
         )
 
 
-@cached(ttl=300, key_prefix="businesses")
 async def get_user_businesses(
     current_user: dict,
     db: Session,
@@ -1129,7 +1128,6 @@ async def get_single_unit(
     )
 
 
-@cached(ttl=300, key_prefix="units")
 async def get_all_units(
     current_user: dict,
     db: Session,
@@ -1185,7 +1183,6 @@ async def get_all_units(
     )
 
 
-@cached(ttl=300, key_prefix="units")
 async def get_business_units(
     business_id: int,
     current_user: dict,
