@@ -125,64 +125,48 @@ class RedisCache:
                     retry_on_timeout=True,
                     health_check_interval=30,
                 )
-                logger.info("Redis client initialized (lazy connection check)")
-                self.enabled = True  # optimistic; real test in init_cache
+                logger.info("Redis client initialized (lazy connection)")
+                self.enabled = True  # optimistic; real test deferred
             except Exception as e:
                 logger.warning(f"⚠️ Redis connection init failed: {str(e)}")
                 self.enabled = False
         
         if not self.enabled:
             logger.info("Redis init failed → will fallback to in-memory")
+    
+    async def health_check(self) -> bool:
+        """Async method to verify Redis connection (call from async context if needed)"""
+        if not self.client or not self.enabled:
+            return False
+        try:
+            pong = await self.client.ping()
+            if pong:
+                logger.info("✓ Redis health check passed")
+                return True
+            return False
+        except Exception as e:
+            logger.warning(f"Redis health check failed: {str(e)}")
+            return False
 
 
 # Global cache instance
 cache = None
 
 
-async def _test_redis_connection(redis_cache: RedisCache) -> bool:
-    """Async helper to safely test Redis connection"""
-    if not redis_cache.client:
-        return False
-    try:
-        pong = await redis_cache.client.ping()
-        if pong:
-            logger.info("✓ Redis connected successfully (async ping)")
-            return True
-        return False
-    except Exception as e:
-        logger.warning(f"Redis async ping failed: {str(e)}")
-        return False
-
-
 def init_cache(url: str = None, fallback=True):
     """
     Initialize global cache during app startup.
-    Uses existing event loop for safe async operations.
+    Uses lazy connection — no blocking ping during init.
+    Safe in already-running event loops (uvicorn/gunicorn workers).
     """
     global cache
     
     redis_cache = RedisCache(url=url)
     
-    if redis_cache.enabled and redis_cache.client:
-        # Safe async test using current running loop
-        try:
-            loop = asyncio.get_running_loop()
-            success = loop.run_until_complete(_test_redis_connection(redis_cache))
-            
-            if success:
-                cache = redis_cache
-                logger.info("✓ Using Redis cache")
-                return cache
-            else:
-                logger.warning("Redis ping test failed → disabling Redis")
-                redis_cache.enabled = False
-        except RuntimeError as e:
-            # No running loop? (shouldn't happen in uvicorn/gunicorn workers)
-            logger.error(f"Cannot get running loop during cache init: {e}")
-            redis_cache.enabled = False
-    
-    # Fallback logic
-    if fallback:
+    if redis_cache.enabled:
+        cache = redis_cache
+        logger.info("✓ Using Redis cache (lazy connection)")
+    elif fallback:
         cache = InMemoryCache(maxsize=10000, ttl=300)
         logger.info("✓ Using in-memory cache fallback")
     else:
