@@ -108,14 +108,16 @@ class InMemoryCache:
 
 
 class RedisCache:
-    """Redis cache manager with connection pooling and error handling"""
-    
     def __init__(self, url: str = None):
         self.client = None
         self.enabled = False
         
         if url:
             try:
+                # Quick sanity check: reject URLs with known invalid params
+                if 'sslmode' in url.lower():
+                    raise ValueError("Invalid Redis URL: contains 'sslmode' (this is a PostgreSQL param, not Redis)")
+
                 self.client = redis.from_url(
                     url,
                     decode_responses=True,
@@ -128,6 +130,7 @@ class RedisCache:
                 self.enabled = True
             except Exception as e:
                 logger.warning(f"⚠️ Redis connection init failed: {str(e)}")
+                logger.warning(f"Bad REDIS_URL was: {url}")
                 self.enabled = False
         
         if not self.enabled:
@@ -383,6 +386,7 @@ def cached(ttl: Union[int, timedelta] = 300, key_prefix: str = ""):
         
         return wrapper
     return decorator
+
 
 
 class CacheKeys:
