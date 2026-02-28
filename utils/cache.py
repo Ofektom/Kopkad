@@ -97,7 +97,6 @@ class InMemoryCache:
             return None
     
     async def get_ttl(self, key: str) -> Optional[int]:
-        # TTLCache does not expose per-key TTL easily
         return None
     
     async def ping(self) -> bool:
@@ -126,7 +125,7 @@ class RedisCache:
                     health_check_interval=30,
                 )
                 logger.info("Redis client initialized (lazy connection)")
-                self.enabled = True  # optimistic; real test deferred
+                self.enabled = True
             except Exception as e:
                 logger.warning(f"⚠️ Redis connection init failed: {str(e)}")
                 self.enabled = False
@@ -146,6 +145,149 @@ class RedisCache:
             return False
         except Exception as e:
             logger.warning(f"Redis health check failed: {str(e)}")
+            return False
+    
+    async def get(self, key: str) -> Optional[Any]:
+        if not self.enabled or not self.client:
+            return None
+        try:
+            value = await self.client.get(key)
+            if value is None:
+                return None
+            try:
+                return json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                try:
+                    return pickle.loads(value)
+                except:
+                    return value
+        except Exception as e:
+            logger.error(f"Redis GET error for key '{key}': {e}")
+            return None
+    
+    async def set(self, key: str, value: Any, ttl: Optional[Union[int, timedelta]] = None) -> bool:
+        if not self.enabled or not self.client:
+            return False
+        try:
+            if isinstance(ttl, timedelta):
+                ttl = int(ttl.total_seconds())
+            try:
+                serialized = json.dumps(value, default=str)
+            except (TypeError, ValueError):
+                serialized = pickle.dumps(value)
+            if ttl:
+                return await self.client.setex(key, ttl, serialized)
+            else:
+                return await self.client.set(key, serialized)
+        except Exception as e:
+            logger.error(f"Redis SET error for key '{key}': {e}")
+            return False
+    
+    async def delete(self, *keys: str) -> int:
+        if not self.enabled or not self.client or not keys:
+            return 0
+        try:
+            return await self.client.delete(*keys)
+        except Exception as e:
+            logger.error(f"Redis DELETE error: {e}")
+            return 0
+    
+    async def exists(self, key: str) -> bool:
+        if not self.enabled or not self.client:
+            return False
+        try:
+            return (await self.client.exists(key)) > 0
+        except Exception as e:
+            logger.error(f"Redis EXISTS error for key '{key}': {e}")
+            return False
+    
+    async def get_many(self, *keys: str) -> dict:
+        if not self.enabled or not self.client or not keys:
+            return {}
+        try:
+            values = await self.client.mget(*keys)
+            result = {}
+            for key, value in zip(keys, values):
+                if value is not None:
+                    try:
+                        result[key] = json.loads(value)
+                    except (json.JSONDecodeError, TypeError):
+                        try:
+                            result[key] = pickle.loads(value)
+                        except:
+                            result[key] = value
+            return result
+        except Exception as e:
+            logger.error(f"Redis MGET error: {e}")
+            return {}
+    
+    async def set_many(self, mapping: dict, ttl: Optional[int] = None) -> bool:
+        if not self.enabled or not self.client or not mapping:
+            return False
+        try:
+            serialized = {}
+            for key, value in mapping.items():
+                try:
+                    serialized[key] = json.dumps(value, default=str)
+                except (TypeError, ValueError):
+                    serialized[key] = pickle.dumps(value)
+            pipe = self.client.pipeline()
+            pipe.mset(serialized)
+            if ttl:
+                for key in serialized:
+                    pipe.expire(key, ttl)
+            await pipe.execute()
+            return True
+        except Exception as e:
+            logger.error(f"Redis MSET error: {e}")
+            return False
+    
+    async def clear_pattern(self, pattern: str) -> int:
+        if not self.enabled or not self.client:
+            return 0
+        try:
+            keys = await self.client.keys(pattern)
+            if keys:
+                return await self.client.delete(*keys)
+            return 0
+        except Exception as e:
+            logger.error(f"Redis CLEAR_PATTERN error for pattern '{pattern}': {e}")
+            return 0
+    
+    async def increment(self, key: str, amount: int = 1) -> Optional[int]:
+        if not self.enabled or not self.client:
+            return None
+        try:
+            return await self.client.incrby(key, amount)
+        except Exception as e:
+            logger.error(f"Redis INCR error for key '{key}': {e}")
+            return None
+    
+    async def get_ttl(self, key: str) -> Optional[int]:
+        if not self.enabled or not self.client:
+            return None
+        try:
+            return await self.client.ttl(key)
+        except Exception as e:
+            logger.error(f"Redis TTL error for key '{key}': {e}")
+            return None
+    
+    async def ping(self) -> bool:
+        if not self.enabled or not self.client:
+            return False
+        try:
+            return await self.client.ping()
+        except Exception as e:
+            logger.error(f"Redis PING error: {e}")
+            return False
+    
+    async def flush_db(self):
+        if not self.enabled or not self.client:
+            return False
+        try:
+            return await self.client.flushdb()
+        except Exception as e:
+            logger.error(f"Redis FLUSHDB error: {e}")
             return False
 
 
@@ -214,7 +356,6 @@ def cached(ttl: Union[int, timedelta] = 300, key_prefix: str = ""):
                 arg_key = cache_key(*args, **kwargs)
                 full_key = f"{key_prefix}:{func_name}:{arg_key}" if key_prefix else f"{func_name}:{arg_key}"
                 
-                # Always await cache get
                 cached_value = await get_cache().get(full_key)
                 if cached_value is not None:
                     logger.debug(f"Cache HIT for {full_key}")
@@ -222,20 +363,16 @@ def cached(ttl: Union[int, timedelta] = 300, key_prefix: str = ""):
                 
                 logger.debug(f"Cache MISS for {full_key}")
                 
-                # Execute the original async function and await result
                 result = await func(*args, **kwargs)
                 
-                # Always await cache set
                 await get_cache().set(full_key, result, ttl)
                 
                 return result
                 
             except Exception as e:
                 logger.error(f"Cache decorator failed for {func.__name__}: {str(e)}", exc_info=True)
-                # Fallback: bypass cache on error
                 return await func(*args, **kwargs)
         
-        # Invalidation helper (async)
         async def invalidate(*args, **kwargs):
             arg_key = cache_key(*args, **kwargs)
             full_key = f"{key_prefix}:{func.__module__}.{func.__name__}:{arg_key}" if key_prefix else f"{func.__module__}.{func.__name__}:{arg_key}"
@@ -263,5 +400,4 @@ class CacheKeys:
     
     @staticmethod
     def format(pattern: str, **kwargs) -> str:
-        """Format a cache key pattern with values"""
         return pattern.format(**kwargs)
