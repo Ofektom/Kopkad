@@ -355,6 +355,7 @@ async def create_savings_daily(
     # Invalidate caches
     get_cache().clear_pattern(f"savings:{tracking_number}")
     get_cache().clear_pattern("savings:*")
+    get_cache().clear_pattern("savings_metrics:*")
     get_cache().clear_pattern("monthly_summary:*")
     
     return _savings_response(savings)
@@ -472,6 +473,7 @@ async def create_savings_target(
     # Invalidate caches
     get_cache().clear_pattern(f"savings:{tracking_number}")
     get_cache().clear_pattern("savings:*")
+    get_cache().clear_pattern("savings_metrics:*")
     get_cache().clear_pattern("monthly_summary:*")
     
     return _savings_response(savings)
@@ -529,6 +531,7 @@ async def extend_savings(
     
     # Invalidate caches
     get_cache().clear_pattern("savings:*")
+    get_cache().clear_pattern("savings_metrics:*")
     get_cache().clear_pattern("monthly_summary:*")
     
     return _savings_response(savings)
@@ -627,6 +630,7 @@ async def update_savings(
     
     # Invalidate caches
     get_cache().clear_pattern("savings:*")
+    get_cache().clear_pattern("savings_metrics:*")
     get_cache().clear_pattern("monthly_summary:*")
     
     return _savings_response(savings)
@@ -699,6 +703,7 @@ async def delete_savings(
     # Invalidate caches
     get_cache().clear_pattern(f"savings:{tracking_number}")
     get_cache().clear_pattern("savings:*")
+    get_cache().clear_pattern("savings_metrics:*")
     get_cache().clear_pattern("monthly_summary:*")
     
     return success_response(
@@ -1363,6 +1368,7 @@ async def verify_savings_payment(reference: str, db: Session):
     # Invalidate caches
     get_cache().clear_pattern("savings:*")
     get_cache().clear_pattern("savings_markings:*")
+    get_cache().clear_pattern("savings_metrics:*")
     
     return success_response(
         status_code=200,
@@ -1453,6 +1459,7 @@ async def confirm_bank_transfer(reference: str, current_user: dict, db: Session)
     
     # Invalidate caches after bank transfer confirmation
     get_cache().clear_pattern("savings:*")
+    get_cache().clear_pattern("savings_metrics:*")
     get_cache().clear_pattern("monthly_summary:*")
     
     return success_response(
@@ -1487,6 +1494,7 @@ async def end_savings_markings(tracking_number: str, current_user: dict, db: Ses
     # Invalidate caches
     get_cache().clear_pattern(f"savings:{tracking_number}")
     get_cache().clear_pattern("savings:*")
+    get_cache().clear_pattern("savings_metrics:*")
     get_cache().clear_pattern("monthly_summary:*")
     
     return success_response(
@@ -1529,7 +1537,7 @@ async def get_savings_markings_by_tracking_number(
     logger.info(f"Retrieved {len(savings_schedule)} markings for savings {tracking_number}")
     return success_response(status_code=200, message="Savings schedule retrieved successfully", data=response_data.model_dump())
 
-
+@cached(ttl=300, key_prefix="savings_metrics")
 async def get_savings_metrics(
     user_id: str,
     db: Session,
