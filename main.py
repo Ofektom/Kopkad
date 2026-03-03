@@ -123,7 +123,9 @@ async def on_startup():
         redis_url = app_settings.REDIS_URL
 
         if redis_url:
-            logger.info(f"Initializing cache from full REDIS_URL: {redis_url.split('@')[0]}@***")
+            import re
+            masked_url = re.sub(r':([^/@]+)@', ':***@', redis_url)
+            logger.info(f"Initializing cache from REDIS_URL: {masked_url}")
             init_cache(url=redis_url, fallback=True)
 
             # init_cache uses a lazy connection, so enabled=True even when the
