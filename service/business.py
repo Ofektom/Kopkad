@@ -222,8 +222,8 @@ async def create_business(
         
         # Return with admin credentials for super_admin to view
         logger.info(f"Business '{business.name}' created successfully with code: {unique_code}")
-        
-        get_cache().clear_pattern("businesses:*")
+
+        await get_cache().clear_pattern("businesses:*")
         
         return success_response(
             status_code=201,
@@ -492,7 +492,7 @@ async def add_customer_to_business(
         if is_linked:
             message = "Member re-invited successfully. Setup link regenerated."
 
-        get_cache().clear_pattern("businesses:*")
+        await get_cache().clear_pattern("businesses:*")
 
         return success_response(
             status_code=200,
@@ -588,6 +588,7 @@ async def complete_registration_service(
         )
         
         logger.info(f"Registration completed for user_id: {user.id}")
+        await get_cache().clear_pattern("businesses:*")
         return success_response(
             status_code=200,
             message="Registration completed successfully",
@@ -694,8 +695,8 @@ async def accept_business_invitation(
         
         
         logger.info(f"Invitation accepted by customer_id: {pending_request.customer_id} for business_id: {business.id}")
-        
-        get_cache().clear_pattern("businesses:*")
+
+        await get_cache().clear_pattern("businesses:*")
         
         return success_response(
             status_code=200,
@@ -768,6 +769,7 @@ async def reject_business_invitation(
         
         
         logger.info(f"Invitation rejected by customer_id: {pending_request.customer_id} for business_id: {business.id}")
+        await get_cache().clear_pattern("businesses:*")
         return success_response(status_code=200, message="Invitation rejected", data={})
     except Exception as e:
         session.rollback()
@@ -952,7 +954,7 @@ async def update_business(
                 related_entity_type="business",
             )
 
-        get_cache().clear_pattern("businesses:*")
+        await get_cache().clear_pattern("businesses:*")
 
         return success_response(
             status_code=200,
@@ -1065,8 +1067,8 @@ async def delete_business(
             )
         
         # Invalidate caches
-        get_cache().clear_pattern("businesses:*")
-        get_cache().clear_pattern("units:*")
+        await get_cache().clear_pattern("businesses:*")
+        await get_cache().clear_pattern("units:*")
 
         return success_response(
             status_code=200, message="Business deleted successfully", data={}
@@ -1129,6 +1131,7 @@ async def create_unit(
             related_entity_type="unit",
         )
 
+        await get_cache().clear_pattern("units:*")
         unit_response = UnitResponse.model_validate(unit)
         return success_response(
             status_code=201,
@@ -1140,6 +1143,7 @@ async def create_unit(
         logger.error(f"Unit creation failed: {str(e)}")
         return error_response(status_code=500, message=f"Failed to create unit: {str(e)}")
 
+@cached(ttl=60, key_prefix="units")
 async def get_single_unit(
     business_id: int,
     unit_id: int,
@@ -1342,6 +1346,7 @@ async def get_business_units(
         }
     )
 
+@cached(ttl=300, key_prefix="units")
 async def get_user_units(
     current_user: dict,
     db: Session,
@@ -1453,6 +1458,7 @@ async def update_business_unit(
             related_entity_type="unit",
         )
 
+        await get_cache().clear_pattern("units:*")
         return success_response(
             status_code=200,
             message="Business updated successfully",
@@ -1531,6 +1537,7 @@ async def delete_unit(
                 related_entity_type="unit",
             )
         
+        await get_cache().clear_pattern("units:*")
         return success_response(
             status_code=200, message="Unit deleted successfully", data={}
         )
@@ -1580,6 +1587,7 @@ async def get_all_unit_summary(
         data={"total_units": total_units}
     )
 
+@cached(ttl=300, key_prefix="units")
 async def get_business_unit_summary(
     business_id: str,
     current_user: dict,

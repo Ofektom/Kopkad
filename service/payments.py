@@ -43,6 +43,7 @@ from store.repositories import (
 )
 from models.financial_advisor import NotificationType, NotificationPriority
 from service.notifications import notify_user, notify_business_admin
+from utils.cache import cached, get_cache
 
 logging.basicConfig(
     filename="payments.log",
@@ -749,6 +750,7 @@ async def create_payment_request(
         logger.error(f"Failed to create payment request: {str(e)}")
         return error_response(status_code=500, message=f"Failed to create payment request: {str(e)}")
 
+@cached(ttl=60, key_prefix="payment_requests")
 async def get_payment_requests(
     business_id: Optional[int] = None,
     customer_id: Optional[int] = None,
@@ -968,6 +970,9 @@ async def approve_payment_request(
                         related_entity_type="commission",
             )
         
+        await get_cache().clear_pattern("payment_requests:*")
+        await get_cache().clear_pattern("agent_commissions:*")
+        await get_cache().clear_pattern("customer_payments:*")
         return success_response(
             status_code=200,
             message="Payment request approved successfully",
@@ -1046,6 +1051,7 @@ async def reject_payment_request(
                 related_entity_type="payment_request",
             )
         
+        await get_cache().clear_pattern("payment_requests:*")
         return success_response(
             status_code=200,
             message="Payment request rejected successfully",
@@ -1127,6 +1133,7 @@ async def cancel_payment_request(
                     related_entity_type="payment_request",
                 )
         
+        await get_cache().clear_pattern("payment_requests:*")
         return success_response(
             status_code=200,
             message="Payment request cancelled successfully",
@@ -1137,6 +1144,7 @@ async def cancel_payment_request(
         logger.error(f"Failed to cancel payment request: {str(e)}")
         return error_response(status_code=500, message=f"Failed to cancel payment request: {str(e)}")
 
+@cached(ttl=300, key_prefix="agent_commissions")
 async def get_agent_commissions(
     business_id: Optional[int],
     savings_account_id: Optional[int],
@@ -1213,6 +1221,7 @@ async def get_agent_commissions(
         },
     )
 
+@cached(ttl=300, key_prefix="customer_payments")
 async def get_customer_payments(
     customer_id: Optional[int],
     savings_account_id: Optional[int],
@@ -1337,6 +1346,7 @@ async def get_customer_payments(
         },
     )
 
+@cached(ttl=300, key_prefix="payment_accounts")
 async def get_payment_accounts(
     customer_id: Optional[int],
     limit: int,

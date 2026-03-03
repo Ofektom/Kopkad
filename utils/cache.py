@@ -350,28 +350,48 @@ def cached(ttl: Union[int, timedelta] = 300, key_prefix: str = ""):
     Async-aware caching decorator for FastAPI route handlers.
     Guarantees that the returned value is always the real result (dict/response),
     never a coroutine object.
+
+    JSONResponse objects are serialised to a plain dict before storage so they
+    can be written to Redis as JSON (Redis rejects raw pickle bytes when the
+    client is configured with decode_responses=True).
     """
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
             try:
+                from fastapi.responses import JSONResponse as _JSONResponse
                 func_name = f"{func.__module__}.{func.__name__}"
                 arg_key = cache_key(*args, **kwargs)
                 full_key = f"{key_prefix}:{func_name}:{arg_key}" if key_prefix else f"{func_name}:{arg_key}"
-                
+
                 cached_value = await get_cache().get(full_key)
                 if cached_value is not None:
                     logger.debug(f"Cache HIT for {full_key}")
+                    if isinstance(cached_value, dict) and cached_value.get("__json_response__"):
+                        return _JSONResponse(
+                            status_code=cached_value["status_code"],
+                            content=cached_value["content"],
+                        )
                     return cached_value
-                
+
                 logger.debug(f"Cache MISS for {full_key}")
-                
+
                 result = await func(*args, **kwargs)
-                
-                await get_cache().set(full_key, result, ttl)
-                
+
+                # Serialise JSONResponse → plain dict so it survives JSON
+                # serialisation into Redis (decode_responses=True rejects bytes).
+                to_store = result
+                if isinstance(result, _JSONResponse):
+                    to_store = {
+                        "__json_response__": True,
+                        "status_code": result.status_code,
+                        "content": json.loads(result.body),
+                    }
+
+                await get_cache().set(full_key, to_store, ttl)
+
                 return result
-                
+
             except Exception as e:
                 logger.error(f"Cache decorator failed for {func.__name__}: {str(e)}", exc_info=True)
                 return await func(*args, **kwargs)

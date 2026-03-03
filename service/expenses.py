@@ -27,6 +27,7 @@ from store.repositories import (
     UserRepository,
     SavingsRepository,
 )
+from utils.cache import cached, get_cache
 
 logging.basicConfig(
     filename="expenses.log",
@@ -174,8 +175,10 @@ async def create_expense_card(
         expense_card.id,
         current_user["user_id"],
     )
+    await get_cache().clear_pattern("expenses:*")
     return ExpenseCardResponse.from_orm(expense_card)
 
+@cached(ttl=300, key_prefix="expenses")
 async def get_expense_cards(
     limit: int,
     offset: int,
@@ -266,6 +269,7 @@ async def record_expense(
         card_id,
         current_user["user_id"],
     )
+    await get_cache().clear_pattern("expenses:*")
     return ExpenseResponse.from_orm(expense)
 
 async def top_up_expense_card(
@@ -300,8 +304,10 @@ async def top_up_expense_card(
         request.amount,
         current_user["user_id"],
     )
+    await get_cache().clear_pattern("expenses:*")
     return ExpenseCardResponse.from_orm(card)
 
+@cached(ttl=300, key_prefix="expenses")
 async def get_expenses_by_card(
     card_id: int,
     limit: int,
@@ -408,6 +414,7 @@ async def update_expense_card(
     session.refresh(card)
 
     logger.info(f"Updated expense card {card_id} for user {current_user['user_id']}")
+    await get_cache().clear_pattern("expenses:*")
     return ExpenseCardResponse.from_orm(card)
 
 async def delete_expense_card(
@@ -432,6 +439,7 @@ async def delete_expense_card(
         card_id,
         current_user["user_id"],
     )
+    await get_cache().clear_pattern("expenses:*")
     return success_response(
         status_code=200,
         message="Expense card deleted successfully",
@@ -911,6 +919,7 @@ async def get_eligible_savings(
         data={"savings": results, "count": len(results)}
     )
 
+@cached(ttl=300, key_prefix="expenses")
 async def get_all_expenses(
     limit: int,
     offset: int,
@@ -1039,6 +1048,7 @@ async def update_expense(
     session.refresh(expense)
     
     logger.info(f"Updated expense {expense_id} for user {current_user['user_id']}")
+    await get_cache().clear_pattern("expenses:*")
     return ExpenseResponse.from_orm(expense)
 
 async def delete_expense(
@@ -1078,6 +1088,7 @@ async def delete_expense(
     session.commit()
     
     logger.info(f"Deleted expense {expense_id}, refunded {refund_amount} to card {card.id}")
+    await get_cache().clear_pattern("expenses:*")
     return success_response(
         status_code=200,
         message="Expense deleted successfully",
@@ -1311,6 +1322,7 @@ async def complete_planned_item(
     
     return ExpenseResponse.from_orm(expense)
 
+@cached(ttl=300, key_prefix="expenses")
 async def get_expense_metrics(
     current_user: dict,
     db: Session,

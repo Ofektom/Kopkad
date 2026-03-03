@@ -353,10 +353,10 @@ async def create_savings_daily(
     )
     
     # Invalidate caches
-    get_cache().clear_pattern(f"savings:{tracking_number}")
-    get_cache().clear_pattern("savings:*")
-    get_cache().clear_pattern("monthly_summary:*")
-    
+    await get_cache().clear_pattern(f"savings:{tracking_number}")
+    await get_cache().clear_pattern("savings:*")
+    await get_cache().clear_pattern("monthly_summary:*")
+
     return _savings_response(savings)
 
 
@@ -468,12 +468,12 @@ async def create_savings_target(
         related_entity_id=savings.id,
         related_entity_type="savings_account",
     )
-    
+
     # Invalidate caches
-    get_cache().clear_pattern(f"savings:{tracking_number}")
-    get_cache().clear_pattern("savings:*")
-    get_cache().clear_pattern("monthly_summary:*")
-    
+    await get_cache().clear_pattern(f"savings:{tracking_number}")
+    await get_cache().clear_pattern("savings:*")
+    await get_cache().clear_pattern("monthly_summary:*")
+
     return _savings_response(savings)
 
 
@@ -528,9 +528,9 @@ async def extend_savings(
     )
     
     # Invalidate caches
-    get_cache().clear_pattern("savings:*")
-    get_cache().clear_pattern("monthly_summary:*")
-    
+    await get_cache().clear_pattern("savings:*")
+    await get_cache().clear_pattern("monthly_summary:*")
+
     return _savings_response(savings)
 
 
@@ -624,11 +624,11 @@ async def update_savings(
         related_entity_id=savings.id,
         related_entity_type="savings_account",
     )
-    
+
     # Invalidate caches
-    get_cache().clear_pattern("savings:*")
-    get_cache().clear_pattern("monthly_summary:*")
-    
+    await get_cache().clear_pattern("savings:*")
+    await get_cache().clear_pattern("monthly_summary:*")
+
     return _savings_response(savings)
 
 
@@ -697,10 +697,10 @@ async def delete_savings(
         )
     
     # Invalidate caches
-    get_cache().clear_pattern(f"savings:{tracking_number}")
-    get_cache().clear_pattern("savings:*")
-    get_cache().clear_pattern("monthly_summary:*")
-    
+    await get_cache().clear_pattern(f"savings:{tracking_number}")
+    await get_cache().clear_pattern("savings:*")
+    await get_cache().clear_pattern("monthly_summary:*")
+
     return success_response(
         status_code=200,
         message="Savings account deleted successfully",
@@ -818,237 +818,6 @@ async def get_all_savings(
         },
     )
 
-
-@cached(ttl=300, key_prefix="savings_markings")
-async def get_savings_markings_by_tracking_number(
-    tracking_number: str,
-    db: Session,
-    *,
-    savings_repo: SavingsRepository | None = None,
-):
-    savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
-    session = savings_repo.db
-    savings_account = session.query(SavingsAccount).filter(SavingsAccount.tracking_number == tracking_number).first()
-    
-    if not savings_account:
-        return error_response(status_code=404, message="Savings account not found")
-    markings = db.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings_account.id).all()
-    if not markings:
-        return error_response(status_code=404, message="No savings schedule found for this account")
-    
-    savings_schedule = {
-        marking.marked_date.isoformat(): marking.status for marking in markings
-    }
-    response_data = SavingsMarkingResponse(
-        tracking_number=tracking_number,
-        unit_id=savings_account.unit_id,
-        savings_schedule=savings_schedule,
-        total_amount=savings_account.target_amount or sum(marking.amount for marking in markings),
-        authorization_url=None,
-        payment_reference=None,
-        virtual_account=None
-    )
-    logger.info(f"Retrieved {len(savings_schedule)} markings for savings {tracking_number}")
-    return success_response(status_code=200, message="Savings schedule retrieved successfully", data=response_data.model_dump())
-
-
-@cached(ttl=300, key_prefix="savings_metrics")
-async def get_savings_metrics(
-    user_id: str,
-    db: Session,
-    tracking_number: str = None,
-    business_id: int = None,
-    *,
-    savings_repo: SavingsRepository | None = None,
-    user_repo: UserRepository | None = None,
-):
-    logger.info(f"Fetching savings metrics for user_id: {user_id}, tracking_number: {tracking_number}, business_id: {business_id}")
-    savings_repo = _resolve_repo(savings_repo, SavingsRepository, db)
-    user_repo = _resolve_repo(user_repo, UserRepository, db)
-    session = savings_repo.db
-    
-    if tracking_number:
-        savings_account = session.query(SavingsAccount).filter(
-            SavingsAccount.tracking_number == tracking_number,
-            SavingsAccount.customer_id == user_id
-        ).first()
-        if not savings_account:
-            logger.error(f"Savings account {tracking_number} not found for user {user_id}")
-            return error_response(status_code=404, message="Savings account not found")
-        markings = session.query(SavingsMarking).filter(SavingsMarking.savings_account_id == savings_account.id).all()
-        if not markings:
-            logger.error(f"No markings found for savings {tracking_number}")
-            return error_response(status_code=404, message="No savings schedule found for this account")
-        total_amount = savings_account.target_amount or sum(marking.amount for marking in markings)
-        amount_marked = sum(marking.amount for marking in markings if marking.status == SavingsStatus.PAID)
-        days_remaining = sum(1 for marking in markings if marking.status == SavingsStatus.PENDING)
-        can_extend = savings_account.marking_status != MarkingStatus.COMPLETED and date.today() <= savings_account.end_date
-        total_commission = calculate_total_commission(savings_account)
-        
-        # Check for existing payment request (assuming PaymentRequest model exists)
-        from models.payments import PaymentRequest, PaymentRequestStatus
-        payment_request = session.query(PaymentRequest).filter(
-            PaymentRequest.savings_account_id == savings_account.id,
-            PaymentRequest.status.in_([PaymentRequestStatus.PENDING, PaymentRequestStatus.APPROVED])
-        ).first()
-        payment_request_status = payment_request.status.value if payment_request else None
-        
-        response_data = SavingsMetricsResponse(
-            tracking_number=tracking_number,
-            savings_account_id=savings_account.id,
-            total_amount=total_amount,
-            amount_marked=amount_marked,
-            days_remaining=days_remaining,
-            can_extend=can_extend,
-            total_commission=total_commission,
-            marking_status=savings_account.marking_status,
-            payment_request_status=payment_request_status,
-        ).model_dump()
-        
-        logger.info(
-            "Retrieved metrics for savings %s: total=%s, marked=%s, days_remaining=%s, "
-            "can_extend=%s, total_commission=%s, marking_status=%s, payment_request_status=%s",
-            tracking_number, total_amount, amount_marked, days_remaining,
-            can_extend, total_commission, savings_account.marking_status, payment_request_status
-        )
-        return success_response(status_code=200, message="Savings metrics retrieved successfully", data=response_data)
-    
-    # Aggregated metrics
-    user = user_repo.get_by_id(user_id)
-    target_business_id = business_id or (user.active_business_id if user else None)
-    today = datetime.now()
-    month_start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    month_end = month_start + relativedelta(months=1)
-    
-    total_savings_all_time = (
-        session.query(func.coalesce(func.sum(SavingsMarking.amount), 0))
-        .join(SavingsAccount)
-        .filter(
-            SavingsAccount.customer_id == user_id,
-            SavingsMarking.status == SavingsStatus.PAID,
-        )
-        .scalar() or Decimal('0')
-    )
-    if target_business_id:
-        total_savings_all_time = (
-            session.query(func.coalesce(func.sum(SavingsMarking.amount), 0))
-            .join(SavingsAccount)
-            .filter(
-                SavingsAccount.customer_id == user_id,
-                SavingsMarking.status == SavingsStatus.PAID,
-                SavingsAccount.business_id == target_business_id,
-            )
-            .scalar() or Decimal('0')
-        )
-    
-    this_month_savings = (
-        session.query(func.coalesce(func.sum(SavingsMarking.amount), 0))
-        .join(SavingsAccount)
-        .filter(
-            SavingsAccount.customer_id == user_id,
-            SavingsMarking.status == SavingsStatus.PAID,
-            SavingsMarking.marked_date >= month_start.date(),
-            SavingsMarking.marked_date < month_end.date(),
-        )
-        .scalar() or Decimal('0')
-    )
-    if target_business_id:
-        this_month_savings = (
-            session.query(func.coalesce(func.sum(SavingsMarking.amount), 0))
-            .join(SavingsAccount)
-            .filter(
-                SavingsAccount.customer_id == user_id,
-                SavingsMarking.status == SavingsStatus.PAID,
-                SavingsMarking.marked_date >= month_start.date(),
-                SavingsMarking.marked_date < month_end.date(),
-                SavingsAccount.business_id == target_business_id,
-            )
-            .scalar() or Decimal('0')
-        )
-    
-    total_savings_cards = session.query(SavingsAccount).filter(SavingsAccount.customer_id == user_id)
-    if target_business_id:
-        total_savings_cards = total_savings_cards.filter(SavingsAccount.business_id == target_business_id)
-    total_savings_cards = total_savings_cards.count()
-    
-    total_markings_all_time = (
-        session.query(func.count(SavingsMarking.id))
-        .join(SavingsAccount)
-        .filter(SavingsAccount.customer_id == user_id)
-        .scalar() or 0
-    )
-    if target_business_id:
-        total_markings_all_time = (
-            session.query(func.count(SavingsMarking.id))
-            .join(SavingsAccount)
-            .filter(
-                SavingsAccount.customer_id == user_id,
-                SavingsAccount.business_id == target_business_id,
-            )
-            .scalar() or 0
-        )
-    
-    total_pending_markings = (
-        session.query(func.count(SavingsMarking.id))
-        .join(SavingsAccount)
-        .filter(
-            SavingsAccount.customer_id == user_id,
-            SavingsMarking.status == SavingsStatus.PENDING,
-        )
-        .scalar() or 0
-    )
-    if target_business_id:
-        total_pending_markings = (
-            session.query(func.count(SavingsMarking.id))
-            .join(SavingsAccount)
-            .filter(
-                SavingsAccount.customer_id == user_id,
-                SavingsMarking.status == SavingsStatus.PENDING,
-                SavingsAccount.business_id == target_business_id,
-            )
-            .scalar() or 0
-        )
-    
-    total_paid_markings = (
-        session.query(func.count(SavingsMarking.id))
-        .join(SavingsAccount)
-        .filter(
-            SavingsAccount.customer_id == user_id,
-            SavingsMarking.status == SavingsStatus.PAID,
-        )
-        .scalar() or 0
-    )
-    if target_business_id:
-        total_paid_markings = (
-            session.query(func.count(SavingsMarking.id))
-            .join(SavingsAccount)
-            .filter(
-                SavingsAccount.customer_id == user_id,
-                SavingsMarking.status == SavingsStatus.PAID,
-                SavingsAccount.business_id == target_business_id,
-            )
-            .scalar() or 0
-        )
-    
-    response_data = {
-        "overview": {
-            "total_savings_all_time": float(total_savings_all_time),
-            "total_savings_this_month": float(this_month_savings),
-            "total_savings_cards": total_savings_cards,
-        },
-        "markings": {
-            "total_markings": int(total_markings_all_time),
-            "pending_markings": int(total_pending_markings),
-            "completed_markings": int(total_paid_markings),
-        },
-    }
-    
-    logger.info("Aggregated metrics payload for user %s: %s", user_id, response_data)
-    return success_response(
-        status_code=200,
-        message="Savings metrics retrieved successfully",
-        data=response_data,
-    )
 
 
 async def mark_savings_payment(
@@ -1361,9 +1130,9 @@ async def verify_savings_payment(reference: str, db: Session):
         response_data["completion_message"] = " ".join(completion_messages)
     
     # Invalidate caches
-    get_cache().clear_pattern("savings:*")
-    get_cache().clear_pattern("savings_markings:*")
-    
+    await get_cache().clear_pattern("savings:*")
+    await get_cache().clear_pattern("savings_markings:*")
+
     return success_response(
         status_code=200,
         message="Payment verified successfully",
@@ -1452,8 +1221,9 @@ async def confirm_bank_transfer(reference: str, current_user: dict, db: Session)
         response_data["completion_message"] = completion_message
     
     # Invalidate caches after bank transfer confirmation
-    get_cache().clear_pattern("savings:*")
-    get_cache().clear_pattern("monthly_summary:*")
+    await get_cache().clear_pattern("savings:*")
+    await get_cache().clear_pattern("savings_markings:*")
+    await get_cache().clear_pattern("monthly_summary:*")
     
     return success_response(
         status_code=200,
@@ -1485,10 +1255,11 @@ async def end_savings_markings(tracking_number: str, current_user: dict, db: Ses
     db.commit()
     
     # Invalidate caches
-    get_cache().clear_pattern(f"savings:{tracking_number}")
-    get_cache().clear_pattern("savings:*")
-    get_cache().clear_pattern("monthly_summary:*")
-    
+    await get_cache().clear_pattern(f"savings:{tracking_number}")
+    await get_cache().clear_pattern("savings:*")
+    await get_cache().clear_pattern("savings_markings:*")
+    await get_cache().clear_pattern("monthly_summary:*")
+
     return success_response(
         status_code=200,
         message="Savings markings ended successfully",

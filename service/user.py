@@ -1631,7 +1631,6 @@ async def update_admin_details(
         return error_response(status_code=500, message=f"Failed to update admin: {str(exc)}")
 
 
-@cached(ttl=60, key_prefix="users")
 async def get_business_admin_credentials(
     current_user: dict,
     db: Session,
