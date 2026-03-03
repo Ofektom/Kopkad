@@ -9,6 +9,10 @@ wheels/
 # Virtual environments
 .venv
 
+# Logs
+logs/
+*.log
+
 # Environment Variables
 .env
 .qodo

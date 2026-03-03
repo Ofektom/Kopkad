@@ -13,7 +13,8 @@ from database.postgres_optimized import (
     get_connection_pool_status, 
     check_database_health
 )
-from utils.cache import init_cache, get_cache
+from utils.cache import init_cache, get_cache, InMemoryCache, RedisCache
+import utils.cache as cache_module
 from middleware.auth import AuditMiddleware
 from middleware.caching import CachingMiddleware
 
@@ -120,16 +121,25 @@ async def on_startup():
     try:
         from config.settings import settings as app_settings
         redis_url = app_settings.REDIS_URL
-        
+
         if redis_url:
             logger.info(f"Initializing cache from full REDIS_URL: {redis_url.split('@')[0]}@***")
             init_cache(url=redis_url, fallback=True)
+
+            # init_cache uses a lazy connection, so enabled=True even when the
+            # server is unreachable. Verify now so we don't pay a Redis timeout
+            # on every subsequent request if the server is down.
+            cache_instance = get_cache()
+            if isinstance(cache_instance, RedisCache):
+                is_healthy = await cache_instance.health_check()
+                if not is_healthy:
+                    logger.warning("⚠️  Redis unreachable → switching to in-memory cache")
+                    cache_module.cache = InMemoryCache(maxsize=10000, ttl=300)
+                else:
+                    logger.info("✓ Redis connection verified")
         else:
             logger.info("ℹ️  REDIS_URL not configured - using in-memory cache")
-            from utils.cache import InMemoryCache
-            cache = InMemoryCache(maxsize=10000, ttl=300)
-            from utils import cache as cache_module
-            cache_module.cache = cache
+            cache_module.cache = InMemoryCache(maxsize=10000, ttl=300)
     except Exception as e:
         logger.warning(f"⚠️  Cache initialization error: {str(e)} - using in-memory fallback")
     
