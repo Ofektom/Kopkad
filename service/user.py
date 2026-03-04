@@ -938,6 +938,7 @@ async def get_business_users(
     savings_status: Optional[str] = None,
     payment_method: Optional[str] = None,
     is_active: Optional[bool] = None,
+    cooperative_interest: Optional[bool] = None,
 ):
     """Retrieve users associated with a business, filtered by role, savings type, savings status, payment method, and active status."""
     if current_user["role"] not in [Role.AGENT, Role.SUB_AGENT]:
@@ -981,6 +982,7 @@ async def get_business_users(
             offset=offset,
             role=normalized_role,
             is_active=is_active,
+            cooperative_interest=cooperative_interest,
             savings_type=normalized_savings_type,
             savings_status=normalized_savings_status,
             payment_method=normalized_payment_method,
@@ -996,6 +998,7 @@ async def get_business_users(
                 email=user.email,
                 role=user.role,
                 is_active=user.is_active,
+                cooperative_interest=user.cooperative_interest,
                 businesses=[business_response],
                 created_at=user.created_at,
                 access_token=None,
@@ -1744,3 +1747,32 @@ async def get_current_user_info_service(
             "created_at": user.created_at.isoformat() if user.created_at else None,
         },
     )
+
+
+async def set_cooperative_interest(
+    interested: bool,
+    current_user: dict,
+    db: Session,
+    user_repo: UserRepository,
+):
+    """Allow a customer to express or withdraw interest in joining the cooperative society."""
+    user = user_repo.get_by_id(current_user["user_id"])
+    if not user:
+        return error_response(status_code=404, message="User not found")
+
+    if user.cooperative_interest == interested:
+        msg = "Already marked as interested" if interested else "Interest already withdrawn"
+        return success_response(status_code=200, message=msg, data={"cooperative_interest": interested})
+
+    user.cooperative_interest = interested
+    user.updated_at = datetime.now(timezone.utc)
+
+    try:
+        db.commit()
+        db.refresh(user)
+        msg = "Interest in cooperative society recorded" if interested else "Cooperative interest withdrawn"
+        return success_response(status_code=200, message=msg, data={"cooperative_interest": user.cooperative_interest})
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to update cooperative_interest for user {user.id}: {str(e)}")
+        return error_response(status_code=500, message="Failed to update cooperative interest")

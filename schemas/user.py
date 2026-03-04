@@ -21,6 +21,7 @@ class UserResponse(BaseModel):
     email: Optional[EmailStr] = None
     role: str
     is_active: bool
+    cooperative_interest: bool = False
     businesses: List[BusinessResponse] = []
     active_business_id: Optional[int] = None
     created_at: datetime
@@ -31,6 +32,10 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
         arbitrary_types_allowed = True
+
+
+class CooperativeInterestRequest(BaseModel):
+    interested: bool
 
 class LoginRequest(BaseModel):
     username: str

@@ -30,8 +30,6 @@ from api.router.financial_advisor import financial_advisor_router as financial_a
 from api.router.cooperative import cooperative_router
 from api.router.savings_group import savings_group_router
 
-# Import scripts
-from scripts.bootstrap_super_admin import bootstrap_super_admin
 from schemas.user import UserResponse
 from schemas.business import BusinessResponse, UnitResponse
 
@@ -110,7 +108,6 @@ async def on_startup():
     Startup tasks:
     - Initialize Redis cache
     - Test database connection
-    - Bootstrap super admin
     - Start scheduler
     """
     logger.info("=" * 60)
@@ -157,21 +154,6 @@ async def on_startup():
             logger.info(f"✓ Connection pool initialized: {pool_status}")
         except Exception as db_test_error:
             logger.warning(f"⚠️  Database connection test failed: {db_test_error}")
-        
-        # Bootstrap superadmin
-        logger.info("Starting SUPER_ADMIN bootstrap process...")
-        try:
-            from database.postgres_optimized import SessionLocal
-            db = SessionLocal()
-            try:
-                bootstrap_super_admin(db)
-                logger.info("✓ SUPER_ADMIN bootstrap completed")
-            except Exception as bootstrap_error:
-                logger.error(f"❌ Bootstrap error: {bootstrap_error}")
-            finally:
-                db.close()
-        except Exception as session_error:
-            logger.error(f"❌ Failed to create database session: {session_error}")
         
         # Scheduler
         logger.info("Initializing Financial Advisor Scheduler...")

@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from schemas.user import SignupRequest, LoginRequest, ChangePasswordRequest, AdminUpdateRequest, UserUpdateRequest, ForgotPasswordRequest, ResetPasswordRequest
+from schemas.user import SignupRequest, LoginRequest, ChangePasswordRequest, AdminUpdateRequest, UserUpdateRequest, ForgotPasswordRequest, ResetPasswordRequest, CooperativeInterestRequest
 from typing import List
 from service.user import (
     signup_unauthenticated,
@@ -33,6 +33,7 @@ from service.user import (
     reset_password_service,
     verify_reset_otp_service,
     resend_reset_otp_service,
+    set_cooperative_interest,
 )
 from database.postgres_optimized import get_db
 from utils.auth import get_current_user, oauth2_scheme
@@ -182,6 +183,7 @@ async def get_business_users_controller(
     savings_status: Optional[str] = Query(None, description="Filter by savings status (e.g., 'pending', 'paid')"),
     payment_method: Optional[str] = Query(None, description="Filter by payment method (e.g., 'card', 'bank_transfer')"),
     is_active: Optional[bool] = Query(None, description="Filter by active/inactive status"),
+    cooperative_interest: Optional[bool] = Query(None, description="Filter by cooperative interest (true/false)"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
     user_repo: UserRepository = Depends(get_repository(UserRepository)),
@@ -200,7 +202,8 @@ async def get_business_users_controller(
         savings_type=savings_type,
         savings_status=savings_status,
         payment_method=payment_method,
-        is_active=is_active
+        is_active=is_active,
+        cooperative_interest=cooperative_interest,
     )
 
 
@@ -403,3 +406,18 @@ async def update_admin_details_controller(
         user_repo=user_repo,
     )
 
+
+
+async def cooperative_interest_controller(
+    request: CooperativeInterestRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    user_repo: UserRepository = Depends(get_repository(UserRepository)),
+):
+    """Allow current user to express or withdraw interest in joining the cooperative society."""
+    return await set_cooperative_interest(
+        interested=request.interested,
+        current_user=current_user,
+        db=db,
+        user_repo=user_repo,
+    )

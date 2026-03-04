@@ -27,6 +27,7 @@ from api.controller.user import (
     reset_password_controller,
     verify_reset_otp_controller,
     resend_reset_otp_controller,
+    cooperative_interest_controller,
 )
 
 
@@ -185,6 +186,14 @@ user_router.add_api_route(
     methods=["PATCH"],
     response_model=UserResponse,
     summary="Update current authenticated user's profile (self-update)",
+)
+
+user_router.add_api_route(
+    "/me/cooperative-interest",
+    endpoint=cooperative_interest_controller,
+    methods=["PATCH"],
+    response_model=dict,
+    summary="Express or withdraw interest in joining the cooperative society",
 )
 
 

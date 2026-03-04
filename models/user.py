@@ -13,6 +13,7 @@ class Role:
     SUB_AGENT = "sub_agent"
     CUSTOMER = "customer"
     COOPERATIVE_MEMBER = "cooperative_member"
+    COOPERATIVE_ADMIN = "cooperative_admin"
 
 class Permission:
     # Super Admin Permissions (User Management Only)
@@ -87,14 +88,15 @@ class User(AuditMixin, Base):
             Role.ADMIN,
             Role.AGENT,
             Role.SUB_AGENT,
-            Role.SUB_AGENT,
             Role.CUSTOMER,
             Role.COOPERATIVE_MEMBER,
+            Role.COOPERATIVE_ADMIN,
             name="role",
         ),
         nullable=False,
     )
     is_active = Column(Boolean, default=True, nullable=True)
+    cooperative_interest = Column(Boolean, default=False, nullable=False, server_default="false")
     token_version = Column(Integer, nullable=False, default=1)
     active_business_id = Column(Integer, ForeignKey("businesses.id"), nullable=True)
     businesses = relationship(
