@@ -941,8 +941,8 @@ async def get_business_users(
     cooperative_status: Optional[str] = None,
 ):
     """Retrieve users associated with a business, filtered by role, savings type, savings status, payment method, and active status."""
-    if current_user["role"] not in [Role.AGENT, Role.SUB_AGENT]:
-        return error_response(status_code=403, message="Only AGENT and SUB AGENT can retrieve business users")
+    if current_user["role"] not in [Role.AGENT, Role.SUB_AGENT, Role.COOPERATIVE_ADMIN]:
+        return error_response(status_code=403, message="Only AGENT, SUB AGENT, and COOPERATIVE ADMIN can retrieve business users")
 
     try:
         business = business_repo.get_by_id(business_id)

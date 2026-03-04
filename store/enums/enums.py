@@ -17,6 +17,7 @@ class Role(str, Enum):
     SUB_AGENT = "sub_agent"
     CUSTOMER = "customer"
     COOPERATIVE_MEMBER = "cooperative_member"
+    COOPERATIVE_ADMIN = "cooperative_admin"
 
 
 class Permission(str, Enum):
