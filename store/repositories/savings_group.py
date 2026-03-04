@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from models.savings_group import SavingsGroup, GroupFrequency
 from models.savings import SavingsAccount, SavingsType, SavingsMarking, SavingsStatus
 from models.business import Unit
+from models.user_business import user_business
 from store.repositories.base import BaseRepository
 from datetime import date
 from decimal import Decimal
@@ -232,11 +233,10 @@ class SavingsGroupRepository(BaseRepository[SavingsGroup]):
             .scalar() or 0
         )
 
-        # Unique members across all groups in this business
+        # All users associated with this business (all roles — agent, customer, cooperative_member, etc.)
         total_members = (
-            self.db.query(func.count(func.distinct(SavingsAccount.customer_id)))
-            .join(SavingsGroup, SavingsGroup.id == SavingsAccount.group_id)
-            .filter(SavingsGroup.business_id == business_id)
+            self.db.query(func.count(user_business.c.user_id))
+            .filter(user_business.c.business_id == business_id)
             .scalar() or 0
         )
 
