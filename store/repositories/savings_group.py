@@ -192,7 +192,7 @@ class SavingsGroupRepository(BaseRepository[SavingsGroup]):
     def get_groups_for_member(self, member_id: int, skip: int = 0, limit: int = 100) -> Tuple[List[SavingsGroup], int]:
         query = self.db.query(SavingsGroup).join(SavingsAccount).filter(
             SavingsAccount.customer_id == member_id,
-            SavingsGroup.is_active == True
+            SavingsGroup.is_active == 1
         )
 
         total = query.count()
