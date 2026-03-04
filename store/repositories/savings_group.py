@@ -215,3 +215,63 @@ class SavingsGroupRepository(BaseRepository[SavingsGroup]):
 
     def get_all_group_accounts(self, group_id: int) -> List[SavingsAccount]:
         return self.db.query(SavingsAccount).filter(SavingsAccount.group_id == group_id).all()
+
+    def get_business_cooperative_summary(self, business_id: int) -> dict:
+        """Aggregate cooperative stats for a business: groups, members, collected amounts."""
+        from models.savings import SavingsStatus
+
+        total_active_groups = (
+            self.db.query(func.count(SavingsGroup.id))
+            .filter(SavingsGroup.business_id == business_id, SavingsGroup.is_active == 1)
+            .scalar() or 0
+        )
+
+        total_inactive_groups = (
+            self.db.query(func.count(SavingsGroup.id))
+            .filter(SavingsGroup.business_id == business_id, SavingsGroup.is_active == 0)
+            .scalar() or 0
+        )
+
+        # Unique members across all groups in this business
+        total_members = (
+            self.db.query(func.count(func.distinct(SavingsAccount.customer_id)))
+            .join(SavingsGroup, SavingsGroup.id == SavingsAccount.group_id)
+            .filter(SavingsGroup.business_id == business_id)
+            .scalar() or 0
+        )
+
+        # Total paid (collected) across all markings for all groups in this business
+        total_collected = (
+            self.db.query(func.coalesce(func.sum(SavingsMarking.amount), Decimal("0")))
+            .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)
+            .join(SavingsGroup, SavingsGroup.id == SavingsAccount.group_id)
+            .filter(
+                SavingsGroup.business_id == business_id,
+                SavingsMarking.status == SavingsStatus.PAID,
+            )
+            .scalar() or Decimal("0")
+        )
+
+        # Total expected (all markings regardless of status) — pre-seeded when member joins
+        total_target = (
+            self.db.query(func.coalesce(func.sum(SavingsMarking.amount), Decimal("0")))
+            .join(SavingsAccount, SavingsAccount.id == SavingsMarking.savings_account_id)
+            .join(SavingsGroup, SavingsGroup.id == SavingsAccount.group_id)
+            .filter(SavingsGroup.business_id == business_id)
+            .scalar() or Decimal("0")
+        )
+
+        progress_pct = (
+            float(total_collected) / float(total_target) * 100
+            if total_target > 0 else 0.0
+        )
+
+        return {
+            "total_active_groups": total_active_groups,
+            "total_inactive_groups": total_inactive_groups,
+            "total_groups": total_active_groups + total_inactive_groups,
+            "total_members": total_members,
+            "total_collected": float(total_collected),
+            "total_target": float(total_target),
+            "overall_progress_percentage": round(progress_pct, 1),
+        }

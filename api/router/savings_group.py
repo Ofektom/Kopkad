@@ -19,10 +19,18 @@ from api.controller.savings_group import (
     init_group_paystack,
     verify_group_paystack,
     get_group_metrics,
+    get_cooperative_summary_controller,
 )
 
 savings_group_router = APIRouter(prefix="/savings-groups", tags=["Savings Groups"])
 
+
+savings_group_router.add_api_route(
+    "/business/{business_id}/summary",
+    endpoint=get_cooperative_summary_controller,
+    methods=["GET"],
+    summary="Get cooperative business summary (members, groups, collected amounts)",
+)
 
 savings_group_router.add_api_route(
     "/",

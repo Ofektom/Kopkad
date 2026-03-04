@@ -894,3 +894,31 @@ async def get_group_savings_metrics(
             )
         }
     )
+
+
+async def get_cooperative_business_summary(
+    business_id: int,
+    current_user: dict,
+    db: Session,
+    *,
+    group_repo: Optional[SavingsGroupRepository] = None,
+):
+    """Return aggregate cooperative stats for an agent/admin's business dashboard."""
+    group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
+
+    role = current_user["role"]
+    if role not in ["agent", "admin", "super_admin"]:
+        raise HTTPException(403, "Not authorized to view cooperative summary")
+
+    # Agents may only view their own business
+    if role == "agent":
+        allowed_ids = current_user.get("business_ids") or []
+        if business_id not in allowed_ids:
+            raise HTTPException(403, "Not authorized to view this business")
+
+    summary = group_repo.get_business_cooperative_summary(business_id)
+    return success_response(
+        status_code=200,
+        message="Cooperative business summary retrieved",
+        data=summary,
+    )

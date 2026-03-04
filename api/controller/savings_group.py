@@ -29,6 +29,7 @@ from service.savings_group import (
     initiate_group_marking_payment,
     verify_group_marking_payment,
     get_group_savings_metrics,
+    get_cooperative_business_summary,
 )
 from store.repositories.savings_group import SavingsGroupRepository
 from store.repositories.savings import SavingsRepository
@@ -351,4 +352,18 @@ async def get_group_metrics(
         db=db,
         group_repo=group_repo,
         savings_repo=savings_repo
+    )
+
+
+async def get_cooperative_summary_controller(
+    business_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    group_repo: SavingsGroupRepository = Depends(get_repository(SavingsGroupRepository)),
+):
+    return await get_cooperative_business_summary(
+        business_id=business_id,
+        current_user=current_user,
+        db=db,
+        group_repo=group_repo,
     )
