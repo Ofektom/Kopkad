@@ -21,7 +21,7 @@ class UserResponse(BaseModel):
     email: Optional[EmailStr] = None
     role: str
     is_active: bool
-    cooperative_interest: bool = False
+    cooperative_status: str = "none"
     businesses: List[BusinessResponse] = []
     active_business_id: Optional[int] = None
     created_at: datetime

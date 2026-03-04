@@ -5,6 +5,7 @@ Controllers contain business logic with dependency injection.
 from typing import Optional
 from fastapi import Depends, Query, Body
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 import logging
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,8 @@ from service.user import (
     verify_reset_otp_service,
     resend_reset_otp_service,
     set_cooperative_interest,
+    get_cooperative_interest_requests,
+    approve_cooperative_membership,
 )
 from database.postgres_optimized import get_db
 from utils.auth import get_current_user, oauth2_scheme
@@ -183,7 +186,7 @@ async def get_business_users_controller(
     savings_status: Optional[str] = Query(None, description="Filter by savings status (e.g., 'pending', 'paid')"),
     payment_method: Optional[str] = Query(None, description="Filter by payment method (e.g., 'card', 'bank_transfer')"),
     is_active: Optional[bool] = Query(None, description="Filter by active/inactive status"),
-    cooperative_interest: Optional[bool] = Query(None, description="Filter by cooperative interest (true/false)"),
+    cooperative_status: Optional[str] = Query(None, description="Filter by cooperative status (none/requested/approved)"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
     user_repo: UserRepository = Depends(get_repository(UserRepository)),
@@ -203,7 +206,7 @@ async def get_business_users_controller(
         savings_status=savings_status,
         payment_method=payment_method,
         is_active=is_active,
-        cooperative_interest=cooperative_interest,
+        cooperative_status=cooperative_status,
     )
 
 
@@ -417,6 +420,35 @@ async def cooperative_interest_controller(
     """Allow current user to express or withdraw interest in joining the cooperative society."""
     return await set_cooperative_interest(
         interested=request.interested,
+        current_user=current_user,
+        db=db,
+        user_repo=user_repo,
+    )
+
+
+async def get_cooperative_requests_controller(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Super admin retrieves all users who have expressed cooperative interest."""
+    return await get_cooperative_interest_requests(current_user=current_user, db=db)
+
+
+class CooperativeApprovalRequest(BaseModel):
+    approved: bool
+
+
+async def approve_cooperative_controller(
+    user_id: int,
+    request: CooperativeApprovalRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    user_repo: UserRepository = Depends(get_repository(UserRepository)),
+):
+    """Super admin approves or rejects a user's cooperative membership request."""
+    return await approve_cooperative_membership(
+        user_id=user_id,
+        approved=request.approved,
         current_user=current_user,
         db=db,
         user_repo=user_repo,

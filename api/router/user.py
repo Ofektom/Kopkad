@@ -28,6 +28,8 @@ from api.controller.user import (
     verify_reset_otp_controller,
     resend_reset_otp_controller,
     cooperative_interest_controller,
+    get_cooperative_requests_controller,
+    approve_cooperative_controller,
 )
 
 
@@ -194,6 +196,22 @@ user_router.add_api_route(
     methods=["PATCH"],
     response_model=dict,
     summary="Express or withdraw interest in joining the cooperative society",
+)
+
+user_router.add_api_route(
+    "/cooperative-interest-requests",
+    endpoint=get_cooperative_requests_controller,
+    methods=["GET"],
+    response_model=dict,
+    summary="Get all users who have expressed cooperative interest (super_admin only)",
+)
+
+user_router.add_api_route(
+    "/{user_id}/cooperative-approval",
+    endpoint=approve_cooperative_controller,
+    methods=["PATCH"],
+    response_model=dict,
+    summary="Approve or reject a user's cooperative membership request (super_admin only)",
 )
 
 

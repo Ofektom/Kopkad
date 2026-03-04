@@ -6,7 +6,7 @@ from typing import List, Optional
 import httpx
 from loguru import logger
 
-from models.user import user_permissions, PasswordResetOtp, PasswordResetToken
+from models.user import User, user_permissions, PasswordResetOtp, PasswordResetToken
 from utils.password_utils import generate_otp, hash_otp, decrypt_password
 from datetime import datetime, timezone, timedelta
 from utils.email_service import send_reset_password_email_async, send_welcome_email, send_email_async
@@ -938,7 +938,7 @@ async def get_business_users(
     savings_status: Optional[str] = None,
     payment_method: Optional[str] = None,
     is_active: Optional[bool] = None,
-    cooperative_interest: Optional[bool] = None,
+    cooperative_status: Optional[str] = None,
 ):
     """Retrieve users associated with a business, filtered by role, savings type, savings status, payment method, and active status."""
     if current_user["role"] not in [Role.AGENT, Role.SUB_AGENT]:
@@ -982,7 +982,7 @@ async def get_business_users(
             offset=offset,
             role=normalized_role,
             is_active=is_active,
-            cooperative_interest=cooperative_interest,
+            cooperative_status=cooperative_status,
             savings_type=normalized_savings_type,
             savings_status=normalized_savings_status,
             payment_method=normalized_payment_method,
@@ -998,7 +998,7 @@ async def get_business_users(
                 email=user.email,
                 role=user.role,
                 is_active=user.is_active,
-                cooperative_interest=user.cooperative_interest,
+                cooperative_status=user.cooperative_status,
                 businesses=[business_response],
                 created_at=user.created_at,
                 access_token=None,
@@ -1760,19 +1760,89 @@ async def set_cooperative_interest(
     if not user:
         return error_response(status_code=404, message="User not found")
 
-    if user.cooperative_interest == interested:
+    target_status = "requested" if interested else "none"
+    if user.cooperative_status == target_status:
         msg = "Already marked as interested" if interested else "Interest already withdrawn"
-        return success_response(status_code=200, message=msg, data={"cooperative_interest": interested})
+        return success_response(status_code=200, message=msg, data={"cooperative_status": user.cooperative_status})
 
-    user.cooperative_interest = interested
+    # Don't allow downgrade from approved back to requested via self-service
+    if user.cooperative_status == "approved" and not interested:
+        return error_response(status_code=400, message="Approved members cannot withdraw interest")
+
+    user.cooperative_status = target_status
     user.updated_at = datetime.now(timezone.utc)
 
     try:
         db.commit()
         db.refresh(user)
         msg = "Interest in cooperative society recorded" if interested else "Cooperative interest withdrawn"
-        return success_response(status_code=200, message=msg, data={"cooperative_interest": user.cooperative_interest})
+        return success_response(status_code=200, message=msg, data={"cooperative_status": user.cooperative_status})
     except Exception as e:
         db.rollback()
-        logger.error(f"Failed to update cooperative_interest for user {user.id}: {str(e)}")
+        logger.error(f"Failed to update cooperative_status for user {user.id}: {str(e)}")
         return error_response(status_code=500, message="Failed to update cooperative interest")
+
+
+async def get_cooperative_interest_requests(
+    current_user: dict,
+    db: Session,
+):
+    """Super admin retrieves all users who have expressed cooperative interest (requested or approved)."""
+    if current_user["role"] != Role.SUPER_ADMIN:
+        return error_response(status_code=403, message="Only Super Admin can view cooperative interest requests")
+
+    users = (
+        db.query(User)
+        .filter(User.cooperative_status.in_(["requested", "approved"]))
+        .order_by(User.created_at.desc())
+        .all()
+    )
+
+    data = [
+        {
+            "id": u.id,
+            "full_name": u.full_name,
+            "phone_number": u.phone_number,
+            "email": u.email,
+            "cooperative_status": u.cooperative_status,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+        }
+        for u in users
+    ]
+    return success_response(status_code=200, message="Cooperative interest requests retrieved", data=data)
+
+
+async def approve_cooperative_membership(
+    user_id: int,
+    approved: bool,
+    current_user: dict,
+    db: Session,
+    user_repo: UserRepository,
+):
+    """Super admin approves or rejects a user's cooperative membership request."""
+    if current_user["role"] != Role.SUPER_ADMIN:
+        return error_response(status_code=403, message="Only Super Admin can approve cooperative membership")
+
+    target_user = user_repo.get_by_id(user_id)
+    if not target_user:
+        return error_response(status_code=404, message="User not found")
+
+    if target_user.cooperative_status == "none":
+        return error_response(status_code=400, message="User has not expressed interest in the cooperative")
+
+    target_user.cooperative_status = "approved" if approved else "requested"
+    target_user.updated_at = datetime.now(timezone.utc)
+
+    try:
+        db.commit()
+        db.refresh(target_user)
+        msg = "Cooperative membership approved" if approved else "Cooperative membership request rejected"
+        return success_response(
+            status_code=200,
+            message=msg,
+            data={"user_id": user_id, "cooperative_status": target_user.cooperative_status},
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to update cooperative_status for user {user_id}: {str(e)}")
+        return error_response(status_code=500, message="Failed to update cooperative membership")

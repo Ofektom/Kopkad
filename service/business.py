@@ -333,8 +333,6 @@ async def add_customer_to_business(
         if not business:
             return error_response(status_code=404, message="Business not found")
 
-        new_role = Role.COOPERATIVE_MEMBER if business.business_type == BusinessType.COOPERATIVE else Role.CUSTOMER
-
         try:
             customer = User(
                 full_name="Invited Member",
@@ -342,21 +340,21 @@ async def add_customer_to_business(
                 email=request.email.lower() if request.email else None,
                 username=phone_number,
                 pin=hash_password("12345"),  # temporary dummy PIN
-                role=new_role,
+                role=Role.CUSTOMER,
                 is_active=False,
                 created_by=current_user["user_id"],
                 created_at=datetime.now(timezone.utc),
             )
             session.add(customer)
             session.flush()
-            logger.info(f"Created new user {customer.id} with role {new_role.value}")
+            logger.info(f"Created new user {customer.id} with role customer")
         except Exception as e:
             session.rollback()
             logger.exception("Failed to create new user")
             return error_response(status_code=500, message=f"Failed to create user: {str(e)}")
 
     # ── Role validation ──
-    if customer.role not in [Role.CUSTOMER, Role.COOPERATIVE_MEMBER]:
+    if customer.role not in [Role.CUSTOMER]:
         return error_response(status_code=400, message=f"User role {customer.role} cannot be added to business")
 
     business = business_repo.find_one_by(unique_code=request.business_unique_code)
@@ -385,8 +383,10 @@ async def add_customer_to_business(
 
         # Always set/update active_business_id (current context)
         customer.active_business_id = business.id
+        # Mark as approved cooperative member (agent-initiated invite = direct approval)
+        customer.cooperative_status = "approved"
         session.add(customer)
-        logger.info(f"[ACTIVE BUSINESS SET] User {customer.id} active_business_id = {business.id}")
+        logger.info(f"[ACTIVE BUSINESS SET] User {customer.id} active_business_id = {business.id}, cooperative_status=approved")
 
         # Assign unit if provided
         if request.unit_id:

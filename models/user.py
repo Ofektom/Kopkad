@@ -96,7 +96,12 @@ class User(AuditMixin, Base):
         nullable=False,
     )
     is_active = Column(Boolean, default=True, nullable=True)
-    cooperative_interest = Column(Boolean, default=False, nullable=False, server_default="false")
+    cooperative_status = Column(
+        Enum("none", "requested", "approved", name="cooperative_status"),
+        nullable=False,
+        default="none",
+        server_default="none",
+    )
     token_version = Column(Integer, nullable=False, default=1)
     active_business_id = Column(Integer, ForeignKey("businesses.id"), nullable=True)
     businesses = relationship(
