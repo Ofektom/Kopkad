@@ -1658,3 +1658,40 @@ async def get_unassigned_admin_businesses(
         message="Unassigned businesses retrieved successfully",
         data={"businesses": business_list, "total": len(business_list)},
     )
+
+
+async def get_cooperative_businesses(
+    current_user: dict,
+    db: Session,
+    *,
+    business_repo: "BusinessRepository" = None,
+):
+    """Super admin: list all cooperative businesses with member and group counts."""
+    if current_user.get("role") != Role.SUPER_ADMIN:
+        return error_response(status_code=403, message="Only super_admin can view all cooperatives")
+
+    business_repo = _resolve_repo(business_repo, BusinessRepository, db)
+    businesses = business_repo.list_by_type(BusinessType.COOPERATIVE)
+
+    data = []
+    for b in businesses:
+        member_count = (
+            db.query(func.count())
+            .select_from(user_business)
+            .filter(user_business.c.business_id == b.id)
+            .scalar()
+        ) or 0
+        data.append({
+            "id": b.id,
+            "name": b.name,
+            "unique_code": b.unique_code,
+            "address": b.address,
+            "member_count": member_count,
+            "created_at": b.created_at.isoformat() if b.created_at else None,
+        })
+
+    return success_response(
+        status_code=200,
+        message="Cooperative businesses retrieved",
+        data={"cooperatives": data, "total": len(data)},
+    )

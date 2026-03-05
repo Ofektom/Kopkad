@@ -221,6 +221,7 @@ async def list_groups_controller(
     search: Optional[str] = Query(None, description="Search in name or description"),
     limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
     offset: int = Query(0, ge=0, description="Number of records to skip"),
+    business_id: Optional[int] = Query(None, description="Filter by business ID (super_admin only)"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
     group_repo: SavingsGroupRepository = Depends(get_repository(SavingsGroupRepository)),
@@ -236,6 +237,7 @@ async def list_groups_controller(
         search=search,
         limit=limit,
         offset=offset,
+        business_id=business_id,
         group_repo=group_repo,
         business_repo=business_repo,
     )

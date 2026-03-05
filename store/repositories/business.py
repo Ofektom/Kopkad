@@ -102,6 +102,15 @@ class BusinessRepository(BaseRepository[Business]):
         """Return all businesses."""
         return self.db.query(Business).all()
 
+    def list_by_type(self, business_type: str) -> List[Business]:
+        """Return all businesses of a given type, ordered newest first."""
+        return (
+            self.db.query(Business)
+            .filter(Business.business_type == business_type)
+            .order_by(Business.created_at.desc())
+            .all()
+        )
+
     def get_unassigned_businesses(self) -> List[Business]:
         """Return businesses that do not currently have an assigned admin (is_assigned=False)."""
         return (

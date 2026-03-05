@@ -44,6 +44,7 @@ from service.business import (
     get_business_units,
     get_single_business,
     get_single_unit,
+    get_cooperative_businesses,
     get_unassigned_admin_businesses,
     get_user_businesses,
     get_user_units,
@@ -439,3 +440,15 @@ async def get_business_unit_count_controller(
         user_business_repo=user_business_repo,
     )
 
+
+
+async def get_cooperative_businesses_controller(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    business_repo: BusinessRepository = Depends(get_repository(BusinessRepository)),
+):
+    return await get_cooperative_businesses(
+        current_user=current_user,
+        db=db,
+        business_repo=business_repo,
+    )

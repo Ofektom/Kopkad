@@ -288,6 +288,7 @@ async def list_groups(
     search: Optional[str] = None,
     limit: int = 10,
     offset: int = 0,
+    business_id: Optional[int] = None,
     *,
     group_repo: Optional[SavingsGroupRepository] = None,
     business_repo: Optional[BusinessRepository] = None,
@@ -312,22 +313,26 @@ async def list_groups(
             skip=offset
         )
     else:
-        # Admins/Agents see all groups for the business
-        business = business_repo.get_by_admin_id(user_id) or business_repo.get_by_agent_id(user_id)
-        if not business:
-            logger.info(f"[SERVICE] No business found for user {user_id}")
-            return {
-                "groups": [],
-                "total_count": 0,
-                "limit": limit,
-                "offset": offset,
-                "message": "No business associated with user"
-            }
+        # super_admin can pass business_id directly; others look up by their user
+        if role == "super_admin" and business_id:
+            resolved_business_id = business_id
+        else:
+            business = business_repo.get_by_admin_id(user_id) or business_repo.get_by_agent_id(user_id)
+            if not business:
+                logger.info(f"[SERVICE] No business found for user {user_id}")
+                return {
+                    "groups": [],
+                    "total_count": 0,
+                    "limit": limit,
+                    "offset": offset,
+                    "message": "No business associated with user"
+                }
+            resolved_business_id = business.id
 
-        logger.info(f"[SERVICE] Listing groups for business {business.id}")
+        logger.info(f"[SERVICE] Listing groups for business {resolved_business_id}")
 
         groups, total_count = group_repo.get_groups_by_business(
-            business_id=business.id,
+            business_id=resolved_business_id,
             name=name,
             frequency=frequency,
             is_active=is_active,

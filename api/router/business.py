@@ -14,6 +14,7 @@ from api.controller.business import (
     get_single_unit_controller,
     get_total_business_count_controller,
     get_total_unit_count_controller,
+    get_cooperative_businesses_controller,
     get_unassigned_admin_businesses_controller,
     get_user_businesses_controller,
     get_user_units_controller,
@@ -71,6 +72,13 @@ business_router.add_api_route(
     endpoint=complete_registration_controller,
     methods=["POST"],
     summary="Complete registration for invited user (Set PIN/Name)",
+)
+
+business_router.add_api_route(
+    "/cooperatives",
+    endpoint=get_cooperative_businesses_controller,
+    methods=["GET"],
+    summary="List all cooperative businesses (super_admin only)",
 )
 
 business_router.add_api_route(

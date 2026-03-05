@@ -941,7 +941,7 @@ async def get_business_users(
     cooperative_status: Optional[str] = None,
 ):
     """Retrieve users associated with a business, filtered by role, savings type, savings status, payment method, and active status."""
-    if current_user["role"] not in [Role.AGENT, Role.SUB_AGENT, Role.COOPERATIVE_ADMIN]:
+    if current_user["role"] not in [Role.AGENT, Role.SUB_AGENT, Role.COOPERATIVE_ADMIN, Role.SUPER_ADMIN]:
         return error_response(status_code=403, message="Only AGENT, SUB AGENT, and COOPERATIVE ADMIN can retrieve business users")
 
     try:
