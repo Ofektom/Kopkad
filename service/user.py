@@ -1752,6 +1752,7 @@ async def get_current_user_info_service(
             "role": getattr(user.role, "value", user.role),
             "is_active": user.is_active,
             "location": getattr(user, "location", None),
+            "cooperative_status": getattr(user, "cooperative_status", "none") or "none",
             "businesses": business_payload,
             "created_at": user.created_at.isoformat() if user.created_at else None,
         },
