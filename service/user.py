@@ -1796,9 +1796,9 @@ async def get_cooperative_interest_requests(
     current_user: dict,
     db: Session,
 ):
-    """Super admin retrieves all users who have expressed cooperative interest (requested or approved)."""
-    if current_user["role"] != Role.SUPER_ADMIN:
-        return error_response(status_code=403, message="Only Super Admin can view cooperative interest requests")
+    """Cooperative admin or super admin retrieves all users who have expressed cooperative interest (requested or approved)."""
+    if current_user["role"] not in [Role.SUPER_ADMIN, Role.COOPERATIVE_ADMIN]:
+        return error_response(status_code=403, message="Only Cooperative Admin can view cooperative interest requests")
 
     users = (
         db.query(User)
@@ -1828,9 +1828,9 @@ async def approve_cooperative_membership(
     db: Session,
     user_repo: UserRepository,
 ):
-    """Super admin approves or rejects a user's cooperative membership request."""
-    if current_user["role"] != Role.SUPER_ADMIN:
-        return error_response(status_code=403, message="Only Super Admin can approve cooperative membership")
+    """Cooperative admin or super admin approves or rejects a cooperative membership request."""
+    if current_user["role"] not in [Role.SUPER_ADMIN, Role.COOPERATIVE_ADMIN]:
+        return error_response(status_code=403, message="Only Cooperative Admin can approve cooperative membership")
 
     target_user = user_repo.get_by_id(user_id)
     if not target_user:
