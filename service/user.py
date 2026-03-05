@@ -1763,6 +1763,8 @@ async def set_cooperative_interest(
     current_user: dict,
     db: Session,
     user_repo: UserRepository,
+    business_repo: BusinessRepository,
+    user_business_repo: UserBusinessRepository,
 ):
     """Allow a customer to express or withdraw interest in joining the cooperative society."""
     user = user_repo.get_by_id(current_user["user_id"])
@@ -1784,6 +1786,14 @@ async def set_cooperative_interest(
     try:
         db.commit()
         db.refresh(user)
+
+        # Link user to the Central Cooperative business when they express interest
+        if interested:
+            central_coop = business_repo.get_by_unique_code("COOPX1")
+            if central_coop and not user_business_repo.is_user_in_business(user.id, central_coop.id):
+                user_business_repo.link_user_to_business(user.id, central_coop.id)
+                db.commit()
+
         msg = "Interest in cooperative society recorded" if interested else "Cooperative interest withdrawn"
         return success_response(status_code=200, message=msg, data={"cooperative_status": user.cooperative_status})
     except Exception as e:

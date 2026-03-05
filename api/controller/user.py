@@ -416,6 +416,8 @@ async def cooperative_interest_controller(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
     user_repo: UserRepository = Depends(get_repository(UserRepository)),
+    business_repo: BusinessRepository = Depends(get_repository(BusinessRepository)),
+    user_business_repo: UserBusinessRepository = Depends(get_repository(UserBusinessRepository)),
 ):
     """Allow current user to express or withdraw interest in joining the cooperative society."""
     return await set_cooperative_interest(
@@ -423,6 +425,8 @@ async def cooperative_interest_controller(
         current_user=current_user,
         db=db,
         user_repo=user_repo,
+        business_repo=business_repo,
+        user_business_repo=user_business_repo,
     )
 
 
