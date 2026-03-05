@@ -976,6 +976,14 @@ async def get_business_users(
             if normalized_payment_method not in {e.value for e in PaymentMethod}:
                 return error_response(status_code=400, message="Invalid payment method specified")
 
+        # cooperative_admin only sees customers with cooperative_status requested or approved
+        coop_status_in = None
+        if current_user["role"] == Role.COOPERATIVE_ADMIN:
+            normalized_role = normalized_role or "customer"
+            if normalized_role == "customer":
+                coop_status_in = ["requested", "approved"]
+                cooperative_status = None  # use in-list filter instead of exact match
+
         users, total = user_repo.get_business_users_with_filters(
             business_id=business_id,
             limit=limit,
@@ -983,6 +991,7 @@ async def get_business_users(
             role=normalized_role,
             is_active=is_active,
             cooperative_status=cooperative_status,
+            cooperative_status_in=coop_status_in,
             savings_type=normalized_savings_type,
             savings_status=normalized_savings_status,
             payment_method=normalized_payment_method,

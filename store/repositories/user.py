@@ -303,6 +303,7 @@ class UserRepository(BaseRepository[User]):
         role: Optional[str] = None,
         is_active: Optional[bool] = None,
         cooperative_status: Optional[str] = None,
+        cooperative_status_in: Optional[list] = None,
         savings_type: Optional[str] = None,
         savings_status: Optional[str] = None,
         payment_method: Optional[str] = None,
@@ -326,6 +327,9 @@ class UserRepository(BaseRepository[User]):
 
         if cooperative_status is not None:
             query = query.filter(User.cooperative_status == cooperative_status)
+
+        if cooperative_status_in is not None:
+            query = query.filter(User.cooperative_status.in_(cooperative_status_in))
 
         if savings_type or savings_status or payment_method or search:
             query = query.join(
