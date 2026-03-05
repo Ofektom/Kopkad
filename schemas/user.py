@@ -37,6 +37,9 @@ class UserResponse(BaseModel):
 class CooperativeInterestRequest(BaseModel):
     interested: bool
 
+class CooperativeApprovalRequest(BaseModel):
+    approved: bool
+
 class LoginRequest(BaseModel):
     username: str
     pin: str = Field(..., pattern=r"^\d{5}$")

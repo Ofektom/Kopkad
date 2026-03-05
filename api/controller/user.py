@@ -10,7 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from schemas.user import SignupRequest, LoginRequest, ChangePasswordRequest, AdminUpdateRequest, UserUpdateRequest, ForgotPasswordRequest, ResetPasswordRequest, CooperativeInterestRequest
+from schemas.user import SignupRequest, LoginRequest, ChangePasswordRequest, AdminUpdateRequest, UserUpdateRequest, ForgotPasswordRequest, ResetPasswordRequest, CooperativeInterestRequest, CooperativeApprovalRequest
 from typing import List
 from service.user import (
     signup_unauthenticated,
@@ -437,9 +437,6 @@ async def get_cooperative_requests_controller(
     """Super admin retrieves all users who have expressed cooperative interest."""
     return await get_cooperative_interest_requests(current_user=current_user, db=db)
 
-
-class CooperativeApprovalRequest(BaseModel):
-    approved: bool
 
 
 async def approve_cooperative_controller(

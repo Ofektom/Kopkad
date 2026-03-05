@@ -1,6 +1,7 @@
 """
 One-time seed script: creates the Central Cooperative business, links the
-Cooperative Admin to it, and migrates all existing cooperative members.
+Cooperative Admin to it, and migrates all existing cooperative members and
+savings groups.
 
 Run manually from the savings-system directory:
     python -m scripts.seed_central_cooperative
@@ -11,6 +12,8 @@ What this does:
 3. Re-links cooperative_admin to COOPX1 and sets it as their active_business_id
 4. Migrates all existing users with cooperative_status in ('requested', 'approved')
    from CEN123 into COOPX1 (adds them to user_business for COOPX1)
+5. Migrates all savings groups owned by the cooperative_admin from CEN123 to COOPX1
+   by updating their business_id
 
 Prerequisites:
 - The Cooperative Admin user must already exist (run script_cooperative_admin.py first).
@@ -36,6 +39,7 @@ from database.postgres_optimized import SessionLocal
 from models.business import Business, BusinessType
 from models.user import User, Role
 from models.user_business import user_business
+from models.savings_group import SavingsGroup
 
 
 COOP_ADMIN_USERNAME = "08000000015"
@@ -139,6 +143,38 @@ def seed():
             f"  Total found   : {len(coop_members)}\n"
             f"  Migrated      : {migrated}\n"
             f"  Already linked: {already}\n"
+        )
+
+        # 5. Migrate savings groups owned by cooperative_admin from CEN123 → COOPX1
+        cen_business = (
+            db.query(Business)
+            .filter(Business.unique_code == "CEN123")
+            .first()
+        )
+        groups_migrated = 0
+        groups_already = 0
+        if cen_business:
+            groups = (
+                db.query(SavingsGroup)
+                .filter(
+                    SavingsGroup.business_id == cen_business.id,
+                    SavingsGroup.created_by == coop_admin.id,
+                )
+                .all()
+            )
+            for g in groups:
+                if g.business_id == central_coop.id:
+                    groups_already += 1
+                else:
+                    g.business_id = central_coop.id
+                    groups_migrated += 1
+            db.commit()
+
+        print(
+            f"Savings group migration:\n"
+            f"  Total found   : {groups_migrated + groups_already}\n"
+            f"  Migrated      : {groups_migrated}\n"
+            f"  Already linked: {groups_already}\n"
         )
 
         print("Done.")
