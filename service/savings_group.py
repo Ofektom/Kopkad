@@ -229,7 +229,7 @@ async def create_group(
     user_id = current_user["user_id"]
     role = current_user["role"]
 
-    if role not in ["admin", "super_admin", "agent"]:
+    if role not in ["admin", "super_admin", "agent", "cooperative_admin"]:
         raise HTTPException(403, "Only admins, super admins or agents can create savings groups")
 
     business = business_repo.get_by_admin_id(user_id) or business_repo.get_by_agent_id(user_id)
@@ -299,7 +299,7 @@ async def list_groups(
     user_id = current_user["user_id"]
     role = current_user["role"]
 
-    if role not in ["admin", "super_admin", "agent", "customer"]:
+    if role not in ["admin", "super_admin", "agent", "customer", "cooperative_admin"]:
         logger.warning(f"[SERVICE] Unauthorized list attempt - role: {role}")
         raise HTTPException(status_code=403, detail="Not authorized to list savings groups")
 
@@ -398,7 +398,7 @@ async def add_member_to_group(
     user_id = current_user["user_id"]
     role = current_user["role"]
 
-    if role not in ["admin", "super_admin", "agent"]:
+    if role not in ["admin", "super_admin", "agent", "cooperative_admin"]:
         raise HTTPException(status_code=403, detail="Not authorized to add members")
 
     group = group_repo.get_active_group(group_id)
@@ -907,7 +907,7 @@ async def get_cooperative_business_summary(
     group_repo = _resolve_repo(group_repo, SavingsGroupRepository, db)
 
     role = current_user["role"]
-    if role not in ["agent", "admin", "super_admin"]:
+    if role not in ["agent", "admin", "super_admin", "cooperative_admin"]:
         raise HTTPException(403, "Not authorized to view cooperative summary")
 
     # Agents may only view their own business
