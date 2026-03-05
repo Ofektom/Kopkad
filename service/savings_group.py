@@ -240,7 +240,8 @@ async def create_group(
         raise HTTPException(400, "Only cooperative businesses can create savings groups")
 
     member_ids = request.member_ids or []
-    duration_months = request.duration_months
+    # Duration is determined by member count: each member gets one rotation period
+    duration_months = len(member_ids)
 
     group_data = request.model_dump(exclude={"member_ids", "duration_months"})
     group_data["business_id"] = business.id
