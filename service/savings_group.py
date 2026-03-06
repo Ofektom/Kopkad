@@ -248,7 +248,7 @@ async def create_group(
     group_data["created_by_id"] = user_id
 
     if duration_months:
-        group_data["end_date"] = group_data["start_date"] + relativedelta(months=duration_months)
+        group_data["end_date"] = group_data["start_date"] + relativedelta(months=duration_months - 1)
 
     group = group_repo.create_group(group_data)
 
@@ -268,7 +268,11 @@ async def create_group(
             )
             created_accounts.append(account)
         except Exception as e:
-            logger.warning(f"Failed to add member {member_id}: {str(e)}")
+            logger.warning(f"Failed to add member {member_id}: {str(e)}", exc_info=True)
+            try:
+                db.rollback()
+            except Exception:
+                pass
             continue
 
     return CreateSavingsGroupResponse(
@@ -427,12 +431,6 @@ async def add_member_to_group(
             detail=f"Only customers and agents can join savings groups (user role: {user.role})"
         )
 
-    # Optional: ensure the user is associated with the same business (extra safety)
-    # If your user_business table or business.agent_id already enforces this, skip
-    user_businesses = business_repo.get_user_businesses_with_units(user.id)  # or your method
-    if not any(b.id == group.business_id for b in user_businesses):
-        raise HTTPException(status_code=403, detail="User does not belong to this cooperative")
-
     if group_repo.member_exists_in_group(group_id, request.user_id):
         raise HTTPException(status_code=400, detail="User is already a member of this group")
     
@@ -497,7 +495,7 @@ async def delete_group_service(
     business_repo = _resolve_repo(business_repo, BusinessRepository, db)
 
     # Check authorization
-    if current_user["role"] not in ["admin", "super_admin", "agent"]:
+    if current_user["role"] not in ["admin", "super_admin", "agent", "cooperative_admin"]:
         raise HTTPException(status_code=403, detail="Not authorized to delete groups")
 
     group = group_repo.get_active_group(group_id)
@@ -505,8 +503,8 @@ async def delete_group_service(
          raise HTTPException(status_code=404, detail="Group not found")
 
     # Verify ownership/business association
-    if current_user["role"] == "agent":
-         business = business_repo.get_by_agent_id(current_user["user_id"])
+    if current_user["role"] in ["agent", "cooperative_admin"]:
+         business = business_repo.get_by_agent_id(current_user["user_id"]) or business_repo.get_by_admin_id(current_user["user_id"])
          if not business or business.id != group.business_id:
               raise HTTPException(status_code=403, detail="Group does not belong to your business")
 
@@ -839,7 +837,7 @@ async def get_group_savings_metrics(
         raise HTTPException(404, "Group not found or inactive")
 
     # Authorization check
-    if current_user["role"] not in ["agent", "admin", "super_admin"]:
+    if current_user["role"] not in ["agent", "admin", "super_admin", "cooperative_admin"]:
         membership_exists = db.query(func.exists().where(
             SavingsAccount.group_id == group_id,
             SavingsAccount.customer_id == current_user["user_id"]
