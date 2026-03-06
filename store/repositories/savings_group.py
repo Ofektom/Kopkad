@@ -208,10 +208,10 @@ class SavingsGroupRepository(BaseRepository[SavingsGroup]):
     
     def member_exists_in_group(self, group_id: int, user_id: int) -> bool:
         return (
-            self.db.query(func.exists().where(
+            self.db.query(SavingsAccount).filter(
                 SavingsAccount.group_id == group_id,
                 SavingsAccount.customer_id == user_id
-            )).scalar() or False
+            ).first() is not None
         )
 
     def get_all_group_accounts(self, group_id: int) -> List[SavingsAccount]:
