@@ -241,14 +241,22 @@ async def create_group(
 
     member_ids = request.member_ids or []
     # Duration is determined by member count: each member gets one rotation period
-    duration_months = len(member_ids)
+    n_periods = len(member_ids) - 1  # periods after the start date
 
     group_data = request.model_dump(exclude={"member_ids", "duration_months"})
     group_data["business_id"] = business.id
     group_data["created_by_id"] = user_id
 
-    if duration_months:
-        group_data["end_date"] = group_data["start_date"] + relativedelta(months=duration_months - 1)
+    if n_periods >= 0 and member_ids:
+        freq = request.frequency
+        if freq == GroupFrequency.WEEKLY:
+            group_data["end_date"] = group_data["start_date"] + relativedelta(weeks=n_periods)
+        elif freq == GroupFrequency.BI_WEEKLY:
+            group_data["end_date"] = group_data["start_date"] + relativedelta(weeks=n_periods * 2)
+        elif freq == GroupFrequency.QUARTERLY:
+            group_data["end_date"] = group_data["start_date"] + relativedelta(months=n_periods * 3)
+        else:  # MONTHLY (default)
+            group_data["end_date"] = group_data["start_date"] + relativedelta(months=n_periods)
 
     group = group_repo.create_group(group_data)
 
