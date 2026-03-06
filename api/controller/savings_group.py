@@ -67,7 +67,7 @@ async def get_group_markings_grid_controller(
     user_id = current_user["user_id"]
     role = current_user["role"].lower()
 
-    is_manager = role in ["admin", "super_admin", "agent"]
+    is_manager = role in ["admin", "super_admin", "agent", "cooperative_admin"]
     member_account = db.query(SavingsAccount).filter(
         SavingsAccount.group_id == group_id,
         SavingsAccount.customer_id == user_id
@@ -136,7 +136,7 @@ async def toggle_group_marking_controller(
     user_id = current_user["user_id"]
     role = current_user["role"].lower()
 
-    is_manager = role in ["admin", "super_admin", "agent"]
+    is_manager = role in ["admin", "super_admin", "agent", "cooperative_admin"]
     is_member = account.customer_id == user_id
 
     if not (is_manager or is_member):
