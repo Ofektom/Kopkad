@@ -423,12 +423,12 @@ async def add_member_to_group(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Allow both CUSTOMER and AGENT roles to join savings groups
-    allowed_roles = ["customer", "agent"]
+    # Allow customer, agent, and cooperative_member roles to join savings groups
+    allowed_roles = ["customer", "agent", "cooperative_member"]
     if user.role.lower() not in allowed_roles:
         raise HTTPException(
             status_code=400,
-            detail=f"Only customers and agents can join savings groups (user role: {user.role})"
+            detail=f"Only customers, agents, and cooperative members can join savings groups (user role: {user.role})"
         )
 
     if group_repo.member_exists_in_group(group_id, request.user_id):
