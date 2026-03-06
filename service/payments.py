@@ -1172,13 +1172,15 @@ async def get_agent_commissions(
             message="Only agents, sub-agents, admins, or super-admins can view commissions",
         )
 
+    # For agents/sub-agents filter directly by their agent_id on the Commission record.
+    # Using user.businesses (user_business table) would miss businesses linked via agent_id FK.
+    agent_filter_id: Optional[int] = None
     business_ids: Optional[List[int]] = None
     if current_user["role"] in ["agent", "sub_agent"]:
-        business_ids = [b.id for b in current_user_obj.businesses]
-        if not business_ids:
-            return error_response(status_code=400, message="No business associated with user")
+        agent_filter_id = current_user["user_id"]
 
     commissions, total_count = commission_repo.get_commissions_with_filters(
+        agent_id=agent_filter_id,
         business_ids=business_ids,
         business_id=business_id,
         savings_account_id=savings_account_id,

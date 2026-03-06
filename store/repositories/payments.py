@@ -117,6 +117,7 @@ class CommissionRepository(BaseRepository[Commission]):
     def get_commissions_with_filters(
         self,
         *,
+        agent_id: Optional[int] = None,
         business_ids: Optional[Sequence[int]] = None,
         business_id: Optional[int] = None,
         savings_account_id: Optional[int] = None,
@@ -135,7 +136,11 @@ class CommissionRepository(BaseRepository[Commission]):
             )
         )
 
-        if business_ids:
+        # Filter by agent_id directly when available (agents linked via Business.agent_id,
+        # not user_business, so business_ids from ORM relationship may be empty)
+        if agent_id:
+            query = query.filter(Commission.agent_id == agent_id)
+        elif business_ids:
             query = query.filter(SavingsAccount.business_id.in_(business_ids))
 
         if business_id:
