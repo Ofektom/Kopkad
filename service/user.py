@@ -516,6 +516,7 @@ async def login(
         email=user.email,
         role=user.role,
         is_active=user.is_active,
+        cooperative_status=user.cooperative_status or "none",
         businesses=business_responses,
         active_business_id=active_business_id,
         created_at=user.created_at,
