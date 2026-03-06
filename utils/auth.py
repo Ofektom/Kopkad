@@ -7,6 +7,8 @@ import bcrypt
 from config.settings import settings
 from database.postgres_optimized import get_db
 from models.user import User
+from models.business import Business
+from sqlalchemy import or_
 import logging
 
 logger = logging.getLogger(__name__)
@@ -65,8 +67,15 @@ async def get_current_user(
     if user is None or not user.is_active or user.token_version != version:
         raise credentials_exception
 
-    business_ids = [b.id for b in user.businesses]
-    
+    # Include businesses via user_business table AND via agent_id/admin_id relationships
+    member_ids = [b.id for b in user.businesses]
+    owned_ids = [
+        b.id for b in db.query(Business).filter(
+            or_(Business.agent_id == user.id, Business.admin_id == user.id)
+        ).all()
+    ]
+    business_ids = list(set(member_ids + owned_ids))
+
     # Validate that active_business_id belongs to user (if provided)
     if active_business_id and active_business_id not in business_ids:
         raise HTTPException(
