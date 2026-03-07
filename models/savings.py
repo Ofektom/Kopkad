@@ -73,6 +73,7 @@ class SavingsAccount(AuditMixin, Base):
         default=MarkingStatus.NOT_STARTED,
     )
 
+    customer = relationship("User", foreign_keys=[customer_id])
     markings = relationship("SavingsMarking", back_populates="savings_account", cascade="all, delete")
     commissions = relationship("Commission", back_populates="savings_account", cascade="all, delete")
     expense_cards = relationship("ExpenseCard", back_populates="savings_account", cascade="all, delete")
