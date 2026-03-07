@@ -4,6 +4,22 @@ from datetime import datetime
 from schemas.business import BusinessResponse
 
 
+class KycVerifyRequest(BaseModel):
+    """Pre-signup KYC — used by agents/sub-agents before account creation."""
+    id_type: str = Field(..., pattern=r"^(NIN|BVN)$", description="NIN or BVN")
+    id_number: str = Field(..., pattern=r"^\d{11}$", description="11-digit ID number")
+    selfie_image: str = Field(..., description="Base64-encoded JPEG selfie (strip data: prefix)")
+    full_name: str = Field(..., min_length=2, description="Full name as it appears on the ID")
+    phone_number: Optional[str] = None
+
+class KycCompleteRequest(BaseModel):
+    """Post-signup KYC — used by customers from their settings page."""
+    id_type: str = Field(..., pattern=r"^(NIN|BVN)$")
+    id_number: str = Field(..., pattern=r"^\d{11}$")
+    selfie_image: str
+    full_name: str = Field(..., min_length=2)
+
+
 class SignupRequest(BaseModel):
     phone_number: str
     pin: str = Field(..., pattern=r"^\d{5}$")
@@ -13,6 +29,7 @@ class SignupRequest(BaseModel):
     identifier: Optional[str] = None
     business_code: Optional[str] = None
     address: Optional[str] = None
+    kyc_reference: Optional[str] = None  # Required for agents/sub-agents; optional for customers
 
 class UserResponse(BaseModel):
     user_id: int

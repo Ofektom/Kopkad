@@ -6,7 +6,8 @@ from typing import List, Optional
 import httpx
 from loguru import logger
 
-from models.user import User, user_permissions, PasswordResetOtp, PasswordResetToken
+from models.user import User, user_permissions, PasswordResetOtp, PasswordResetToken, KycVerification
+from service.kyc import validate_and_consume_kyc_reference
 from utils.password_utils import generate_otp, hash_otp, decrypt_password
 from datetime import datetime, timezone, timedelta
 from utils.email_service import send_reset_password_email_async, send_welcome_email, send_email_async
@@ -124,6 +125,35 @@ async def signup_unauthenticated(
             message="AGENT cannot sign up with a business_code; use /business/create to create a business after signup",
         )
 
+    # --- KYC validation ---
+    from config.settings import settings as app_settings
+    initial_kyc_status = "none"
+    dev_mode = not app_settings.SMILE_PARTNER_ID
+
+    if requested_role == Role.AGENT:
+        if not dev_mode:
+            # Production: kyc_reference is mandatory for agents
+            if not request.kyc_reference:
+                return error_response(
+                    status_code=400,
+                    message="Identity verification is required for agents. Please complete KYC before signing up.",
+                )
+            try:
+                validate_and_consume_kyc_reference(request.kyc_reference, db)
+                initial_kyc_status = "verified"
+            except Exception as exc:
+                return error_response(status_code=400, message=str(exc))
+        else:
+            # Dev mode: auto-pass agents
+            initial_kyc_status = "verified"
+    elif requested_role == Role.CUSTOMER and request.kyc_reference:
+        # Customer optionally passes KYC at signup
+        try:
+            validate_and_consume_kyc_reference(request.kyc_reference, db)
+            initial_kyc_status = "verified"
+        except Exception:
+            pass  # Optional — ignore invalid token for customers
+
     business = None
     if requested_role == Role.CUSTOMER:
         if request.business_code:
@@ -155,6 +185,7 @@ async def signup_unauthenticated(
             "pin": hash_password(request.pin),
             "role": requested_role.value,
             "is_active": True,
+            "kyc_status": initial_kyc_status,
             "created_by": 1,
             "created_at": datetime.now(timezone.utc),
         }

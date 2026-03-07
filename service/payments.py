@@ -547,6 +547,13 @@ async def create_payment_request(
         )
         return error_response(status_code=403, message="Unauthorized role")
 
+    # KYC gate — customers must be verified before requesting payment
+    if current_user["role"] == "customer" and getattr(current_user_obj, "kyc_status", "none") != "verified":
+        return error_response(
+            status_code=403,
+            message="Identity verification required. Please complete KYC in Settings > Security before requesting payments.",
+        )
+
     payment_account = payment_account_repo.get_by_customer_id(current_user["user_id"])
     if not payment_account:
         logger.error(f"No payment account found for customer {current_user['user_id']}")

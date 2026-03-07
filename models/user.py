@@ -102,6 +102,7 @@ class User(AuditMixin, Base):
         default="none",
         server_default="none",
     )
+    kyc_status = Column(String(20), nullable=False, default="none", server_default="none")
     token_version = Column(Integer, nullable=False, default=1)
     active_business_id = Column(Integer, ForeignKey("businesses.id"), nullable=True)
     businesses = relationship(
@@ -160,3 +161,24 @@ class PasswordResetOtp(Base):
 
     def is_valid(self):
         return not self.is_used and self.expires_at > datetime.datetime.now(datetime.timezone.utc)
+
+
+class KycVerification(Base):
+    """Pre-signup KYC verification session (agents/sub-agents).
+    Stores the result of a Smile ID biometric check and a single-use
+    reference_token that the signup endpoint consumes to prove KYC passed.
+    """
+    __tablename__ = "kyc_verifications"
+
+    id              = Column(Integer, primary_key=True)
+    phone_number    = Column(String(20), nullable=True)
+    id_type         = Column(String(10), nullable=False)
+    id_number       = Column(String(20), nullable=False)
+    full_name       = Column(String(100), nullable=True)
+    status          = Column(String(20), nullable=False, default="pending")
+    smile_reference = Column(String(100), nullable=True)
+    result_text     = Column(String(500), nullable=True)
+    reference_token = Column(String(64), unique=True, nullable=False, index=True)
+    used            = Column(Boolean, default=False, nullable=False)
+    created_at      = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at      = Column(DateTime(timezone=True), nullable=False)

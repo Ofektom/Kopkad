@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     ENV: str
     REDIS_URL: str | None = None  # Optional Redis cache URL
     ENCRYPTION_KEY: str | None = None  # For encrypting admin credentials (set in production)
+    SMILE_PARTNER_ID: str | None = None  # Smile ID partner ID (leave empty for dev-mode bypass)
+    SMILE_API_KEY: str | None = None     # Smile ID API key
+    SMILE_SANDBOX: bool = True           # True = use sandbox URL; False = production
     WHATSAPP_SENDER_NUMBER: str | None = None # WhatsApp Number to display or use for links
     
     # Financial Advisor ML Parameters
