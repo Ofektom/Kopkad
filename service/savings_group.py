@@ -652,7 +652,7 @@ async def initiate_group_marking_payment(
     - Only initializes new transaction if needed
     - Defers marking status updates to verify step
     """
-    if current_user["role"] not in ["agent", "admin", "super_admin"]:
+    if current_user["role"] not in ["agent", "admin", "super_admin", "cooperative_admin"]:
         raise HTTPException(403, "Only agents/admins can mark group contributions")
 
     if not request.markings:
